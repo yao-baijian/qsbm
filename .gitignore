@@ -1,10 +1,9 @@
 *.class
 *.log
 *.bak
-project/
-.idea/
-.bsp/
+
 data/
+
 # sbt specific
 .cache/
 .history/
