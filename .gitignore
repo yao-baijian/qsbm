@@ -2,6 +2,7 @@
 *.log
 *.bak
 
+data/
 # sbt specific
 .cache/
 .history/
