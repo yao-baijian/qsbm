@@ -1,16 +1,31 @@
-case class global_reg(
+case class Global_Reg(
 
+    input_width: Int = 128,
+    reg_depth: Int = 64,
+    rd_addr_width: Int = 6,
+    vertex_width: Int = 16
     
 ) extends Component{
 
     val io = new Bundle{
-        val in_stream = slave Stream(Bits(128))
-        val rd_addr   = in Bits(6 bits)
-        val rd_data   = out Bits(16)
+        val in_stream = slave Stream(Bits(input_width bits))
+        val rd_addr   = in Bits(rd_addr_width bits)
+        val sw_done   = in Bool()
+
+        val rd_data   = out Bits(vertex_width bits)
+        val reg_full  = out Reg(Bool())
     }
 
-    val vertex_reg = Vec(Reg(UInt(16 bits)), 64)
-    val wr_pointer = Reg(UInt(4 bits)) init 0
+    val io_vertex_ram = new Bundle {
+        val wr_addr_to_ram = out Bits(6 bits)
+        val wr_data_to_ram = out Bits(16 bits)
+        val rd_addr_to_ram = out Bits(6 bits)
+        val rd_data_from_ram = in Bits(16 bits)
+    }
+
+
+    val vertex_reg = Vec(Reg(UInt(vertex_width bits)) init(0), reg_depth)
+    val wr_pointer = Reg(UInt(3 bits)) init 0
 
     when(rst) {
         wr_pointer := 0b0
@@ -20,9 +35,21 @@ case class global_reg(
         wr_pointer := 0b0
     }
 
-    when(rst) {
-        vertex_reg.foreach(_ := 0)
-    }.elsewhen (in_stream.valid && in_stream.ready) {
+    when (wr_pointer === reg_depth) {
+        io.reg_full := True
+    }.otherwise {
+        io.reg_full := False
+    }
+
+    when (io.reg_full) {
+        in_stream.ready := False
+    }. elsewhen (sw_done)
+        in_stream.ready := True
+    otherwise {
+        in_stream.ready := in_stream.ready
+    }
+
+    when(in_stream.valid && in_stream.ready) {
         vertex_reg(wr_pointer) := in_stream.payload(127 downto 112)
         vertex_reg(wr_pointer + 1) := in_stream.payload(111 downto 96)
         vertex_reg(wr_pointer + 2) := in_stream.payload(95 downto 80)
@@ -34,36 +61,6 @@ case class global_reg(
     }
 
     io.rd_data := vertex_reg(io.rd_addr)
-
-//     reg [3:0] finish_num;// the number of finish fifo data to reg
-//     always@(posedge clk, negedge rst) begin
-//         if(~rst) begin
-//             finish_num<=0;
-//             vertex_write_fnish<=0;
-//         end
-//         else if( push_valid && i==56) begin
-//             finish_num<=finish_num+1;
-//             vertex_write_fnish<=1;
-//         end
-//         else begin
-//             vertex_write_fnish<=0;
-//         end
-//     end
-
-//     reg [5:0] update_cnt;//initially move the value of the reg after the first to eight assignments to ram,when finish whole update once , 9-16 reg to ram
-//     always@(posedge clk, negedge rst) begin
-//         if(~rst) begin
-//             update_cnt<=0;
-//         end
-//         else if(whole_update_finish) begin
-//             update_cnt<=update_cnt+1;
-//         end
-//     end
-// //use finish whole update to change finish num
-//     assign vertex_reg_finish[3]=(finish_num==(update_cnt<<2) &&  push_valid && i==56); //to the first PE
-//     assign vertex_reg_finish[2]=(finish_num==(update_cnt<<2)+1 &&  push_valid && i==56); //to the second PE
-//     assign vertex_reg_finish[1]=(finish_num==(update_cnt<<2)+2 &&  push_valid && i==56); //to the third PE
-//     assign vertex_reg_finish[0]=(finish_num==(update_cnt<<2)+3 &&  push_valid && i==56); //to the 4th PE
 }
 
 

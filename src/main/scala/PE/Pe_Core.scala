@@ -1,24 +1,51 @@
-case class pe_core() extends Component {
+import spinal.core._
 
-    val io = new Bundle {
-        val edge_fifo_in        = in Bits(8 bits)
-        val edge_fifo_noempty   = in Bool
-        val vertex_in           = in Bits(32 bits)
-        val update_done         =   in Bool
+case class Pe_Core(
 
-        val vertex_reg_done     = in Bool
-        val vertex_reg_addr     = out Bits(6 bits)
-        val vertex_reg_out      = in Bits(16 bits)
+    vertex_reg_width: Int = 32,
+    vertex_reg_addr_width: Int = 6,
+    edge_width  : Int = 32,
 
-        val edge_fifo_pre_h0        = in Bits(32 bits)
-        val update_ram_wea          = out Bool
-        val write_addr_update_ram   = out Bits(6 bits)
-        val dina_update_ram         = out Bits(32 bits)
-        val update_ram_enb          = out Bool
-        val read_addr_update_ram    = out Bits(6 bits)
-        val data_update_ram         = in Bits(32 bits)
+    update_ram_addr_width: Int = 6,
+    updata_ram_data_width: Int = 32,
 
+    vertex_ram_addr_width: Int = 6,
+    vertex_ram_data_width: Int = 32,
+
+) extends Component {
+
+    val io_edge_fifo = new Bundle {
+        val edge_fifo_in        = in Bits(edge_width bits)
+        val edge_fifo_noempty   = in Bool()
     }
+
+    val io_vertex_reg = new Bundle {
+        val vertex_reg_addr     = out Bits(vertex_reg_addr_width bits)
+        val vertex_reg_in       = in SInt(vertex_width bits)
+        val vertex_reg_full     = in Bool()
+    }
+
+    val io_update_ram = new Bundle {
+        val update_ram_wr_valid  = out Bool()
+        val update_ram_wr_addr   = out Bits(update_ram_addr_width bits)
+        val update_ram_wr_data   = out Bits(32 bits)
+
+        val update_ram_enb          = out Bool
+        val read_addr_update_ram    = out Bits(update_ram_addr_width bits)
+        val data_update_ram         = in Bits(32 bits)
+    }
+
+    val io_update_ram = new Bundle {
+        val update_ram_wr_valid  = out Bool()
+        val update_ram_wr_addr   = out Bits(update_ram_addr_width bits)
+        val update_ram_wr_data   = out Bits(updata_ram_data_width bits)
+
+        val update_ram_rd_valid  = out Bool
+        val update_ram_rd_addr   = out Bits(update_ram_addr_width bits)
+        val update_ram_rd_data   = in Bits(updata_ram_data_width bits)
+    }
+
+}
 
 // state machine
 
@@ -127,3 +154,4 @@ when (h2_valid) {
     h3_valid     		:= False
 }
 
+}

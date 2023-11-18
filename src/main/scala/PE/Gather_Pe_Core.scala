@@ -1,4 +1,6 @@
-case class gather_pe_core(
+import spinal.lib._
+
+case class Gather_Pe_Core(
 
     alpha: SInt,
     beta: SInt,  
@@ -6,29 +8,32 @@ case class gather_pe_core(
     positive_boundary: SInt,
     negetive_boundary: SInt
 
+    addr_width: Int = 6,
+    data_width: Int = 32,
+
 ) extends Component {
 
     val io = new Bundle {
         val pe_done = in Bool()
         val gather_pe_done = out Bool()
 
-        val rd_addr_update_ram = out Bits(6 bits)
+        val rd_addr_update_ram = out Bits(addr_width bits)
         val rd_en_update_ram  = out Bool()
-        val rd_data_update_ram = in Bits(32 bits)
+        val rd_data_update_ram = in Bits(data_width bits)
         
         val rd_addr_vertex_ram = out Bits(6 bits)
         val rd_en_vertex_ram  = out Bool()
-        val rd_data_vertex_ram = out Bits(32 bits)
+        val rd_data_vertex_ram = out Bits(data_width bits)
 
         val wr_addr_vertex_ram = out Bits(6 bits)
         val wr_en_vertex_ram  = out Bool()
         val wr_data_vertex_ram = out Bits(16 bits)
     }
 
-val h1_valid = Reg(Bool()) init False
-val h2_valid = Reg(Bool()) init False
-val h3_valid = Reg(Bool()) init False
-val h4_valid = Reg(Bool()) init False
+    val h1_valid = Reg(Bool()) init False
+    val h2_valid = Reg(Bool()) init False
+    val h3_valid = Reg(Bool()) init False
+    val h4_valid = Reg(Bool()) init False
 
     val gather_pe_fsm = new StateMachine {
 

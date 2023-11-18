@@ -1,7 +1,7 @@
 import spinal.lib._
 import PE._
 
-case class pe_top(
+case class Pe_Top(
 
     alpha: SInt = 1, //alpha = (np.linspace(0, 1, num_iters))
     beta: SInt = 8,  // beta = (0.7 / math.sqrt(N))#
@@ -22,32 +22,44 @@ case class pe_top(
 ) extends Component {
 
     val io = new Bundle {
-        val pe_idle         = out Bool()
-        val fifo_stream     = slave Stream(Bits(128))
-        val vertex_stream   = slave Stream(Bits(128))
+        val pe_idle         =   out Bool()
+        val edge_stream     =   slave Stream(Bits(128))
+        val vertex_stream   =   slave Stream(Bits(128))
     }
 
-    val pe                  = pe_core(
+    val pe                  =   Pe_Core (
 
-    )
-    val global_reg          = global_reg(
+                                                        )
+    pe.io.edge_fifo_in      << edge_fifo.out_stream
+    pe.io.vertex_reg        << global_reg.vertex_stream
 
-    )
-    val fifo                =   fifo (  axi_width
-                                        fifo_depth)
+    val global_reg          =   Global_Reg (
 
-    val gather_pe           =   gather_pe_core( alpha,
+                                                        )
+    global_reg.io.in_stream << io.vertex_stream
+    
+    val edge_fifo           =   fifo(   axi_width
+                                        fifo_depth )
+    fifo.io.in_stream       << io.edge_stream
+
+    val gather_pe           =   Gather_Pe_Core( alpha,
                                                 beta,
                                                 xi_dt,
                                                 positive_boundary,
-                                                negetive_boundary )
+                                                negetive_boundary)
 
-    val switch_vertex_ram   =   Switch(vertex_ram_entry_width, 10)
+    val switch_vertex_ram   =   Switch( vertex_ram_entry_width, 
+                                        10)
+
     val switch_update_ram   =   Switch(update_ram_entry_width, 10)
+
     val update_ramA         =   Bram(update_ram_entry_num, 
                                     Bits(update_ram_entry_width))
+
     val update_ramB         =   Bram(update_ram_entry_num, Bits(update_ram_entry_type))
+
     val vertex_ramA         =   Bram(vertex_ram_entry_num, Bits(vertex_ram_entry_type))
+
     val vertex_ramB         =   Bram(vertex_ram_entry_num, Bits(vertex_ram_entry_type))
 
 
