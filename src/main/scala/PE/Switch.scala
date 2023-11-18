@@ -1,3 +1,5 @@
+package PE
+
 import spinal.lib._
 
 case class Switch (

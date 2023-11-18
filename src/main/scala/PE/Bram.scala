@@ -1,4 +1,5 @@
 package PE
+
 import spinal.core._
 
 case class Bram(

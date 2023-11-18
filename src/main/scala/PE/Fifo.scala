@@ -1,3 +1,7 @@
+package PE
+
+import spinal.core._
+import spinal.lib._
 /*
  * @Author: byao
  * @Date: 2023-11-09 11:22:37
@@ -11,30 +15,36 @@
 
 case class Fifo(
     
-    reg_depth: Int = 64,
-    reg_width: Int = 128
+    reg_depth: Int      = 256,
+    reg_width: Int      = 16,
+    stream_width: Int   = 128
 
 ) extends Component{
     
     val io = new Bundle{
-        val in_stream = slave Stream(Bits(reg_width))
-        val out_stream = master Stream(Bits(reg_width))
+        val in_stream = slave Stream(Bits(reg_width bits))
+        val out_stream = master Stream(Bits(reg_width bits))
+        val fifo_done = out Bool()
+        val rst = in Bool()
     }
 
-    val edge_Fifo = StreamFifo(Bits(reg_width), reg_depth)
-    val input_edge_valid = Reg(Bool) init True
+    val edge_fifo = StreamFifo(Bits(reg_width bits), reg_depth)
+    val pay_load_buf =  Reg(Bits(reg_width bits))
 
-    when (slave.payload == 0x0000000000000000) {
-        input_edge_valid := False
-    }.elsewhen (!in_stream.valid) {
-        input_edge_valid := True
-    } otherwise {
-        input_edge_valid := input_edge_valid
+    when (io.in_stream.payload === 0x0000000000000000) {
+        io.fifo_done := True
+    }.elsewhen (io.rst) {
+        io.fifo_done := False
     }
 
-    edge_Fifo.io.push.valid := in_stream.valid && input_edge_valid
-    edge_Fifo.io.push.payload := in_stream.payload
-    in_stream.ready := edge_Fifo.io.push.ready
-    edge_Fifo.io.pop << io.out_stream
+    when (io.fifo_done) {
+        pay_load_buf := io.in_stream.payload
+    }
+
+    edge_fifo.io.push.valid := io.in_stream.valid && !io.fifo_done
+    edge_fifo.io.push.payload := pay_load_buf
+
+    io.in_stream.ready := edge_fifo.io.push.ready
+    edge_fifo.io.pop << io.out_stream
 
 }

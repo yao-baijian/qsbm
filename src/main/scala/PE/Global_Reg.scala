@@ -1,19 +1,24 @@
+package PE
+
+import spinal.core._
+import spinal.lib._
+
 case class Global_Reg(
 
-    input_width: Int = 128,
-    reg_depth: Int = 64,
-    rd_addr_width: Int = 6,
-    vertex_width: Int = 16
-    
+   stream_width: Int = 128,
+   reg_depth: Int = 64,
+   rd_addr_width: Int = 6,
+   data_width: Int = 16
+
 ) extends Component{
 
     val io = new Bundle{
-        val in_stream = slave Stream(Bits(input_width bits))
+        val in_stream = slave Stream(Bits(stream_width bits))
         val rd_addr   = in Bits(rd_addr_width bits)
         val sw_done   = in Bool()
 
-        val rd_data   = out Bits(vertex_width bits)
-        val reg_full  = out Reg(Bool())
+        val rd_data   = out Bits(data_width bits)
+        val reg_full  = out Bool()
     }
 
     val io_vertex_ram = new Bundle {
@@ -24,15 +29,13 @@ case class Global_Reg(
     }
 
 
-    val vertex_reg = Vec(Reg(UInt(vertex_width bits)) init(0), reg_depth)
+    val vertex_reg = Vec(Reg(UInt(data_width bits)) init(0), reg_depth)
     val wr_pointer = Reg(UInt(3 bits)) init 0
 
-    when(rst) {
-        wr_pointer := 0b0
-    }.elsewhen (in_stream.valid && in_stream.ready) {
+    when(io.in_stream.valid && io.in_stream.ready) {
         wr_pointer := wr_pointer + 1
     }.otherwise {
-        wr_pointer := 0b0
+        wr_pointer := 0
     }
 
     when (wr_pointer === reg_depth) {

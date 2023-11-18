@@ -1,4 +1,7 @@
-import spinal.lib._
+package PE
+
+import spinal.core._
+import spinal.lib.fsm._
 
 case class Gather_Pe_Core(
 
@@ -6,28 +9,31 @@ case class Gather_Pe_Core(
     beta: SInt,  
     xi_dt: SInt, 
     positive_boundary: SInt,
-    negetive_boundary: SInt
+    negetive_boundary: SInt,
 
     addr_width: Int = 6,
-    data_width: Int = 32,
+    data_width: Int = 32
 
 ) extends Component {
 
     val io = new Bundle {
         val pe_done = in Bool()
         val gather_pe_done = out Bool()
+    }
+    val io_update_ram = new Bundle {
+        val rd_addr_update_ram = out Bits (addr_width bits)
+        val rd_en_update_ram = out Bool()
+        val rd_data_update_ram = in Bits (data_width bits)
+    }
 
-        val rd_addr_update_ram = out Bits(addr_width bits)
-        val rd_en_update_ram  = out Bool()
-        val rd_data_update_ram = in Bits(data_width bits)
-        
-        val rd_addr_vertex_ram = out Bits(6 bits)
-        val rd_en_vertex_ram  = out Bool()
-        val rd_data_vertex_ram = out Bits(data_width bits)
+    val io_vertex_ram = new Bundle {
+        val rd_addr_vertex_ram = out Bits (6 bits)
+        val rd_en_vertex_ram = out Bool()
+        val rd_data_vertex_ram = out Bits (data_width bits)
 
-        val wr_addr_vertex_ram = out Bits(6 bits)
-        val wr_en_vertex_ram  = out Bool()
-        val wr_data_vertex_ram = out Bits(16 bits)
+        val wr_addr_vertex_ram = out Bits (6 bits)
+        val wr_en_vertex_ram = out Bool()
+        val wr_data_vertex_ram = out Bits (16 bits)
     }
 
     val h1_valid = Reg(Bool()) init False
@@ -37,9 +43,10 @@ case class Gather_Pe_Core(
 
     val gather_pe_fsm = new StateMachine {
 
-        val IDLE    = new State with EntryPoint
-        val OPERATE = new State
-        val FINISH  = new State
+        val IDLE        = new State with EntryPoint
+        val OPERATE     = new State
+        val WAIT_UPDATE = new State
+        val FINISH      = new State
 
         IDLE
         .whenIsActive (
@@ -53,6 +60,13 @@ case class Gather_Pe_Core(
             when(h4_valid && ~h3_valid) {
                 goto(FINISH)
             }
+        }
+
+        WAIT_UPDATE
+        .whenIsActive {
+          when(h4_valid && ~h3_valid) {
+              goto(FINISH)
+          }
         }
 
         FINISH
