@@ -45,6 +45,10 @@ case class Pe_Core(
         val update_switch_done = in Bool()
     }
 
+    val io_state = new Bundle {
+        val pe_busy = out Bool()
+    }
+
 // wire
 
 val switch_done = Bool() init False

@@ -16,9 +16,10 @@ case class Gather_Pe_Core(
 
 ) extends Component {
 
-    val io = new Bundle {
+    val io_state = new Bundle {
         val pe_done = in Bool()
         val gather_pe_done = out Bool()
+        val gather_pe_busy = out Bool()
     }
     val io_update_ram = new Bundle {
         val rd_addr_update_ram = out Bits (addr_width bits)

@@ -45,22 +45,18 @@ case class Global_Reg(
     }
 
     when (io.reg_full) {
-        in_stream.ready := False
-    }. elsewhen (sw_done)
-        in_stream.ready := True
-    otherwise {
-        in_stream.ready := in_stream.ready
+        io.in_stream.ready := False
+    } .elsewhen (sw_done) {
+        io.in_stream.ready := True
+    } .otherwise {
+        io.in_stream.ready := io.in_stream.ready
     }
 
-    when(in_stream.valid && in_stream.ready) {
-        vertex_reg(wr_pointer) := in_stream.payload(127 downto 112)
-        vertex_reg(wr_pointer + 1) := in_stream.payload(111 downto 96)
-        vertex_reg(wr_pointer + 2) := in_stream.payload(95 downto 80)
-        vertex_reg(wr_pointer + 3) := in_stream.payload(79 downto 64)
-        vertex_reg(wr_pointer + 4) := in_stream.payload(63 downto 48)
-        vertex_reg(wr_pointer + 5) := in_stream.payload(47 downto 32)
-        vertex_reg(wr_pointer + 6) := in_stream.payload(31 downto 16)
-        vertex_reg(wr_pointer + 7) := in_stream.payload(15 downto 0)
+
+    when(io.in_stream.valid && io.in_stream.ready) {
+        for (x <- 0 until 8) {
+            vertex_reg(wr_pointer + x) := io.in_stream.payload(16 * x - 1 downto 16 * (x - 1))
+        }
     }
 
     io.rd_data := vertex_reg(io.rd_addr)
