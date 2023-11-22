@@ -1,10 +1,10 @@
 package PE
+
+import spinal.core._
 import spinal.lib._
 import spinal.lib.fsm._
-import spinal.core._
-import PE._
 
-case class Pe_Top(
+case class SinglePeTopReg(
 
        alpha: SInt = 1, //alpha = (np.linspace(0, 1, num_iters))
        beta: SInt = 8, // beta = (0.7 / math.sqrt(N))#
@@ -38,7 +38,7 @@ case class Pe_Top(
         val more_block      =   in Bool()
     }
 
-    val global_reg          =   Global_Reg (axi_width,
+    val global_reg          =   GlobalReg (axi_width,
                                             matrix_size,
                                             addr_width,
                                             vertex_width)
@@ -57,14 +57,14 @@ case class Pe_Top(
 // To do:
 // stream width doesn't fit
 
-    val pe                  =   Pe_Core(
+    val pe                  =   PeCore(
 
                                         )
 //    pe.io.edge_fifo_in << edge_fifo.out_stream
 //    pe.io.vertex_reg << global_reg.vertex_stream
 
 
-    val gather_pe           =   Gather_Pe_Core( alpha,
+    val gather_pe           =   GatherPeCore( alpha,
                                                 beta,
                                                 xi_dt,
                                                 positive_boundary,

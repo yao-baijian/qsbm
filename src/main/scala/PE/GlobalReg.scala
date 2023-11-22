@@ -3,7 +3,7 @@ package PE
 import spinal.core._
 import spinal.lib._
 
-case class Global_Reg(
+case class GlobalReg(
 
    stream_width: Int = 128,
    reg_depth: Int = 64,
@@ -74,34 +74,6 @@ case class Global_Reg(
 //     input push_valid,
 //     input [127:0] push_data,
 // //ports to 4 PE
-// //1
-//     input [5:0] read_addr_vertex_reg_pe_1,
-//     input vertex_reg_enb_pe_1,
-//     output reg [15:0]  dout_vertex_reg_pe_1,
-//     input [5:0] read_addr_vertex_reg_reg2ram_1,
-//     input vertex_reg_enb_reg2ram_1,
-//     output reg [15:0]  dout_vertex_reg_reg2ram_1,
-// //2
-//     input [5:0] read_addr_vertex_reg_pe_2,
-//     input vertex_reg_enb_pe_2,
-//     output reg [15:0] dout_vertex_reg_pe_2,
-//     input [5:0] read_addr_vertex_reg_reg2ram_2,
-//     input vertex_reg_enb_reg2ram_2,
-//     output reg [15:0] dout_vertex_reg_reg2ram_2,
-// //3
-//     input [5:0] read_addr_vertex_reg_pe_3,
-//     input vertex_reg_enb_pe_3,
-//     output reg [15:0] dout_vertex_reg_pe_3,
-//     input [5:0] read_addr_vertex_reg_reg2ram_3,
-//     input vertex_reg_enb_reg2ram_3,
-//     output reg [15:0] dout_vertex_reg_reg2ram_3,
-// //4
-//     input [5:0] read_addr_vertex_reg_pe_4,
-//     input vertex_reg_enb_pe_4,
-//     output reg [15:0] dout_vertex_reg_pe_4,
-//     input [5:0] read_addr_vertex_reg_reg2ram_4,
-//     input vertex_reg_enb_reg2ram_4,
-//     output reg [15:0] dout_vertex_reg_reg2ram_4,
 // //ports to reg2ram
 //     output [3:0] vertex_reg_finish,
 // //ports to PE
