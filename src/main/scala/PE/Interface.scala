@@ -9,12 +9,12 @@ class Interface(val config: BramConfig) extends Bundle with IMasterSlave {
     val PWRITE     = Bool()
     val PWDATA     = Bits(config.dataWidth bits)
     val PRDATA     = Bits(config.dataWidth bits)
-    val PSLVERROR  = if(useSlaveError) Bool() else null   //This wire is created only when useSlaveError is true
+//    val PSLVERROR  = if(useSlaveError) Bool() else null   //This wire is created only when useSlaveError is true
 
     override def asMaster() : Unit = {
         out(PADDR,PSEL,PENABLE,PWRITE,PWDATA)
         in(PREADY,PRDATA)
-        if(useSlaveError) in(PSLVERROR)
+//        if(useSlaveError) in(PSLVERROR)
     }
     //The asSlave is by default the flipped version of asMaster.
 }

@@ -20,6 +20,7 @@ case class GatherPeCore(
         val switch_done = in Bool()
         val pe_done = in Bool()
         val gather_pe_done = out Bool()
+        val gather_pe_busy = out Bool()
     }
     val io_update_ram = new Bundle {
         val rd_addr_update_ram = out UInt (addr_width bits)
@@ -42,6 +43,8 @@ case class GatherPeCore(
         val IDLE        = new State with EntryPoint
         val OPERATE     = new State
 
+        val operate     = Reg(Bool()) init( False )
+
         IDLE
         .whenIsActive(
             io_state.gather_pe_done := False
@@ -53,14 +56,14 @@ case class GatherPeCore(
         )
 
         OPERATE
+        .onEntry(operate := True)
         .whenIsActive {
-
             when(h4_valid && ~h3_valid) {
-
                 goto(IDLE)
             }
         }
         .onExit(io_state.gather_pe_done := True)
+        .onExit(operate := False)
     }
 
 val h1_valid = Reg(Bool()) init False
@@ -72,7 +75,7 @@ val h4_valid = Reg(Bool()) init False
 // pipeline h1: read updated value (J @ X_comp) and vertex ram (x_old)
 //-----------------------------------------------------------
 // TO DO
-when (gather_pe_fsm.stateReg === gather_pe_fsm.OPERATE && io_update_ram.rd_addr_update_ram != 63) {
+when ((gather_pe_fsm.operate) & (io_update_ram.rd_addr_update_ram =/= 63)) {
     io_update_ram.rd_addr_update_ram := io_update_ram.rd_addr_update_ram + 1
     io_vertex_ram.rd_addr_vertex_ram := io_vertex_ram.rd_addr_vertex_ram + 1
     h1_valid := True

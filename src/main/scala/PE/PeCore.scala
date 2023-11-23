@@ -20,8 +20,9 @@ case class PeCore(
 
 
     val io_edge_fifo = new Bundle {
+        val edge_fifo_ready = out Bool() init(True)
         val edge_fifo_in = in Bits (edge_width bits)
-        val edge_fifo_noempty = in Bool()
+        val edge_fifo_valid = in Bool()
     }
 
     val io_vertex_reg = new Bundle {
@@ -47,12 +48,12 @@ case class PeCore(
 
     val io_state = new Bundle {
         val pe_busy = out Bool()
+//        val pe_done = out Bool()
     }
 
 // wire
 
-val switch_done = Bool() init False
-
+val switch_done = Bool()
 
 // this logic is problematic
 switch_done := io_to_switch.vertex_switch_done && io_to_switch.update_switch_done
@@ -62,11 +63,13 @@ switch_done := io_to_switch.vertex_switch_done && io_to_switch.update_switch_don
 
         val IDLE = new State with EntryPoint
         val OPERATE = new State
-        val FINISH = new State
 
         IDLE
           .whenIsActive {
-              when(io_edge_fifo.edge_fifo_noempty && io_vertex_reg.vertex_reg_full) {
+              when (switch_done) {
+                  io_edge_fifo.edge_fifo_ready := True
+              }
+              when(io_edge_fifo.edge_fifo_valid && io_vertex_reg.vertex_reg_full && io_edge_fifo.edge_fifo_ready) {
                   goto(OPERATE)
               }
           }
@@ -74,6 +77,7 @@ switch_done := io_to_switch.vertex_switch_done && io_to_switch.update_switch_don
         OPERATE
           .whenIsActive {
               when(h3_valid && !h2_valid) {
+                  io_edge_fifo.edge_fifo_ready := False
                   goto(IDLE)
               }
           }
@@ -97,7 +101,7 @@ val update_ram_addr_h1 = Reg(Bits(10 bits)) init 0
 val hazard_s1_h1 = Reg(Bool()) init False
 val h1_valid = Reg(Bool()) init False
 
-    when (pe_fsm.stateReg === pe_fsm.OPERATE && io_edge_fifo.edge_fifo_noempty) {
+    when ((pe_fsm.stateReg.asBits === pe_fsm.OPERATE) && io_edge_fifo.edge_fifo_valid && io_edge_fifo.edge_fifo_ready) {
         vertex_reg_addr_h1  := io_edge_fifo.edge_fifo_in (31 downto 22)
         update_ram_addr_h1  := io_edge_fifo.edge_fifo_in (21 downto 12)
         edge_value_h1       := io_edge_fifo.edge_fifo_in (11 downto 0)
