@@ -94,14 +94,14 @@ hazard_s1 := (io_edge_fifo.edge_fifo_in (21 downto 12) === update_ram_addr_h1) ?
 //-----------------------------------------------------------
 // pipeline h1
 //-----------------------------------------------------------
+// reg
+val edge_value_h1       = Reg(SInt(8 bits)) init(0)
+val vertex_reg_addr_h1  = Reg(Bits(10 bits)) init(0)
+val update_ram_addr_h1  = Reg(Bits(10 bits)) init(0)
+val hazard_s1_h1        = Reg(Bool()) init(False)
+val h1_valid            = Reg(Bool()) init(False)
 
-val edge_value_h1 = Reg(SInt(8 bits)) init 0
-val vertex_reg_addr_h1 = Reg(Bits(10 bits)) init 0
-val update_ram_addr_h1 = Reg(Bits(10 bits)) init 0
-val hazard_s1_h1 = Reg(Bool()) init False
-val h1_valid = Reg(Bool()) init False
-
-    when ((pe_fsm.stateReg.asBits === pe_fsm.OPERATE) && io_edge_fifo.edge_fifo_valid && io_edge_fifo.edge_fifo_ready) {
+    when ((pe_fsm.stateReg.asBits === pe_fsm.OPERATE) && io_edge_fifo.edge_fifo_valid) {
         vertex_reg_addr_h1  := io_edge_fifo.edge_fifo_in (31 downto 22)
         update_ram_addr_h1  := io_edge_fifo.edge_fifo_in (21 downto 12)
         edge_value_h1       := io_edge_fifo.edge_fifo_in (11 downto 0)
@@ -122,16 +122,16 @@ val h1_valid = Reg(Bool()) init False
 //-----------------------------------------------------------
 // pipeline h2
 //-----------------------------------------------------------
+// reg
+val vertex_reg_data_h2  = Reg(SInt(32 bits)) init(0)
+val edge_value_h2       = Reg(SInt(8 bits)) init(0)
+val h2_valid            = Reg(Bool()) init(False)
+val updata_data_old_h2  = Reg(SInt(32 bits)) init(0)
+val update_ram_addr_h2  = Reg(Bits(6 bits)) init(0)
+val hazard_s1_h2        = Reg(Bool()) init(False)
 
-
-val vertex_reg_data_h2 = Reg(SInt(32 bits))
-val edge_value_h2 = Reg(SInt(8 bits)) init 0
-val h2_valid = Reg(Bool()) init False
-val updata_data_old_h2 = Reg(SInt(32 bits))
-val update_ram_addr_h2 = Reg(Bits(6 bits))
-val hazard_s1_h2 = Reg(Bool()) init False
-
-val updata_data_h2 = SInt(32 bits)
+// wire
+val updata_data_h2      = SInt(32 bits)
 
     when (h1_valid) {
         edge_value_h2  		:= edge_value_h1
@@ -154,9 +154,9 @@ val updata_data_h2 = SInt(32 bits)
 //-----------------------------------------------------------
 // pipeline h3
 //-----------------------------------------------------------
-val h3_valid = Reg(Bool()) init False
-val ram_data_h3 = Reg(SInt(32 bits)) init 0
-val update_ram_addr_h3 = Reg(Bits(6 bits)) init 0
+val h3_valid            = Reg(Bool()) init False
+val ram_data_h3         = Reg(SInt(32 bits)) init 0
+val update_ram_addr_h3  = Reg(Bits(6 bits)) init 0
 
     when (h2_valid) {
         update_ram_addr_h3	:= update_ram_addr_h2

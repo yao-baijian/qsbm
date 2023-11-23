@@ -14,22 +14,22 @@ import spinal.lib._
  */
 
 case class Fifo(
-    
-    reg_depth: Int      = 256,
-    reg_width: Int      = 16,
-    stream_width: Int   = 128
+
+     fifo_depth: Int      = 256,
+     data_width: Int      = 16,
+     stream_width: Int   = 128
 
 ) extends Component{
-    
+
     val io = new Bundle{
-        val in_stream = slave Stream(Bits(reg_width bits))
-        val out_stream = master Stream(Bits(reg_width bits))
+        val in_stream = slave Stream(Bits(data_width bits))
+        val out_stream = master Stream(Bits(data_width bits))
         val fifo_done = out Bool()
         val rst = in Bool()
     }
 
-    val edge_fifo = StreamFifo(Bits(reg_width bits), reg_depth)
-    val pay_load_buf =  Reg(Bits(reg_width bits))
+    val edge_fifo = StreamFifo(Bits(data_width bits), fifo_depth)
+    val pay_load_buf =  Reg(Bits(data_width bits))
 
     when (io.in_stream.payload === 0x0000000000000000) {
         io.fifo_done := True

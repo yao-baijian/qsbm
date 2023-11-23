@@ -32,12 +32,6 @@ case class SinglePeTopReg(
 
 ) extends Component {
 
-    val io = new Bundle {
-        val pe_idle = out Bool()
-        val edge_stream = slave Stream (Bits(axi_width bits))
-        val vertex_stream = slave Stream (Bits(axi_width bits))
-        val more_block = in Bool()
-    }
     val io_fifo = new Bundle {
         val pe_1_fifo       =   slave Stream(Bits(axi_width / 8 bits))
         val pe_2_fifo       =   slave Stream(Bits(axi_width / 8 bits))
@@ -49,12 +43,20 @@ case class SinglePeTopReg(
         val pe_8_fifo       =   slave Stream(Bits(axi_width / 8 bits))
     }
 
+    val io_global_reg =new Bundle {
+        val vertex_stream = slave Stream (Bits(axi_width bits))
+    }
+
+    val write_back = new Bundle {
+
+    }
+
     val global_reg          =   GlobalReg (axi_width,
                                             matrix_size,
                                             addr_width,
                                             vertex_width)
 
-    global_reg.io.in_stream << io.vertex_stream
+    global_reg.io.in_stream <> io_global_reg.vertex_stream
 
 
 //    val edge_fifo           =   Fifo( fifo_depth,
@@ -130,11 +132,6 @@ case class SinglePeTopReg(
                                         update_ram_addr_width)
 
 
-
-
-
-
-
     val update_regA         =   DualPortReg (  update_ram_depth,
                                         update_ram_width,
                                         update_ram_addr_width)
@@ -143,11 +140,11 @@ case class SinglePeTopReg(
                                         update_ram_width,
                                         update_ram_addr_width)
 
-    val vertex_regA         =   DualPortReg (  vertex_ram_depth,
+    val vertex_regA         =   DualModeReg (  vertex_ram_depth,
                                         vertex_ram_width,
                                         vertex_ram_addr_width)
 
-    val vertex_regB         =   DualPortReg (  vertex_ram_depth,
+    val vertex_regB         =   DualModeReg (  vertex_ram_depth,
                                         vertex_ram_width,
                                         vertex_ram_addr_width)
 
@@ -167,7 +164,7 @@ val fifo_valid =  Bool()
 fifo_valid :=   io_fifo.pe_1_fifo.valid | io_fifo.pe_2_fifo.valid | io_fifo.pe_3_fifo.valid | io_fifo.pe_4_fifo.valid |
                 io_fifo.pe_5_fifo.valid | io_fifo.pe_6_fifo.valid | io_fifo.pe_7_fifo.valid | io_fifo.pe_8_fifo.valid
 
-    val switch_done = Reg(Bool())
+val switch_done = Reg(Bool())
 
 
     val top_fsm = new StateMachine {

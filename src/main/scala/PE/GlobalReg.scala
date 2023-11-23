@@ -15,7 +15,7 @@ case class GlobalReg(
     val io = new Bundle{
         val in_stream = slave Stream(Bits(stream_width bits))
         val rd_addr   = in UInt(addr_width bits)
-        val sw_done   = in Bool()
+        val pe_done   = in Bool()
 
         val rd_data   = out Bits(data_width bits)
         val reg_full  = out Bool()
@@ -34,7 +34,7 @@ case class GlobalReg(
 
     when (wr_pointer === reg_depth - 1) {
         io.in_stream.ready := False
-    } elsewhen (io.sw_done) {
+    } elsewhen (io.pe_done) {
         io.in_stream.ready := True
     }
 
@@ -42,7 +42,7 @@ case class GlobalReg(
 
     when(io.in_stream.valid && io.in_stream.ready) {
         for (x <- 0 until 8) {
-            vertex_reg(wr_pointer + x) := io.in_stream.payload(16 * x - 1 downto 16 * (x - 1))
+            vertex_reg(wr_pointer + x) := io.in_stream.payload(16 * (x + 1) - 1 downto 16 * x )
         }
         wr_pointer := wr_pointer + 1
     } otherwise {
