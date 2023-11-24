@@ -3,36 +3,29 @@ package PE
 import spinal.core._
 import spinal.lib._
 
-case class GlobalReg(
-
-   stream_width: Int = 128,
-   reg_depth: Int = 64,
-   addr_width: Int = 6,
-   data_width: Int = 16
-
-) extends Component{
+case class GlobalReg(config: GlobalRegConfig) extends Component{
 
     val io = new Bundle{
-        val in_stream = slave Stream(Bits(stream_width bits))
-        val rd_addr   = in UInt(addr_width bits)
+        val in_stream = slave Stream(Bits(config.stream_width bits))
+        val rd_addr   = in UInt(config.addr_width bits)
         val pe_done   = in Bool()
 
-        val rd_data   = out Bits(data_width bits)
+        val rd_data   = out Bits(config.data_width bits)
         val reg_full  = out Bool()
     }
 
     val io_vertex_ram = new Bundle {
-        val wr_addr_to_ram = out Bits(addr_width bits)
-        val wr_data_to_ram = out Bits(data_width bits)
-        val rd_addr_to_ram = out Bits(addr_width bits)
-        val rd_data_from_ram = in Bits(data_width bits)
+        val wr_addr_to_ram = out Bits(config.addr_width bits)
+        val wr_data_to_ram = out Bits(config.data_width bits)
+        val rd_addr_to_ram = out Bits(config.addr_width bits)
+        val rd_data_from_ram = in Bits(config.data_width bits)
     }
 
 
-    val vertex_reg = Vec(Reg(UInt(data_width bits)) init(0), reg_depth)
+    val vertex_reg = Vec(Reg(UInt(config.data_width bits)) init(0), config.reg_depth)
     val wr_pointer = Reg(UInt(3 bits)) init 0
 
-    when (wr_pointer === reg_depth - 1) {
+    when (wr_pointer === config.reg_depth - 1) {
         io.in_stream.ready := False
     } elsewhen (io.pe_done) {
         io.in_stream.ready := True

@@ -4,40 +4,28 @@ import spinal.core.{Bits, _}
 import spinal.lib._
 import spinal.lib.fsm._
 
-case class PeCore(
-
-    vertex_reg_data_width: Int = 32,
-    vertex_reg_addr_width: Int = 6,
-    edge_width  : Int = 32,
-
-    update_ram_addr_width: Int = 6,
-    updata_ram_data_width: Int = 32,
-
-    vertex_ram_addr_width: Int = 6,
-    vertex_ram_data_width: Int = 32
-
-) extends Component {
+case class PeCore(config: PeCoreConfig) extends Component {
 
 
     val io_edge_fifo = new Bundle {
         val edge_fifo_ready = out Bool() init(True)
-        val edge_fifo_in = in Bits (edge_width bits)
+        val edge_fifo_in = in Bits (config.edge_width bits)
         val edge_fifo_valid = in Bool()
     }
 
     val io_vertex_reg = new Bundle {
-        val vertex_reg_addr = out Bits (vertex_reg_addr_width bits)
-        val vertex_reg_in = in SInt (vertex_reg_data_width bits)
+        val vertex_reg_addr = out Bits (config.vertex_reg_addr_width bits)
+        val vertex_reg_in = in SInt (config.vertex_reg_data_width bits)
         val vertex_reg_full = in Bool()
     }
 
     val io_update_ram = new Bundle {
         val update_ram_wr_valid = out Bool()
-        val update_ram_wr_addr = out Bits (update_ram_addr_width bits)
+        val update_ram_wr_addr = out Bits (config.update_ram_addr_width bits)
         val update_ram_wr_data = out Bits (32 bits)
 
         val update_ram_rd_valid = out Bool()
-        val update_ram_rd_addr = out Bits (update_ram_addr_width bits)
+        val update_ram_rd_addr = out Bits (config.update_ram_addr_width bits)
         val update_ram_rd_data = in Bits (32 bits)
     }
 

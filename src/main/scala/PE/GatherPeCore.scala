@@ -3,24 +3,17 @@ package PE
 import spinal.core._
 import spinal.lib.fsm._
 
-case class GatherPeCore(
-
-    alpha: SInt,
-    beta: SInt,  
-    xi_dt: SInt, 
-    positive_boundary: SInt,
-    negetive_boundary: SInt,
-
-    addr_width: Int = 6,
-    data_width: Int = 32
-
-) extends Component {
+case class GatherPeCore(config:GatherPeConfig) extends Component {
+    val io = new Bundle {
+        val switch_done = in Bool()
+    }
 
     val io_state = new Bundle {
         val switch_done = in Bool()
         val pe_done = in Bool()
         val gather_pe_done = out Bool()
         val gather_pe_busy = out Bool()
+        val need_gather    = out Bool()
     }
     val io_update_ram = new Bundle {
         val rd_addr_update_ram = out UInt (addr_width bits)
@@ -50,7 +43,7 @@ case class GatherPeCore(
             io_state.gather_pe_done := False
         )
         .whenIsActive (
-            when (io_state.pe_done) {
+            when (io_state.need_gather) {
                 goto(OPERATE)
             }
         )
