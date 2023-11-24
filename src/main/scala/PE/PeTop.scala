@@ -11,7 +11,6 @@ case class PeTop() extends Component {
         val last_update = in Bool()
     }
 
-    spinal.core.Reg
     val y = new Array[Reg(Bits(32 bits)) init 1](8)
     val z = new Array[PeBundle](8)
 
@@ -26,7 +25,7 @@ case class PeTop() extends Component {
         pe_bundle_array(i).setName("pe_bundle" + i.toString)
     }
 
-    val vFifoDataRegLast =  Array.tabulate(4)(_ => Reg(Bits(32 bits)) init 1)
+//    val vFifoDataRegLast =  Array.tabulate(4)(_ => Reg(Bits(32 bits)) init 1)
 
     val pe_bundle1_reg1 = Vec(Reg(UInt(reg_config.data_width bits)) init(0), reg_config.reg_depth)
     val pe_bundle1_reg2 = Vec(Reg(UInt(reg_config.data_width bits)) init(0), reg_config.reg_depth)
