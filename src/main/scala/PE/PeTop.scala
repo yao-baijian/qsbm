@@ -8,145 +8,65 @@ import spinal.lib.fsm._
 case class PeTop() extends Component {
 
     val io = new Bundle {
-        val last_update = in Bool()
+        val vertex_stream = in Bool()
     }
-
-    val y = new Array[Reg(Bits(32 bits)) init 1](8)
-    val z = new Array[PeBundle](8)
 
     val reg_config = RegConfig()
     val pe_bundle_config = PeBundleConfig()
-    val gather_pe_bundle_config = GatherPeConfig()
+    val gather_pe_bundle_config = GatherPeCoreConfig()
 
     val pe_bundle_array = new Array[PeBundle](4)
+    val pe_bundle_reg_group = new Array[Array[Vec[UInt]]](4)
+//  val pe_bundle_reg_group =  Array.tabulate(4)(_ => Vec)
+//  alternative declaration of pe_bundle_reg_group
 
+//  PE Bundle, each with respective update reg group
     for (i <- 0 until 4) {
         pe_bundle_array(i) = PeBundle(pe_bundle_config)
         pe_bundle_array(i).setName("pe_bundle" + i.toString)
+        for (j <- 0 until 8) {
+            pe_bundle_reg_group(i)(j) = Vec(Reg(UInt(reg_config.data_width bits)) init(0), reg_config.reg_depth)
+            pe_bundle_reg_group(i)(j).setName("pe_bundle"+ i.toString+"_reg"+j.toString)
+        }
+
     }
 
-//    val vFifoDataRegLast =  Array.tabulate(4)(_ => Reg(Bits(32 bits)) init 1)
-
-    val pe_bundle1_reg1 = Vec(Reg(UInt(reg_config.data_width bits)) init(0), reg_config.reg_depth)
-    val pe_bundle1_reg2 = Vec(Reg(UInt(reg_config.data_width bits)) init(0), reg_config.reg_depth)
-    val pe_bundle1_reg3 = Vec(Reg(UInt(reg_config.data_width bits)) init(0), reg_config.reg_depth)
-    val pe_bundle1_reg4 = Vec(Reg(UInt(reg_config.data_width bits)) init(0), reg_config.reg_depth)
-    val pe_bundle1_reg5 = Vec(Reg(UInt(reg_config.data_width bits)) init(0), reg_config.reg_depth)
-    val pe_bundle1_reg6 = Vec(Reg(UInt(reg_config.data_width bits)) init(0), reg_config.reg_depth)
-    val pe_bundle1_reg7 = Vec(Reg(UInt(reg_config.data_width bits)) init(0), reg_config.reg_depth)
-    val pe_bundle1_reg8 = Vec(Reg(UInt(reg_config.data_width bits)) init(0), reg_config.reg_depth)
-
-    val pe_bundle2_reg1 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-    val pe_bundle2_reg2 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-    val pe_bundle2_reg3 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-    val pe_bundle2_reg4 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-    val pe_bundle2_reg5 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-    val pe_bundle2_reg6 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-    val pe_bundle2_reg7 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-    val pe_bundle2_reg8 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-
-    val pe_bundle3_reg1 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-    val pe_bundle3_reg2 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-    val pe_bundle3_reg3 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-    val pe_bundle3_reg4 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-    val pe_bundle3_reg5 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-    val pe_bundle3_reg6 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-    val pe_bundle3_reg7 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-    val pe_bundle3_reg8 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-
-    val pe_bundle4_reg1 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-    val pe_bundle4_reg2 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-    val pe_bundle4_reg3 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-    val pe_bundle4_reg4 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-    val pe_bundle4_reg5 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-    val pe_bundle4_reg6 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-    val pe_bundle4_reg7 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-    val pe_bundle4_reg8 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-
-    val reg_array = new Array[DualModeReg](16)
+//  Vertex Reg Array is used to store vertex date for gather PE
+    val vertex_reg_array = new Array[DualModeReg](16)
 
     for (i <- 0 until 8) {
-        reg_array(i) = DualModeReg()
-        reg_array(i).setName("vertex_regA_" + i.toString)
-        reg_array(i+8) = DualModeReg()
-        reg_array(i+8).setName("vertex_regB_" + i.toString)
+        vertex_reg_array(i) = DualModeReg()
+        vertex_reg_array(i).setName("vertex_regA_" + i.toString)
+        vertex_reg_array(i+8) = DualModeReg()
+        vertex_reg_array(i+8).setName("vertex_regB_" + i.toString)
     }
 
-    val gather_pe_bundle_array = new Array[GatherPeCore](8)
+    When ()
+
+//  Update reg group
+//  sum up 4 large pe result
+    val update_reg_group = new Array[Vec[UInt]](8)
 
     for (i <- 0 until 8) {
-        gather_pe_bundle_array(i) = GatherPeCore(gather_pe_bundle_config)
-        gather_pe_bundle_array(i).setName("gather_pe" + i.toString)
+        update_reg_group(i) = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
+        update_reg_group(i).setName("update_reg" + i.toString)
     }
 
-    val update_reg1 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-
     when(need_update) {
-        for (x <- 0 until 64) {
-            update_reg1(x) := pe_bundle1_reg1(x) + pe_bundle2_reg1(x) + pe_bundle3_reg1(x) + pe_bundle4_reg1(x)
+        for (i <- 0 until 8) {
+            for (j <- 0 until 64) {
+                update_reg_group (i)(j) := pe_bundle_reg_group(1)(i)(j) + pe_bundle_reg_group(2)(i)(j) +
+                                            pe_bundle_reg_group(3)(i)(j) + pe_bundle_reg_group(4)(i)(j)
+            }
         }
     }
 
-    val update_reg2 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
+val gather_pe_bundle_array = new Array[GatherPeCore](8)
 
-    when(need_update) {
-        for (x <- 0 until 64) {
-            update_reg2(x) := pe_bundle1_reg2(x) + pe_bundle2_reg2(x) + pe_bundle3_reg2(x) + pe_bundle4_reg2(x)
-        }
-    }
-
-    val update_reg3 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-
-    when(need_update) {
-        for (x <- 0 until 64) {
-            update_reg3(x) := pe_bundle1_reg3(x) + pe_bundle2_reg3(x) + pe_bundle3_reg3(x) + pe_bundle4_reg3(x)
-        }
-    }
-
-    val update_reg4 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-
-    when(need_update) {
-        for (x <- 0 until 64) {
-            update_reg4(x) := pe_bundle1_reg4(x) + pe_bundle2_reg4(x) + pe_bundle3_reg4(x) + pe_bundle4_reg4(x)
-        }
-    }
-
-    val update_reg5 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-
-    when(need_update) {
-        for (x <- 0 until 64) {
-            update_reg5(x) := pe_bundle1_reg5(x) + pe_bundle2_reg5(x) + pe_bundle3_reg5(x) + pe_bundle4_reg5(x)
-        }
-    }
-
-    val update_reg6 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-
-    when(need_update) {
-        for (x <- 0 until 64) {
-            update_reg6(x) := pe_bundle1_reg6(x) + pe_bundle2_reg6(x) + pe_bundle3_reg6(x) + pe_bundle4_reg6(x)
-        }
-    }
-
-    val update_reg7 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-
-    when(need_update) {
-        for (x <- 0 until 64) {
-            update_reg7(x) := pe_bundle1_reg7(x) + pe_bundle2_reg7(x) + pe_bundle3_reg7(x) + pe_bundle4_reg7(x)
-        }
-    }
-
-    val update_reg8 = Vec(Reg(UInt(reg_config.data_width bits)) init (0), reg_config.reg_depth)
-
-    when(need_update) {
-        for (x <- 0 until 64) {
-            update_reg8(x) := pe_bundle1_reg8(x) + pe_bundle2_reg8(x) + pe_bundle3_reg8(x) + pe_bundle4_reg8(x)
-        }
-    }
-
-
-
-
-    val gather_pe_bundle = PeBundle(pe_bundle_config)
+for (i <- 0 until 8) {
+    gather_pe_bundle_array(i) = GatherPeCore(gather_pe_bundle_config)
+    gather_pe_bundle_array(i).setName("gather_pe" + i.toString)
+}
 
     val bundle_busy = Bool() init(False)
     bundle_busy := pe_bundle_array(1).io_state.bundle_busy || pe_bundle_array(1).io_state.bundle_busy ||

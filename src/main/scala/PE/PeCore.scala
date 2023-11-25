@@ -14,7 +14,7 @@ case class PeCore(config: PeCoreConfig) extends Component {
     }
 
     val io_vertex_reg = new Bundle {
-        val vertex_reg_addr = out Bits (config.vertex_reg_addr_width bits)
+        val vertex_reg_addr = out UInt (config.vertex_reg_addr_width bits)
         val vertex_reg_in = in SInt (config.vertex_reg_data_width bits)
         val vertex_reg_full = in Bool()
     }
@@ -29,43 +29,63 @@ case class PeCore(config: PeCoreConfig) extends Component {
         val update_ram_rd_data = in Bits (32 bits)
     }
 
-    val io_to_switch = new Bundle {
-        val vertex_switch_done = in Bool()
-        val update_switch_done = in Bool()
-    }
-
     val io_state = new Bundle {
         val pe_busy = out Bool()
-//        val pe_done = out Bool()
+        val last_update = in Bool()
+        val globalreg_done = in Bool()
+        val switch_done = in Bool()
+        val need_new_vertex = out Bool() init(False)
     }
 
-// wire
-
-val switch_done = Bool()
-
-// this logic is problematic
-switch_done := io_to_switch.vertex_switch_done && io_to_switch.update_switch_done
-// state machine
 
     val pe_fsm = new StateMachine {
 
         val IDLE = new State with EntryPoint
         val OPERATE = new State
+        val WAIT_DONE = new State
+        val WAIT_VERTEX = new State
+        val PAUSE = new State
 
         IDLE
           .whenIsActive {
-              when (switch_done) {
-                  io_edge_fifo.edge_fifo_ready := True
+              when (io_state.globalreg_done ) {
+                  io_state.need_new_vertex  := False
               }
-              when(io_edge_fifo.edge_fifo_valid && io_vertex_reg.vertex_reg_full && io_edge_fifo.edge_fifo_ready) {
+              when (io_state.globalreg_done && io_edge_fifo.edge_fifo_valid === True) {
+                  io_state.pe_busy := True
+                  io_edge_fifo.edge_fifo_ready := True
                   goto(OPERATE)
               }
           }
 
         OPERATE
           .whenIsActive {
-              when(h3_valid && !h2_valid) {
-                  io_edge_fifo.edge_fifo_ready := False
+              when(io_edge_fifo.edge_fifo_in === 0) {
+                  goto(WAIT_DONE)
+              }
+          }
+        WAIT_DONE
+          .onEntry{
+              io_edge_fifo.edge_fifo_ready := False
+          }
+          .whenIsActive {
+              when(h3_valid === False) {
+                  when (io_state.last_update) {
+                      io_edge_fifo.edge_fifo_ready := False
+                      io_state.pe_busy := False
+                      goto(PAUSE)
+                  } otherwise{
+                      io_state.need_new_vertex  := True
+                      io_edge_fifo.edge_fifo_ready := True
+                      goto(IDLE)
+                  }
+              }
+          }
+        PAUSE
+          .whenIsActive {
+              when(io_state.switch_done) {
+                  io_edge_fifo.edge_fifo_ready := True
+                  io_state.need_new_vertex  := True
                   goto(IDLE)
               }
           }
@@ -89,7 +109,7 @@ val update_ram_addr_h1  = Reg(Bits(10 bits)) init(0)
 val hazard_s1_h1        = Reg(Bool()) init(False)
 val h1_valid            = Reg(Bool()) init(False)
 
-    when ((pe_fsm.stateReg.asBits === pe_fsm.OPERATE) && io_edge_fifo.edge_fifo_valid) {
+    when (io_edge_fifo.edge_fifo_ready && io_edge_fifo.edge_fifo_valid && io_edge_fifo.edge_fifo_in =/= 0) {
         vertex_reg_addr_h1  := io_edge_fifo.edge_fifo_in (31 downto 22)
         update_ram_addr_h1  := io_edge_fifo.edge_fifo_in (21 downto 12)
         edge_value_h1       := io_edge_fifo.edge_fifo_in (11 downto 0)

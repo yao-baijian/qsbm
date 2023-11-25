@@ -8,26 +8,18 @@ case class GlobalReg(config: GlobalRegConfig) extends Component{
     val io = new Bundle{
         val in_stream = slave Stream(Bits(config.stream_width bits))
         val rd_addr   = in UInt(config.addr_width bits)
-        val pe_done   = in Bool()
-
         val rd_data   = out Bits(config.data_width bits)
+
+        val need_new_vertex   = in Bool()
         val reg_full  = out Bool()
     }
-
-    val io_vertex_ram = new Bundle {
-        val wr_addr_to_ram = out Bits(config.addr_width bits)
-        val wr_data_to_ram = out Bits(config.data_width bits)
-        val rd_addr_to_ram = out Bits(config.addr_width bits)
-        val rd_data_from_ram = in Bits(config.data_width bits)
-    }
-
 
     val vertex_reg = Vec(Reg(UInt(config.data_width bits)) init(0), config.reg_depth)
     val wr_pointer = Reg(UInt(3 bits)) init 0
 
     when (wr_pointer === config.reg_depth - 1) {
         io.in_stream.ready := False
-    } elsewhen (io.pe_done) {
+    } elsewhen (io.need_new_vertex) {
         io.in_stream.ready := True
     }
 

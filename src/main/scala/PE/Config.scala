@@ -41,11 +41,11 @@ case class PeCoreConfig(vertex_reg_data_width: Int = 16,
                         vertex_ram_addr_width: Int = 6,
                         vertex_ram_data_width: Int = 16)
 
-case class GatherPeCoreConfig(alpha: SInt,
-                              beta: SInt,
-                              xi_dt: SInt,
-                              positive_boundary: SInt,
-                              negetive_boundary: SInt,
+case class GatherPeCoreConfig(alpha: SInt = 1, //alpha = (np.linspace(0, 1, num_iters))
+                              beta: SInt = 8, // beta = (0.7 / math.sqrt(N))#
+                              xi_dt: SInt = 32,
+                              positive_boundary: SInt = 127,
+                              negetive_boundary: SInt = -1, // np.clip(x_comp,-1, 1)
 
                               addr_width: Int = 6,
                               data_width: Int = 32)

@@ -3,7 +3,7 @@ package PE
 import spinal.core._
 import spinal.lib.fsm._
 
-case class GatherPeCore(config:GatherPeConfig) extends Component {
+case class GatherPeCore(config:GatherPeCoreConfig) extends Component {
     val io = new Bundle {
         val switch_done = in Bool()
     }
@@ -16,15 +16,15 @@ case class GatherPeCore(config:GatherPeConfig) extends Component {
         val need_gather    = out Bool()
     }
     val io_update_ram = new Bundle {
-        val rd_addr_update_ram = out UInt (addr_width bits)
+        val rd_addr_update_ram = out UInt (config.addr_width bits)
         val rd_en_update_ram = out Bool()
-        val rd_data_update_ram = in Bits (data_width bits)
+        val rd_data_update_ram = in Bits (config.data_width bits)
     }
 
     val io_vertex_ram = new Bundle {
         val rd_addr_vertex_ram = out UInt (6 bits)
         val rd_en_vertex_ram = out Bool()
-        val rd_data_vertex_ram = out Bits (data_width bits)
+        val rd_data_vertex_ram = out Bits (config.data_width bits)
 
         val wr_addr_vertex_ram = out UInt (6 bits)
         val wr_en_vertex_ram = out Bool()
@@ -100,7 +100,7 @@ when (h1_valid) {
     h2_valid       := False
 }
 
-y_new_h2 := y_old_h2 + ((-32 + alpha_h2) * x_old_h2 + beta * updated_value_h2) * xi_dt
+y_new_h2 := y_old_h2 + ((-32 + alpha_h2) * x_old_h2 + config.beta * updated_value_h2) * config.xi_dt
 
 // -----------------------------------------------------------
 // pipeline h3: x_new = x_old + y_new * dt
@@ -120,13 +120,13 @@ when (h2_valid) {
     h3_valid := False
 }
 
-x_new_h3 := x_old_h3 + y_new_h2 * xi_dt
+x_new_h3 := x_old_h3 + y_new_h2 * config.xi_dt
 
 val x_new_cliped_h3 = SInt(8 bits)
 val y_new_cliped_h3 = SInt(8 bits)
 
-x_new_cliped_h3 := (x_new_h3 > positive_boundary) ? positive_boundary | ((x_new_h3 < negetive_boundary) ? negetive_boundary | x_new_h3 (7 downto 0))
-y_new_cliped_h3 := ((x_new_h3 < positive_boundary ) && (x_new_h3 > negetive_boundary)) ? y_new_h3 | 0
+x_new_cliped_h3 := (x_new_h3 > config.positive_boundary) ? config.positive_boundary | ((x_new_h3 < config.negetive_boundary) ? config.negetive_boundary | x_new_h3 (7 downto 0))
+y_new_cliped_h3 := ((x_new_h3 < config.positive_boundary ) && (x_new_h3 > config.negetive_boundary)) ? y_new_h3 | 0
 
 
 // -----------------------------------------------------------
