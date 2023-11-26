@@ -63,6 +63,12 @@ case class PeBundle(config: PeBundleConfig) extends Component {
         pe_bundle(i).io_edge_fifo.edge_fifo_valid <> io_fifo.pe_fifo(i).valid
         pe_bundle(i).io_edge_fifo.edge_fifo_in <> io_fifo.pe_fifo(i).payload
 
+        //TO DO
+        // pass state signal to pe top:
+        // val bundle_busy = out Bool()
+        // val switch_done = in Bool()
+        // val last_update   = in Bool()
+
     }
 
     io_state.bundle_busy := pe_bundle(1).io_state.pe_busy | pe_bundle(2).io_state.pe_busy | pe_bundle(3).io_state.pe_busy | pe_bundle(4).io_state.pe_busy |

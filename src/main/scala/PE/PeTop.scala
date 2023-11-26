@@ -4,6 +4,11 @@ import spinal.core.{Reg, Vec, _}
 import spinal.lib._
 import spinal.lib.fsm._
 
+// TO DO:
+// connnect vertex stream
+// connect update reg
+// switch between pe bundle and gather pe
+// connect gather pe 
 
 case class PeTop() extends Component {
 

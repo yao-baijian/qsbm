@@ -11,18 +11,20 @@ case class PeBundleConfig(alpha: SInt = 1, //alpha = (np.linspace(0, 1, num_iter
 
                           addr_width: Int = 6,
                           vertex_width: Int = 16,
-                          update_ram_addr_width: Int = 64,
-                          vertex_ram_addr_width: Int = 64,
+                          update_ram_addr_width: Int = 6,
+                          vertex_ram_addr_width: Int = 6,
                           update_ram_depth: Int = 64,
                           vertex_ram_depth: Int = 64,
-                          update_ram_width: Int = 32,
-                          vertex_ram_width: Int = 32,
+                          update_ram_width: Int = 16,
+                          vertex_ram_width: Int = 16,
                           global_reg_config: GlobalRegConfig = GlobalRegConfig(),
                           reg_config: RegConfig = RegConfig(),
                           pe_core_config: PeCoreConfig = PeCoreConfig())
+
 case class GatherPeConfig(reg_depth: Int = 64,
                      addr_width: Int = 6,
                      data_width: Int = 16)
+
 case class RegConfig(reg_depth: Int = 64,
                      addr_width: Int = 6,
                      data_width: Int = 16)
@@ -31,6 +33,7 @@ case class GlobalRegConfig(stream_width: Int = 128,
                            reg_depth: Int = 64,
                            addr_width: Int = 6,
                            data_width: Int = 16)
+                           
 case class PeCoreConfig(vertex_reg_data_width: Int = 16,
                         vertex_reg_addr_width: Int = 6,
                         edge_width: Int = 16,
