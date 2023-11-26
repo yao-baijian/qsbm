@@ -7,8 +7,9 @@ case class GlobalReg(config: GlobalRegConfig) extends Component{
 
     val io = new Bundle{
         val in_stream = slave Stream(Bits(config.stream_width bits))
-        val rd_addr   = in UInt(config.addr_width bits)
-        val rd_data   = out Bits(config.data_width bits)
+
+        val rd_addr   = Vec(in UInt(config.addr_width bits), 8)
+        val rd_data   = Vec(out Bits(config.data_width bits), 8)
 
         val need_new_vertex   = in Bool()
         val reg_full  = out Bool()
