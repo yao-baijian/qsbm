@@ -9,7 +9,9 @@ import spinal.lib._
 class AxiMemCtrlTest extends AnyFunSuite {
 
   val compiled= SimConfig
-    .withWave.compile(AxiMemCtrl())
+    .withWave
+    .withIVerilog
+    .compile(PE.PeTop())
 
   test("hello"){
 //    implicit val _ = "."
@@ -18,10 +20,10 @@ class AxiMemCtrlTest extends AnyFunSuite {
 //
       dut.clockDomain.forkStimulus(100) //产生周期为10个单位的时钟
       dut.clockDomain.waitSampling() //等一个时钟上升沿到来
-      dut.io.a #= 10L //
-      dut.io.b #= 20L
+//      dut.io.a #= 10L //
+//      dut.io.b #= 20L
       dut.clockDomain.waitSampling(10)
-      assert(200 == dut.io.prod.toLong ,"乘法模块出错！")
+//      assert(200 == dut.io.prod.toLong ,"乘法模块出错！")
       dut.clockDomain.waitSampling(10)
 
 //      println(dut.io.prod.toLong)

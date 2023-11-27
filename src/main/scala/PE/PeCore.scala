@@ -4,8 +4,18 @@ import spinal.core.{Bits, _}
 import spinal.lib._
 import spinal.lib.fsm._
 
+import scala.language.postfixOps
+
 case class PeCore(config: PeCoreConfig) extends Component {
 
+    val io_state = new Bundle {
+        val last_update = in Bool()
+        val globalreg_done = in Bool()
+        val switch_done = in Bool()
+
+        val pe_busy = out Bool()
+        val need_new_vertex = out Bool() init (False)
+    }
 
     val io_edge_fifo = new Bundle {
         val edge_fifo_ready = out Bool() init(True)
@@ -15,27 +25,37 @@ case class PeCore(config: PeCoreConfig) extends Component {
 
     val io_vertex_reg = new Bundle {
         val vertex_reg_addr = out UInt (config.vertex_reg_addr_width bits)
-        val vertex_reg_in = in SInt (config.vertex_reg_data_width bits)
-        val vertex_reg_full = in Bool()
+        val vertex_reg_in = in Bits (config.vertex_reg_data_width bits)
     }
 
     val io_update_ram = new Bundle {
         val update_ram_wr_valid = out Bool()
-        val update_ram_wr_addr = out Bits (config.update_ram_addr_width bits)
+        val update_ram_wr_addr = out UInt (config.update_ram_addr_width bits)
         val update_ram_wr_data = out Bits (32 bits)
 
         val update_ram_rd_valid = out Bool()
-        val update_ram_rd_addr = out Bits (config.update_ram_addr_width bits)
+        val update_ram_rd_addr = out UInt (config.update_ram_addr_width bits)
         val update_ram_rd_data = in Bits (32 bits)
     }
 
-    val io_state = new Bundle {
-        val pe_busy = out Bool()
-        val last_update = in Bool()
-        val globalreg_done = in Bool()
-        val switch_done = in Bool()
-        val need_new_vertex = out Bool() init(False)
-    }
+    val hazard_s1 = Reg(Bool())
+    val edge_value_h1       = Reg(SInt(8 bits)) init(0)
+    val update_ram_addr_h1  = Reg(UInt (10 bits)) init(0)
+    val hazard_s1_h1        = Reg(Bool()) init(False)
+    val h1_valid            = Reg(Bool()) init(False)
+
+    val vertex_reg_data_h2  = Reg(SInt(32 bits)) init (0)
+    val edge_value_h2       = Reg(SInt(8 bits)) init (0)
+    val h2_valid            = Reg(Bool()) init (False)
+    val updata_data_old_h2  = Reg(SInt(32 bits)) init (0)
+    val update_ram_addr_h2  = Reg(UInt (6 bits)) init (0)
+    val hazard_s1_h2        = Reg(Bool()) init (False)
+
+    val updata_data_h2      = SInt(32 bits)
+
+    val h3_valid            = Reg(Bool()) init False
+    val ram_data_h3         = Reg(SInt(32 bits)) init 0
+    val update_ram_addr_h3  = Reg(UInt (6 bits)) init 0
 
 
     val pe_fsm = new StateMachine {
@@ -43,7 +63,6 @@ case class PeCore(config: PeCoreConfig) extends Component {
         val IDLE = new State with EntryPoint
         val OPERATE = new State
         val WAIT_DONE = new State
-        val WAIT_VERTEX = new State
         val PAUSE = new State
 
         IDLE
@@ -94,29 +113,23 @@ case class PeCore(config: PeCoreConfig) extends Component {
 //-----------------------------------------------------------
 // pipeline h0
 //-----------------------------------------------------------
-val hazard_s1 = Reg(Bool())
 
 // WRITE AFTER READ
-hazard_s1 := (io_edge_fifo.edge_fifo_in (21 downto 12) === update_ram_addr_h1) ? True | False
+    hazard_s1 := (io_edge_fifo.edge_fifo_in (21 downto 12).asUInt === update_ram_addr_h1) ? True | False
 
 //-----------------------------------------------------------
 // pipeline h1
 //-----------------------------------------------------------
 // reg
-val edge_value_h1       = Reg(SInt(8 bits)) init(0)
-val vertex_reg_addr_h1  = Reg(Bits(10 bits)) init(0)
-val update_ram_addr_h1  = Reg(Bits(10 bits)) init(0)
-val hazard_s1_h1        = Reg(Bool()) init(False)
-val h1_valid            = Reg(Bool()) init(False)
 
     when (io_edge_fifo.edge_fifo_ready && io_edge_fifo.edge_fifo_valid && io_edge_fifo.edge_fifo_in =/= 0) {
-        vertex_reg_addr_h1  := io_edge_fifo.edge_fifo_in (31 downto 22)
-        update_ram_addr_h1  := io_edge_fifo.edge_fifo_in (21 downto 12)
-        edge_value_h1       := io_edge_fifo.edge_fifo_in (11 downto 0)
+        io_vertex_reg.vertex_reg_addr  := io_edge_fifo.edge_fifo_in (15 downto 10).asUInt
+        update_ram_addr_h1  := io_edge_fifo.edge_fifo_in (9 downto 4).asUInt
+        edge_value_h1       := io_edge_fifo.edge_fifo_in (3 downto 0).asSInt
         h1_valid            := True
         hazard_s1_h1        := hazard_s1
     } otherwise {
-        vertex_reg_addr_h1  := 0
+        io_vertex_reg.vertex_reg_addr  := 0
         update_ram_addr_h1  := 0
         edge_value_h1       := 0
         hazard_s1_h1        := False
@@ -130,22 +143,12 @@ val h1_valid            = Reg(Bool()) init(False)
 //-----------------------------------------------------------
 // pipeline h2
 //-----------------------------------------------------------
-// reg
-val vertex_reg_data_h2  = Reg(SInt(32 bits)) init(0)
-val edge_value_h2       = Reg(SInt(8 bits)) init(0)
-val h2_valid            = Reg(Bool()) init(False)
-val updata_data_old_h2  = Reg(SInt(32 bits)) init(0)
-val update_ram_addr_h2  = Reg(Bits(6 bits)) init(0)
-val hazard_s1_h2        = Reg(Bool()) init(False)
-
-// wire
-val updata_data_h2      = SInt(32 bits)
 
     when (h1_valid) {
         edge_value_h2  		:= edge_value_h1
         update_ram_addr_h2:= update_ram_addr_h1
-        updata_data_old_h2:= io_update_ram.update_ram_rd_data
-        vertex_reg_data_h2:= io_vertex_reg.vertex_reg_in
+        updata_data_old_h2:= io_update_ram.update_ram_rd_data.asSInt
+        vertex_reg_data_h2:= io_vertex_reg.vertex_reg_in.asSInt
         hazard_s1_h2      := hazard_s1_h1
         h2_valid       		:= True
     } otherwise {
@@ -162,9 +165,6 @@ val updata_data_h2      = SInt(32 bits)
 //-----------------------------------------------------------
 // pipeline h3
 //-----------------------------------------------------------
-val h3_valid            = Reg(Bool()) init False
-val ram_data_h3         = Reg(SInt(32 bits)) init 0
-val update_ram_addr_h3  = Reg(Bits(6 bits)) init 0
 
     when (h2_valid) {
         update_ram_addr_h3	:= update_ram_addr_h2
@@ -178,5 +178,5 @@ val update_ram_addr_h3  = Reg(Bits(6 bits)) init 0
 
     io_update_ram.update_ram_wr_valid   := h3_valid
     io_update_ram.update_ram_wr_addr    := update_ram_addr_h3
-    io_update_ram.update_ram_wr_data    := ram_data_h3
+    io_update_ram.update_ram_wr_data    := ram_data_h3.asBits
 }
