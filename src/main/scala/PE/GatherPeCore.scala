@@ -13,16 +13,16 @@ case class GatherPeCore(config:GatherPeCoreConfig) extends Component {
         val gather_pe_busy = out Bool()
     }
     val io_update_ram = new Bundle {
-        val rd_addr = out UInt (config.addr_width bits)
+        val rd_addr = out UInt (config.addr_width bits) setAsReg() init(0)
         val rd_data = in Bits (config.data_width bits)
     }
 
     val io_vertex_ram = new Bundle {
-        val rd_addr = out UInt (6 bits)
+        val rd_addr = out UInt (6 bits) setAsReg() init(0)
         val rd_data = in Bits (config.data_width bits)
-        val wr_addr = out UInt (6 bits)
-        val wr_val = out Bool()
-        val wr_data = out Bits (16 bits)
+        val wr_addr = out UInt (6 bits) setAsReg() init(0)
+        val wr_val = out Bool() setAsReg() init(False)
+        val wr_data = out Bits (16 bits) setAsReg() init(0)
     }
 
     val h1_valid = Reg(Bool()) init False

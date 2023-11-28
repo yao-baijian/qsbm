@@ -63,10 +63,10 @@ case class PeTop() extends Component {
             pe_bundle_update_reg_group(i)(j) = Vec(Reg(Bits(reg_config.data_width bits)) init(0), reg_config.reg_depth)
             pe_bundle_update_reg_group(i)(j).setName("pe_bundle"+ i.toString+"_reg"+j.toString)
 
-            when (pe_bundle_array(i).io_update_reg.update_reg_wr_valid(j)) {
-                pe_bundle_update_reg_group(i)(j)(pe_bundle_array(i).io_update_reg.update_reg_wr_addr(j)) := pe_bundle_array(i).io_update_reg.update_reg_wr_data(j)
+            when (pe_bundle_array(i).io_update_reg.wr_valid(j)) {
+                pe_bundle_update_reg_group(i)(j)(pe_bundle_array(i).io_update_reg.wr_addr(j)) := pe_bundle_array(i).io_update_reg.wr_data(j)
             }
-            pe_bundle_array(i).io_update_reg.update_reg_rd_data(j) := pe_bundle_update_reg_group(i)(j)(pe_bundle_array(i).io_update_reg.update_reg_rd_addr(j))
+            pe_bundle_array(i).io_update_reg.rd_data(j) := pe_bundle_update_reg_group(i)(j)(pe_bundle_array(i).io_update_reg.rd_addr(j))
         }
         // Update reg need soft reset, after all update result is sum up in 1 update reg
         when (update_reg_srst(i)) {

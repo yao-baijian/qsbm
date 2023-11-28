@@ -1,6 +1,6 @@
 package PE
 
-import spinal.core.{Bits, _}
+import spinal.core._
 import spinal.lib._
 import spinal.lib.fsm._
 
@@ -13,34 +13,35 @@ case class PeCore(config: PeCoreConfig) extends Component {
         val globalreg_done = in Bool()
         val switch_done = in Bool()
 
-        val pe_busy = out Bool()
-        val need_new_vertex = out Bool() init (False)
+        val pe_busy = out Bool() setAsReg() init (False)
+        val need_new_vertex = out Bool() setAsReg() init (False)
     }
 
     val io_edge_fifo = new Bundle {
-        val edge_fifo_ready = out Bool() init(True)
+        val edge_fifo_ready = out Bool() setAsReg() init(True)
         val edge_fifo_in = in Bits (config.edge_width bits)
         val edge_fifo_valid = in Bool()
     }
 
     val io_vertex_reg = new Bundle {
-        val vertex_reg_addr = out UInt (config.vertex_reg_addr_width bits)
-        val vertex_reg_in = in Bits (config.vertex_reg_data_width bits)
+        val addr = out UInt (config.vertex_reg_addr_width bits)
+        val data = in Bits (config.vertex_reg_data_width bits)
     }
 
     val io_update_ram = new Bundle {
-        val update_ram_wr_valid = out Bool()
-        val update_ram_wr_addr = out UInt (config.update_ram_addr_width bits)
-        val update_ram_wr_data = out Bits (32 bits)
+        val wr_valid = out Bool()
+        val wr_addr = out UInt (config.update_ram_addr_width bits)
+        val wr_data = out Bits (32 bits)
 
-        val update_ram_rd_valid = out Bool()
-        val update_ram_rd_addr = out UInt (config.update_ram_addr_width bits)
-        val update_ram_rd_data = in Bits (32 bits)
+        val rd_valid = out Bool()
+        val rd_addr = out UInt (config.update_ram_addr_width bits)
+        val rd_data = in Bits (32 bits)
     }
 
-    val hazard_s1 = Reg(Bool())
+    val hazard_s1           = Reg(Bool())
     val edge_value_h1       = Reg(SInt(8 bits)) init(0)
     val update_ram_addr_h1  = Reg(UInt (10 bits)) init(0)
+    val vertex_reg_addr_h1  = Reg(UInt (config.vertex_reg_addr_width bits)) init(0)
     val hazard_s1_h1        = Reg(Bool()) init(False)
     val h1_valid            = Reg(Bool()) init(False)
 
@@ -123,21 +124,22 @@ case class PeCore(config: PeCoreConfig) extends Component {
 // reg
 
     when (io_edge_fifo.edge_fifo_ready && io_edge_fifo.edge_fifo_valid && io_edge_fifo.edge_fifo_in =/= 0) {
-        io_vertex_reg.vertex_reg_addr  := io_edge_fifo.edge_fifo_in (15 downto 10).asUInt
+        vertex_reg_addr_h1  := io_edge_fifo.edge_fifo_in (15 downto 10).asUInt
         update_ram_addr_h1  := io_edge_fifo.edge_fifo_in (9 downto 4).asUInt
         edge_value_h1       := io_edge_fifo.edge_fifo_in (3 downto 0).asSInt
         h1_valid            := True
         hazard_s1_h1        := hazard_s1
     } otherwise {
-        io_vertex_reg.vertex_reg_addr  := 0
+        vertex_reg_addr_h1  := 0
         update_ram_addr_h1  := 0
         edge_value_h1       := 0
         hazard_s1_h1        := False
         h1_valid            := False
     }
 
-    io_update_ram.update_ram_rd_valid   := h1_valid
-    io_update_ram.update_ram_rd_addr    := update_ram_addr_h1
+    io_update_ram.rd_valid   := h1_valid
+    io_update_ram.rd_addr    := update_ram_addr_h1
+    io_vertex_reg.addr := vertex_reg_addr_h1
 
 
 //-----------------------------------------------------------
@@ -147,8 +149,8 @@ case class PeCore(config: PeCoreConfig) extends Component {
     when (h1_valid) {
         edge_value_h2  		:= edge_value_h1
         update_ram_addr_h2:= update_ram_addr_h1
-        updata_data_old_h2:= io_update_ram.update_ram_rd_data.asSInt
-        vertex_reg_data_h2:= io_vertex_reg.vertex_reg_in.asSInt
+        updata_data_old_h2:= io_update_ram.rd_data.asSInt
+        vertex_reg_data_h2:= io_vertex_reg.data.asSInt
         hazard_s1_h2      := hazard_s1_h1
         h2_valid       		:= True
     } otherwise {
@@ -176,7 +178,7 @@ case class PeCore(config: PeCoreConfig) extends Component {
         h3_valid     		:= False
     }
 
-    io_update_ram.update_ram_wr_valid   := h3_valid
-    io_update_ram.update_ram_wr_addr    := update_ram_addr_h3
-    io_update_ram.update_ram_wr_data    := ram_data_h3.asBits
+    io_update_ram.wr_valid   := h3_valid
+    io_update_ram.wr_addr    := update_ram_addr_h3
+    io_update_ram.wr_data    := ram_data_h3.asBits
 }

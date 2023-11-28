@@ -23,12 +23,12 @@ case class PeBundle(config: PeBundleConfig) extends Component {
     }
 
     val io_update_reg = new Bundle {
-        val update_reg_wr_valid = Vec(out Bool(), 8)
-        val update_reg_wr_addr = Vec(out UInt (config.update_ram_addr_width bits), 8)
-        val update_reg_wr_data = Vec(out Bits (config.vertex_width bits), 8)
+        val wr_valid = Vec(out Bool(), 8)
+        val wr_addr = Vec(out UInt (config.update_ram_addr_width bits), 8)
+        val wr_data = Vec(out Bits (config.vertex_width bits), 8)
 
-        val update_reg_rd_addr = Vec(out UInt (config.update_ram_addr_width bits), 8)
-        val update_reg_rd_data = Vec(in Bits (config.vertex_width bits))
+        val rd_addr = Vec(out UInt (config.update_ram_addr_width bits), 8)
+        val rd_data = Vec(in Bits (config.vertex_width bits), 8)
     }
 
     val last_update_r       = Reg(Bool())
@@ -47,24 +47,33 @@ case class PeBundle(config: PeBundleConfig) extends Component {
         pe_bundle(i).io_state.switch_done <> io_state.switch_done
         pe_bundle(i).io_state.globalreg_done <> global_reg.io.reg_full
 
-        pe_bundle(i).io_vertex_reg.vertex_reg_addr <> global_reg.io.rd_addr(i)
-        pe_bundle(i).io_vertex_reg.vertex_reg_in <> global_reg.io.rd_data(i)
+        pe_bundle(i).io_vertex_reg.addr <> global_reg.io.rd_addr(i)
+        pe_bundle(i).io_vertex_reg.data <> global_reg.io.rd_data(i)
 
-        pe_bundle(i).io_update_ram.update_ram_wr_valid <>  io_update_reg.update_reg_wr_valid(i)
-        pe_bundle(i).io_update_ram.update_ram_wr_addr <>  io_update_reg.update_reg_wr_addr(i)
-        pe_bundle(i).io_update_ram.update_ram_wr_data <>  io_update_reg.update_reg_wr_data(i)
+        pe_bundle(i).io_update_ram.wr_valid <>  io_update_reg.wr_valid(i)
+        pe_bundle(i).io_update_ram.wr_addr <>  io_update_reg.wr_addr(i)
+        pe_bundle(i).io_update_ram.wr_data <>  io_update_reg.wr_data(i)
 
-        pe_bundle(i).io_update_ram.update_ram_rd_addr <>  io_update_reg.update_reg_rd_addr(i)
-        pe_bundle(i).io_update_ram.update_ram_rd_data <>  io_update_reg.update_reg_rd_data(i)
+        pe_bundle(i).io_update_ram.rd_addr <>  io_update_reg.rd_addr(i)
+        pe_bundle(i).io_update_ram.rd_data <>  io_update_reg.rd_data(i)
 
         pe_bundle(i).io_edge_fifo.edge_fifo_ready <> io_fifo.pe_fifo(i).ready
         pe_bundle(i).io_edge_fifo.edge_fifo_valid <> io_fifo.pe_fifo(i).valid
         pe_bundle(i).io_edge_fifo.edge_fifo_in <> io_fifo.pe_fifo(i).payload
 
     }
+    println(pe_bundle.length)
 
-    io_state.bundle_busy := pe_bundle(1).io_state.pe_busy | pe_bundle(2).io_state.pe_busy | pe_bundle(3).io_state.pe_busy | pe_bundle(4).io_state.pe_busy |
-      pe_bundle(5).io_state.pe_busy | pe_bundle(6).io_state.pe_busy | pe_bundle(7).io_state.pe_busy | pe_bundle(0).io_state.pe_busy
+    io_state.bundle_busy :=  pe_bundle(0).io_state.pe_busy |
+      pe_bundle(1).io_state.pe_busy |
+      pe_bundle(2).io_state.pe_busy |
+      pe_bundle(3).io_state.pe_busy |
+      pe_bundle(4).io_state.pe_busy |
+      pe_bundle(5).io_state.pe_busy |
+      pe_bundle(6).io_state.pe_busy |
+      pe_bundle(7).io_state.pe_busy
+
+
 
     when (io_state.last_update) {
         last_update_r := True

@@ -16,9 +16,22 @@ case class GlobalReg(config: GlobalRegConfig) extends Component{
         val need_new_vertex   = in Bool()
         val reg_full  = out Bool()
     }
+//    val vertex_reg = Vec(Bits(config.data_width bits), config.reg_depth)
+//    val vertex_reg = Vec(Reg(Bits(config.data_width bits)), config.reg_depth)
+    val vertex_reg = Vec.fill(config.reg_depth)(Reg(Bits(config.data_width bits)))
+    vertex_reg.foreach(_ init(0))
+//    val vertex_reg = Vec(Reg(Bits(config.data_width bits)))  init (0)
+//    val vertex_reg = new Array[Bits] (64)
+//    for (i <- 0 until 63) {
+//        vertex_reg(i) = Reg(Bits(config.data_width bits)) init(0)
+//    }
 
-    val vertex_reg = Vec(Reg(Bits(config.data_width bits)), config.reg_depth)
-    val wr_pointer = Reg(UInt(3 bits)) init 0
+    val wr_pointer = Reg(UInt(3 bits)) init (0)
+//
+//    var test = ((wr_pointer*8)(5 downto 0) + U(1)).resized
+//    println(test)
+
+//    println(wr_pointer.resized)
 
     when (wr_pointer === 7) {
         io.in_stream.ready := False
@@ -29,9 +42,12 @@ case class GlobalReg(config: GlobalRegConfig) extends Component{
     io.reg_full := !io.in_stream.ready
 
     when(io.in_stream.valid && io.in_stream.ready) {
-        for (x <- 0 until 7) {
-//            println((wr_pointer*8).)
-            vertex_reg(wr_pointer * 8 + x) := io.in_stream.payload(16 * (x + 1) - 1 downto 16 * x )
+        for (i <- 0 until 7) {
+//            println(wr_pointer * U(8))
+//            println(vertex_reg(0))
+//            println(wr_pointer)
+//            vertex_reg(wr_pointer.resized * 8 + x) := io.in_stream.payload(16*(x + 1) - 1 downto 16*x )
+            vertex_reg((wr_pointer*8)(5 downto 0) + i) := io.in_stream.payload(16*(i + 1) - 1 downto 16*i )
         }
         wr_pointer := wr_pointer + 1
     } otherwise {
