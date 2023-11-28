@@ -10,7 +10,7 @@ class AxiMemCtrlTest extends AnyFunSuite {
 
   val compiled= SimConfig
     .withWave
-    .withIVerilog
+//    .withIVerilog
     .compile(PE.PeTop())
 
   test("hello"){

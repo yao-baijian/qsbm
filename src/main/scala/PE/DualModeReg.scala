@@ -6,11 +6,11 @@ import spinal.lib._
 import scala.language.postfixOps
 import scala.math._
 
-case class DualModeReg(config: RegConfig) extends Component{
+case class DualModeReg(config: VertexConfig) extends Component{
 
     val io = new Bundle{
         val srst   = in Bool()
-        val in_stream = slave Stream(Bits(config.data_width bits))
+        val in_stream = slave Stream(Bits(config.stream_width bits))
     }
 // Todo: add vertex write back
 
@@ -26,15 +26,19 @@ case class DualModeReg(config: RegConfig) extends Component{
     val vertex_reg = Vec(Reg(Bits(config.data_width bits)) init(0), pow(2,config.addr_width).toInt)
     val wr_pointer = Reg(UInt(3 bits)) init 0
 
-    when(wr_pointer === pow(2,config.addr_width).toInt - 1) {
-        io.in_stream.ready := False
+    val rdy = Reg(Bool()) init True
+
+    when(wr_pointer === 7) {
+        rdy := False
     } elsewhen (io.srst) {
-        io.in_stream.ready := True
+        rdy := True
     }
+
+    io.in_stream.ready := rdy
 
     when(io.in_stream.valid && io.in_stream.ready) {
         for (x <- 0 until 8) {
-            vertex_reg(wr_pointer + x) := io.in_stream.payload(16 * (x + 1) - 1 downto 16 * x)
+            vertex_reg((wr_pointer*8) (5 downto 0) + x) := io.in_stream.payload(16 * (x + 1) - 1 downto 16 * x)
         }
         wr_pointer := wr_pointer + 1
     } otherwise {

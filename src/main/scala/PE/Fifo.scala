@@ -31,6 +31,8 @@ case class Fifo(
     val edge_fifo = StreamFifo(Bits(data_width bits), fifo_depth)
     val pay_load_buf =  Reg(Bits(data_width bits))
 
+    //TODO: stream rdy is wrongly driven
+    
     when (io.in_stream.payload === 0x0000000000000000) {
         io.fifo_done := True
     }.elsewhen (io.rst) {

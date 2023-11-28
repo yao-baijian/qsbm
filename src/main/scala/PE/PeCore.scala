@@ -13,51 +13,59 @@ case class PeCore(config: PeCoreConfig) extends Component {
         val globalreg_done = in Bool()
         val switch_done = in Bool()
 
-        val pe_busy = out Bool() setAsReg() init (False)
-        val need_new_vertex = out Bool() setAsReg() init (False)
+        val pe_busy = out Bool()
+        val need_new_vertex = out Bool()
     }
 
     val io_edge_fifo = new Bundle {
         val edge_fifo_ready = out Bool() setAsReg() init(True)
-        val edge_fifo_in = in Bits (config.edge_width bits)
+        val edge_fifo_in = in Bits (config.edge_data_width bits)
         val edge_fifo_valid = in Bool()
     }
 
     val io_vertex_reg = new Bundle {
-        val addr = out UInt (config.vertex_reg_addr_width bits)
-        val data = in Bits (config.vertex_reg_data_width bits)
+        val addr = out UInt (config.vertex_addr_width bits)
+        val data = in Bits (config.vertex_data_width bits)
     }
 
     val io_update_ram = new Bundle {
-        val wr_valid = out Bool()
-        val wr_addr = out UInt (config.update_ram_addr_width bits)
-        val wr_data = out Bits (32 bits)
+        val wr_valid    = out Bool()
+        val wr_addr     = out UInt (config.update_addr_width bits)
+        val wr_data     = out Bits (config.update_data_width bits)
 
-        val rd_valid = out Bool()
-        val rd_addr = out UInt (config.update_ram_addr_width bits)
-        val rd_data = in Bits (32 bits)
+        val rd_valid    = out Bool()
+        val rd_addr     = out UInt (config.update_addr_width bits)
+        val rd_data     = in  Bits (config.update_data_width bits)
     }
 
     val hazard_s1           = Reg(Bool())
-    val edge_value_h1       = Reg(SInt(8 bits)) init(0)
-    val update_ram_addr_h1  = Reg(UInt (10 bits)) init(0)
-    val vertex_reg_addr_h1  = Reg(UInt (config.vertex_reg_addr_width bits)) init(0)
-    val hazard_s1_h1        = Reg(Bool()) init(False)
-    val h1_valid            = Reg(Bool()) init(False)
+    val edge_value_h1       = Reg(SInt(config.edge_value_length bits)) init 0
+    val update_ram_addr_h1  = Reg(UInt(config.update_addr_width bits)) init 0
+    val vertex_reg_addr_h1  = Reg(UInt(config.vertex_addr_width bits)) init 0
+    val hazard_s1_h1        = Reg(Bool()) init False
+    val h1_valid            = Reg(Bool()) init False
 
-    val vertex_reg_data_h2  = Reg(SInt(32 bits)) init (0)
-    val edge_value_h2       = Reg(SInt(8 bits)) init (0)
-    val h2_valid            = Reg(Bool()) init (False)
-    val updata_data_old_h2  = Reg(SInt(32 bits)) init (0)
-    val update_ram_addr_h2  = Reg(UInt (6 bits)) init (0)
-    val hazard_s1_h2        = Reg(Bool()) init (False)
+    val vertex_reg_data_h2  = Reg(SInt(config.vertex_data_width bits)) init 0
+    val edge_value_h2       = Reg(SInt(config.edge_value_length bits)) init 0
+    val h2_valid            = Reg(Bool()) init False
+    val updata_data_old_h2  = Reg(SInt(config.update_data_width bits)) init 0
+    val update_ram_addr_h2  = Reg(UInt(config.update_addr_width bits)) init 0
+    val hazard_s1_h2        = Reg(Bool()) init False
 
-    val updata_data_h2      = SInt(32 bits)
+    val updata_data_h2      = SInt(config.update_data_width bits)
 
     val h3_valid            = Reg(Bool()) init False
-    val ram_data_h3         = Reg(SInt(32 bits)) init 0
-    val update_ram_addr_h3  = Reg(UInt (6 bits)) init 0
+    val ram_data_h3         = Reg(SInt(config.update_data_width bits)) init 0
+    val update_ram_addr_h3  = Reg(UInt(config.update_addr_width bits)) init 0
 
+
+    val pe_busy             = Reg(Bool()) init False
+    val need_new_vertex     = Reg(Bool()) init False
+    val rdy                 = Reg(Bool()) init False
+
+    io_edge_fifo.edge_fifo_ready    := rdy
+    io_state.pe_busy                := pe_busy
+    io_state.need_new_vertex        := need_new_vertex
 
     val pe_fsm = new StateMachine {
 
@@ -69,34 +77,34 @@ case class PeCore(config: PeCoreConfig) extends Component {
         IDLE
           .whenIsActive {
               when (io_state.globalreg_done ) {
-                  io_state.need_new_vertex  := False
+                  need_new_vertex  := False
               }
               when (io_state.globalreg_done && io_edge_fifo.edge_fifo_valid === True) {
-                  io_state.pe_busy := True
-                  io_edge_fifo.edge_fifo_ready := True
+                  pe_busy := True
+                  rdy := True
                   goto(OPERATE)
               }
           }
 
         OPERATE
           .whenIsActive {
-              when(io_edge_fifo.edge_fifo_in === 0) {
+              when(io_edge_fifo.edge_fifo_in === 0 | io_edge_fifo.edge_fifo_valid === False) {
                   goto(WAIT_DONE)
               }
           }
         WAIT_DONE
           .onEntry{
-              io_edge_fifo.edge_fifo_ready := False
+              rdy := False
           }
           .whenIsActive {
               when(h3_valid === False) {
                   when (io_state.last_update) {
-                      io_edge_fifo.edge_fifo_ready := False
-                      io_state.pe_busy := False
+                      rdy := False
+                      pe_busy := False
                       goto(PAUSE)
                   } otherwise{
-                      io_state.need_new_vertex  := True
-                      io_edge_fifo.edge_fifo_ready := True
+                      need_new_vertex  := True
+                      rdy := True
                       goto(IDLE)
                   }
               }
@@ -104,8 +112,8 @@ case class PeCore(config: PeCoreConfig) extends Component {
         PAUSE
           .whenIsActive {
               when(io_state.switch_done) {
-                  io_edge_fifo.edge_fifo_ready := True
-                  io_state.need_new_vertex  := True
+                  rdy := True
+                  need_new_vertex  := True
                   goto(IDLE)
               }
           }
@@ -116,7 +124,7 @@ case class PeCore(config: PeCoreConfig) extends Component {
 //-----------------------------------------------------------
 
 // WRITE AFTER READ
-    hazard_s1 := (io_edge_fifo.edge_fifo_in (21 downto 12).asUInt === update_ram_addr_h1) ? True | False
+    hazard_s1 := (io_edge_fifo.edge_fifo_in (9 downto 4).asUInt === update_ram_addr_h1) ? True | False
 
 //-----------------------------------------------------------
 // pipeline h1
@@ -137,9 +145,9 @@ case class PeCore(config: PeCoreConfig) extends Component {
         h1_valid            := False
     }
 
-    io_update_ram.rd_valid   := h1_valid
-    io_update_ram.rd_addr    := update_ram_addr_h1
-    io_vertex_reg.addr := vertex_reg_addr_h1
+    io_update_ram.rd_valid  := h1_valid
+    io_update_ram.rd_addr   := update_ram_addr_h1
+    io_vertex_reg.addr      := vertex_reg_addr_h1
 
 
 //-----------------------------------------------------------
@@ -162,7 +170,7 @@ case class PeCore(config: PeCoreConfig) extends Component {
         h2_valid       		:= False
     }
 
-    updata_data_h2 := hazard_s1_h2 ? ram_data_h3 | updata_data_old_h2  + vertex_reg_data_h2 * edge_value_h2;
+    updata_data_h2 := (hazard_s1_h2 ? ram_data_h3 | updata_data_old_h2  + vertex_reg_data_h2 * edge_value_h2) (config.update_data_width - 1 downto 0);
 
 //-----------------------------------------------------------
 // pipeline h3

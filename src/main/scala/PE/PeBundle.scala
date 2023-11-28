@@ -19,7 +19,7 @@ case class PeBundle(config: PeBundleConfig) extends Component {
     }
 
     val io_global_reg =new Bundle {
-        val vertex_stream = slave Stream (Bits(config.axi_width / 8 bits))
+        val vertex_stream = slave Stream (Bits(config.axi_width bits))
     }
 
     val io_update_reg = new Bundle {
@@ -36,10 +36,10 @@ case class PeBundle(config: PeBundleConfig) extends Component {
     val pe_bundle           = new Array[PeCore](8)
     val global_reg          = GlobalReg (config.global_reg_config)
 
-    global_reg.io.in_stream <> io_global_reg.vertex_stream
+    global_reg.io.in_stream << io_global_reg.vertex_stream
     global_reg.io.need_new_vertex <> need_new_vertex_r
 
-    for (i <- 0 until 7) {
+    for (i <- 0 until 8) {
         pe_bundle (i) = PeCore(config.pe_core_config)
         pe_bundle (i).setName("pe_" + i.toString)
 
@@ -57,23 +57,21 @@ case class PeBundle(config: PeBundleConfig) extends Component {
         pe_bundle(i).io_update_ram.rd_addr <>  io_update_reg.rd_addr(i)
         pe_bundle(i).io_update_ram.rd_data <>  io_update_reg.rd_data(i)
 
-        pe_bundle(i).io_edge_fifo.edge_fifo_ready <> io_fifo.pe_fifo(i).ready
-        pe_bundle(i).io_edge_fifo.edge_fifo_valid <> io_fifo.pe_fifo(i).valid
-        pe_bundle(i).io_edge_fifo.edge_fifo_in <> io_fifo.pe_fifo(i).payload
+        io_fifo.pe_fifo(i).ready := pe_bundle(i).io_edge_fifo.edge_fifo_ready
+        pe_bundle(i).io_edge_fifo.edge_fifo_valid := io_fifo.pe_fifo(i).valid
+        pe_bundle(i).io_edge_fifo.edge_fifo_in := io_fifo.pe_fifo(i).payload
 
     }
-    println(pe_bundle.length)
 
-    io_state.bundle_busy :=  pe_bundle(0).io_state.pe_busy |
-      pe_bundle(1).io_state.pe_busy |
-      pe_bundle(2).io_state.pe_busy |
-      pe_bundle(3).io_state.pe_busy |
-      pe_bundle(4).io_state.pe_busy |
-      pe_bundle(5).io_state.pe_busy |
-      pe_bundle(6).io_state.pe_busy |
-      pe_bundle(7).io_state.pe_busy
+    val bundle_busy_table = Reg(Bits(8 bits))
+    val bundle_need_vertex_table = Reg(Bits(8 bits))
 
+    for (i <- 0 until 8) {
+        bundle_busy_table(i) := pe_bundle(i).io_state.pe_busy
+        bundle_need_vertex_table(i) := pe_bundle(i).io_state.need_new_vertex
+    }
 
+    io_state.bundle_busy := bundle_busy_table.orR
 
     when (io_state.last_update) {
         last_update_r := True
@@ -81,8 +79,7 @@ case class PeBundle(config: PeBundleConfig) extends Component {
         last_update_r := False
     }
 
-    when(pe_bundle(1).io_state.need_new_vertex & pe_bundle(2).io_state.need_new_vertex & pe_bundle(3).io_state.need_new_vertex & pe_bundle(4).io_state.need_new_vertex |
-      pe_bundle(5).io_state.need_new_vertex & pe_bundle(6).io_state.need_new_vertex & pe_bundle(7).io_state.need_new_vertex & pe_bundle(0).io_state.need_new_vertex) {
+    when(bundle_need_vertex_table.andR) {
         need_new_vertex_r := True
     } otherwise {
         need_new_vertex_r := False
