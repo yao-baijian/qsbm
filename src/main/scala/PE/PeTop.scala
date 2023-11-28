@@ -21,6 +21,8 @@ case class PeTop() extends Component {
 
         val bundle_busy_table = out Bits(4 bits)
         val vertex_stream_top = slave Stream (Bits(128 bits))
+
+        val writeback_stream = Vec(master Stream (Bits(16 bits)), 8)
     }
 
     //-----------------------------------------------------
@@ -119,10 +121,14 @@ case class PeTop() extends Component {
         vertex_reg_group_A(i).io_gather_pe.wr_valid := Mux(!switch , gather_pe_group(i).io_vertex_ram.wr_val , False )
         vertex_reg_group_A(i).io_gather_pe.wr_addr := Mux(!switch , gather_pe_group(i).io_vertex_ram.wr_addr , U(0) )
         vertex_reg_group_A(i).io_gather_pe.wr_data := Mux(!switch , gather_pe_group(i).io_vertex_ram.wr_data , B(0) )
+        vertex_reg_group_A(i).io_gather_pe.rd_addr := Mux(!switch, Mux(writeback_busy, writeback_pointer ,gather_pe_group(i).io_vertex_ram.rd_addr), U(0))
+        vertex_reg_group_A(i).io_gather_pe.rd_data := Mux(!switch, Mux(writeback_busy, writeback_payload ,gather_pe_group(i).io_vertex_ram.rd_data）, B(0))
 
         vertex_reg_group_B(i).io_gather_pe.wr_valid := Mux(switch, gather_pe_group(i).io_vertex_ram.wr_val, False)
         vertex_reg_group_B(i).io_gather_pe.wr_addr := Mux(switch, gather_pe_group(i).io_vertex_ram.wr_addr, U(0))
         vertex_reg_group_B(i).io_gather_pe.wr_data := Mux(switch, gather_pe_group(i).io_vertex_ram.wr_data, B(0))
+        vertex_reg_group_B(i).io_gather_pe.rd_addr := Mux(switch, gather_pe_group(i).io_vertex_ram.rd_addr, U(0))
+        vertex_reg_group_B(i).io_gather_pe.rd_data := Mux(switch, gather_pe_group(i).io_vertex_ram.rd_data, B(0))
 
         vertex_reg_group_A(i).io.srst   := Mux(!switch, switch_done, False)
         vertex_reg_group_B(i).io.srst   := Mux(switch, switch_done, False)
@@ -172,13 +178,26 @@ case class PeTop() extends Component {
     //Todo: this logic might be problematic
     last_update := io.last_update(0)
 
-    //Todo: final write back
+    //Todo: combinational busy signal need redo
 
     //-----------------------------------------------------
     // Write Back
     //-----------------------------------------------------
 
-    when(writeback_busy)
+//    val writeback_stream_payload
+//    val writeback_stream_valid
+
+    val writeback_payload = Bits(16 bits)
+    val writeback_pointer = Reg(Bits(7 bits))
+    val writeback_done = Reg(Bool())
+    when(writeback_busy && writeback_pointer =/= 64) {
+        for  (i <- 0 until 8) {
+            vertex_reg_group_A(i).
+        }
+
+    }
+
+
 
     //-----------------------------------------------------
     // State Machine
@@ -242,7 +261,8 @@ case class PeTop() extends Component {
           }
         WRITE_BACK
           .whenIsActive {
-              when(!writeback_busy) {
+              when(writeback_done) {
+                  writeback_busy := False
                   goto(IDLE)
               }
           }

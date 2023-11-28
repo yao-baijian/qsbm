@@ -92,7 +92,7 @@ case class GatherPeCore(config:GatherPeCoreConfig) extends Component {
 //-----------------------------------------------------------
 // TO DO
 
-    when (gather_pe_busy & (update_ram_rd_addr_h1 =/= 63)) {
+    when (gather_pe_busy & (update_ram_rd_addr_h1 =/= 64)) {
         update_ram_rd_addr_h1 := update_ram_rd_addr_h1 + 1
         vertex_ram_rd_addr_h1 := vertex_ram_rd_addr_h1 + 1
         h1_valid := True
