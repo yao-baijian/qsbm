@@ -1,13 +1,39 @@
 package PE
 
-
+import spinal.core._
 
 object Config {
+    val axi_width: Int = 128
     val data_width: Int = 16
-//    def get(): Unit = {
-//        return this.
-//    }
+    val matrix_size: Int = 64
+    val addr_width: Int = log2Up(matrix_size)
+    def test(): Unit = {
+        println(addr_width)
+    }
+    def main(args: Array[String]): Unit = {
+        test()
+    }
 }
+case class RegConfig(reg_depth: Int = Config.matrix_size,
+                     addr_width: Int = Config.addr_width,
+                     data_width: Int = Config.data_width)
+case class VertexConfig(stream_width: Int = Config.axi_width) extends RegConfig
+case class GlobalRegConfig() extends VertexConfig
+case class PeCoreConfig(vertex_data_width: Int = 16,
+                        vertex_addr_width: Int = 6,
+                        edge_data_width: Int = 16,
+                        edge_addr_width: Int = 6,
+                        update_addr_width : Int = 6,
+                        update_data_width : Int = 16,
+                        edge_value_length : Int = 4)
+
+case class GatherPeCoreConfig(alpha: Int = 1, //alpha = (np.linspace(0, 1, num_iters))
+                              beta: Int = 8, // beta = (0.7 / math.sqrt(N))#
+                              xi_dt: Int = 32,
+                              positive_boundary: Int  = 127,
+                              negetive_boundary: Int  = -1, // np.clip(x_comp,-1, 1)
+                              addr_width: Int = 6,
+                              data_width: Int = 16)
 case class PETopConfig(core_num: Int = 4,
                        thread_num: Int = 8,
                        vertex_reg_num: Int = 8,
@@ -32,37 +58,9 @@ case class PeBundleConfig(axi_width: Int = 128,
                           reg_config: RegConfig = RegConfig(),
                           pe_core_config: PeCoreConfig = PeCoreConfig())
 
-case class GatherPeConfig(reg_depth: Int = 64,
-                     addr_width: Int = 6,
-                     data_width: Int = 16)
 
-case class RegConfig(reg_depth: Int = 64,
-                     addr_width: Int = 6,
-                     data_width: Int = 16)
 
-case class VertexConfig(reg_depth: Int = 64,
-                     addr_width: Int = 6,
-                     data_width: Int = 16,
-                        stream_width: Int = 128)
 
-case class GlobalRegConfig(stream_width: Int = 128,
-                           reg_depth: Int = 64,
-                           addr_width: Int = 6,
-                           data_width: Int = 16)
                            
-case class PeCoreConfig(vertex_data_width: Int = 16,
-                        vertex_addr_width: Int = 6,
-                        edge_data_width: Int = 16,
-                        edge_addr_width: Int = 6,
-                        update_addr_width : Int = 6,
-                        update_data_width : Int = 16,
-                        edge_value_length : Int = 4)
 
-case class GatherPeCoreConfig(alpha: Int = 1, //alpha = (np.linspace(0, 1, num_iters))
-                              beta: Int = 8, // beta = (0.7 / math.sqrt(N))#
-                              xi_dt: Int = 32,
-                              positive_boundary: Int  = 127,
-                              negetive_boundary: Int  = -1, // np.clip(x_comp,-1, 1)
-                              addr_width: Int = 6,
-                              data_width: Int = 16)
 

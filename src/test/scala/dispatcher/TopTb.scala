@@ -1,6 +1,7 @@
 package dispatcher
 
 import PE.PETopConfig
+import PE.Config
 import org.scalatest.funsuite.AnyFunSuite
 import spinal.core.ClockDomain.FixedFrequency
 import spinal.core.{ClockDomainConfig, IntToBuilder, SYNC, SpinalConfig}
