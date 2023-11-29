@@ -21,6 +21,7 @@ case class GatherPeCore(config:GatherPeCoreConfig) extends Component {
     val io_vertex_ram = new Bundle {
         val rd_addr = out UInt (6 bits)
         val rd_data = in Bits (config.data_width bits)
+
         val wr_addr = out UInt (6 bits)
         val wr_val = out Bool()
         val wr_data = out Bits (16 bits)
@@ -33,8 +34,8 @@ case class GatherPeCore(config:GatherPeCoreConfig) extends Component {
     val negetive_boundary =  S(config.negetive_boundary, 8 bits)
 
     val h1_valid = Reg(Bool()) init False
-    val update_ram_rd_addr_h1 = Reg(UInt (config.addr_width bits)) init(0)
-    val vertex_ram_rd_addr_h1 = Reg(UInt (config.addr_width bits)) init(0)
+    val update_ram_rd_addr_h1 = Reg(UInt (config.addr_width bits)) init 0
+    val vertex_ram_rd_addr_h1 = Reg(UInt (config.addr_width bits)) init 0
 
     val h2_valid = Reg(Bool()) init False
     val y_old_h2 = Reg(SInt(8 bits)) init 0
@@ -92,10 +93,13 @@ case class GatherPeCore(config:GatherPeCoreConfig) extends Component {
 //-----------------------------------------------------------
 // TO DO
 
-    when (gather_pe_busy & (update_ram_rd_addr_h1 =/= 64)) {
-        update_ram_rd_addr_h1 := update_ram_rd_addr_h1 + 1
-        vertex_ram_rd_addr_h1 := vertex_ram_rd_addr_h1 + 1
-        h1_valid := True
+    when (gather_pe_busy & (update_ram_rd_addr_h1 =/= 63)) {
+        when (h1_valid) {
+            update_ram_rd_addr_h1 := update_ram_rd_addr_h1 + 1
+            vertex_ram_rd_addr_h1 := vertex_ram_rd_addr_h1 + 1
+        } otherwise {
+            h1_valid := True
+        }
     } otherwise {
         update_ram_rd_addr_h1 := 0
         vertex_ram_rd_addr_h1 := 0

@@ -3,7 +3,6 @@ package PE
 import spinal.core.SInt
 
 case class PeBundleConfig(axi_width: Int = 128,
-
                           addr_width: Int = 6,
                           vertex_width: Int = 16,
                           update_ram_addr_width: Int = 6,
@@ -49,8 +48,13 @@ case class GatherPeCoreConfig(alpha: Int = 1, //alpha = (np.linspace(0, 1, num_i
                               negetive_boundary: Int  = -1, // np.clip(x_comp,-1, 1)
                               addr_width: Int = 6,
                               data_width: Int = 16)
-
-//val alpha = 1
-//val beta = 1
-//val xi_dt = 1
-//val positive_boundary = 1
+case class PETopConfig(core_num: Int = 4,
+                       thread_num: Int = 8,
+                       vertex_reg_num: Int = 8,
+                       gather_pe_num: Int = 8,
+                       data_width: Int = 16,
+                       matrix_size: Int = 64,
+                       vertex_config: VertexConfig  = VertexConfig(),
+                       reg_config: RegConfig  = RegConfig(),
+                       gather_pe_bundle_config: GatherPeCoreConfig = GatherPeCoreConfig(),
+                       pe_bundle_config: PeBundleConfig = PeBundleConfig())
