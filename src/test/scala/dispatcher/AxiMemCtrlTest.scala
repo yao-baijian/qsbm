@@ -7,11 +7,11 @@ import spinal.core.sim._
 import spinal.sim._
 import spinal.lib._
 class AxiMemCtrlTest extends AnyFunSuite {
-
+  val pe_top_config = PE.PETopConfig()
   val compiled= SimConfig
     .withWave
 //    .withIVerilog
-    .compile(PE.PeTop())
+    .compile(PE.PeTop(pe_top_config))
 
   test("hello"){
 //    implicit val _ = "."

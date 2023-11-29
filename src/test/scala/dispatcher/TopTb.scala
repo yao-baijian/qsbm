@@ -1,5 +1,6 @@
 package dispatcher
 
+import PE.PETopConfig
 import org.scalatest.funsuite.AnyFunSuite
 import spinal.core.ClockDomain.FixedFrequency
 import spinal.core.{ClockDomainConfig, IntToBuilder, SYNC, SpinalConfig}
@@ -8,10 +9,11 @@ import spinal.sim._
 import spinal.lib._
 class TopTb extends AnyFunSuite {
 
+    val pe_top_config = PETopConfig()
     val compiled= SimConfig
       .withWave
       .withIVerilog
-      .compile(PE.PeTop())
+      .compile(PE.PeTop(pe_top_config))
 
     test("hello"){
         //    implicit val _ = "."

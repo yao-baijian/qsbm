@@ -168,7 +168,7 @@ case class PeTop(config:PETopConfig) extends Component {
         vertex_reg_en := 0x00000001
     }
 
-    // Todo this part is not capable of parameterlize
+    // Todo this part is not capable of parameterize
     when(need_update) {
         for (i <- 0 until config.thread_num) {
             for (j <- 0 until config.matrix_size) {
