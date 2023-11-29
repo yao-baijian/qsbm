@@ -1,3 +1,24 @@
+/*
+ * @Author: Yao Baijian eebyao@ust.hk
+ * @Date: 2023-11-24 12:10:55
+ * @LastEditors:  
+ * @LastEditTime: 2023-11-29 10:52:00
+ * @FilePath: \sboom\src\main\scala\PE\PeTop.scala
+ * @Description: Parameterized PE top module:
+    *               1. PE bundle array x4:  each PE bundle contains 8 PE and 8 FIFO
+    *               2. Gather PE array x1:  contains 8 gather PE core
+    *               3. Vertex register array: contains 8 vertex register
+    *               4. Update register array: contains 8 update register
+    *               5. Write back control: control the write back process
+    *  the number of PE bundle, gather PE, vertex register, update register can be changed through config file  
+ * 
+ * Copyright (c) 2023 by ${git_name_email}, All Rights Reserved. 
+ */
+
+
+// Todo, FIFO need to be revised and connected
+// Todo, interface and corresponding apply method need to be added
+
 package PE
 
 import spinal.core._

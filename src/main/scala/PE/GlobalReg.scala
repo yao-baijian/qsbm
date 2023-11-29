@@ -1,3 +1,16 @@
+/*
+ * @Author: Yao Baijian eebyao@ust.hk
+ * @Date: 2023-11-17 16:39:05
+ * @LastEditors:  
+ * @LastEditTime: 2023-11-29 10:54:07
+ * @FilePath: \sboom\src\main\scala\PE\GlobalReg.scala
+ * @Description: 
+ * 
+ * Copyright (c) 2023 by ${git_name_email}, All Rights Reserved. 
+ */
+
+
+
 package PE
 
 import spinal.core._

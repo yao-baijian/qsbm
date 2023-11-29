@@ -1,3 +1,14 @@
+/*
+ * @Author: Yao Baijian eebyao@ust.hk
+ * @Date: 2023-11-17 16:39:05
+ * @LastEditors:  
+ * @LastEditTime: 2023-11-29 10:54:18
+ * @FilePath: \sboom\src\main\scala\PE\PeCore.scala
+ * @Description: 
+ * 
+ * Copyright (c) 2023 by ${git_name_email}, All Rights Reserved. 
+ */
+
 package PE
 
 import spinal.core._
