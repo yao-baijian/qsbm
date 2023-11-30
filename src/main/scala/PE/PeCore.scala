@@ -2,7 +2,7 @@
  * @Author: Yao Baijian eebyao@ust.hk
  * @Date: 2023-11-17 16:39:05
  * @LastEditors:  
- * @LastEditTime: 2023-11-29 10:54:18
+ * @LastEditTime: 2023-11-30 10:09:42
  * @FilePath: \sboom\src\main\scala\PE\PeCore.scala
  * @Description: 
  * 
@@ -49,7 +49,10 @@ case class PeCore(config: PeCoreConfig) extends Component {
         val rd_data     = in  Bits (config.update_data_width bits)
     }
 
+    // Todo: test hazard signal
+    
     val hazard_s1           = Reg(Bool())
+    val hazard_s2           = Reg(Bool())
     val edge_value_h1       = Reg(SInt(config.edge_value_length bits)) init 0
     val update_ram_addr_h1  = Reg(UInt(config.update_addr_width bits)) init 0
     val vertex_reg_addr_h1  = Reg(UInt(config.vertex_addr_width bits)) init 0
@@ -136,7 +139,7 @@ case class PeCore(config: PeCoreConfig) extends Component {
 
 // WRITE AFTER READ
     hazard_s1 := (io_edge_fifo.edge_fifo_in (9 downto 4).asUInt === update_ram_addr_h1) ? True | False
-
+    hazard_s2 := (io_edge_fifo.edge_fifo_in (9 downto 4).asUInt === update_ram_addr_h2) ? True | False
 //-----------------------------------------------------------
 // pipeline h1
 //-----------------------------------------------------------

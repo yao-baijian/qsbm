@@ -62,6 +62,7 @@ case class PeTop(config:PETopConfig) extends Component {
     // Module Declaration
     //-----------------------------------------------------
 
+    val edge_fifo                   = new Array[Array[Fifo]](config.core_num)
     val pe_bundle_array             = new Array[PeBundle](config.core_num)
     val gather_pe_group             = new Array[GatherPeCore](config.gather_pe_num)
     val vertex_reg_group_A          = new Array[DualModeReg](config.thread_num)
@@ -76,6 +77,10 @@ case class PeTop(config:PETopConfig) extends Component {
     for (i <- 0 until config.core_num) {
         pe_bundle_array(i) = PeBundle(config.pe_bundle_config)
         pe_bundle_array(i).setName("pe_bundle_" + i.toString)
+        edge_fifo(i) = new Array[Fifo] (config.thread_num)
+        for (j <- 0 until config.thread_num) {
+            edge_fifo(i)(j) = Fifo(config.pe_fifo_config)
+        }
     }
 
     for (i <- 0 until config.thread_num) {
@@ -98,7 +103,8 @@ case class PeTop(config:PETopConfig) extends Component {
         pe_bundle_array(i).io_state.switch_done <> switch_done
 
         for (j <- 0 until config.thread_num) {
-            pe_bundle_array(i).io_fifo.pe_fifo(j) << io.edge_stream(i)(j)
+            edge_fifo(i)(j).io.in_stream << io.edge_stream(i)(j)
+            pe_bundle_array(i).io_fifo.pe_fifo(j) << edge_fifo(i)(j).io.out_stream
 
             when (pe_bundle_array(i).io_update_reg.wr_valid(j)) {
                 pe_bundle_update_reg_group(i)(j)(pe_bundle_array(i).io_update_reg.wr_addr(j)) := pe_bundle_array(i).io_update_reg.wr_data(j)

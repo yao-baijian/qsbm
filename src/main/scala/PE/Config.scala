@@ -6,6 +6,7 @@ object Config {
     val axi_width: Int = 128
     val data_width: Int = 16
     val matrix_size: Int = 64
+    val fifo_depth: Int = 2048
     val addr_width: Int = log2Up(matrix_size)
     def test(): Unit = {
         println(addr_width)
@@ -17,6 +18,10 @@ object Config {
 case class RegConfig(reg_depth: Int = Config.matrix_size,
                      addr_width: Int = Config.addr_width,
                      data_width: Int = Config.data_width)
+
+case class FifoConfig(fifo_depth: Int = Config.fifo_depth,
+                        stream_width: Int = Config.axi_width,
+                        data_width: Int = Config.data_width)
 case class VertexConfig(stream_width: Int = Config.axi_width,
                         reg_depth: Int = Config.matrix_size,
                         addr_width: Int = Config.addr_width,
@@ -49,7 +54,8 @@ case class PETopConfig(core_num: Int = 4,
                        vertex_config: VertexConfig  = VertexConfig(),
                        reg_config: RegConfig  = RegConfig(),
                        gather_pe_bundle_config: GatherPeCoreConfig = GatherPeCoreConfig(),
-                       pe_bundle_config: PeBundleConfig = PeBundleConfig())
+                       pe_bundle_config: PeBundleConfig = PeBundleConfig(),
+                       pe_fifo_config: FifoConfig =FifoConfig())
 
 case class PeBundleConfig(axi_width: Int = 128,
                           addr_width: Int = 6,

@@ -63,8 +63,10 @@ case class PeBundle(config: PeBundleConfig) extends Component {
 
     }
 
-    val bundle_busy_table = Reg(Bits(8 bits))
-    val bundle_need_vertex_table = Reg(Bits(8 bits))
+    val bundle_busy_table = Bits(8 bits)
+    bundle_busy_table := 0
+    val bundle_need_vertex_table = Bits(8 bits)
+    bundle_need_vertex_table := 0
 
     for (i <- 0 until 8) {
         bundle_busy_table(i) := pe_bundle(i).io_state.pe_busy
