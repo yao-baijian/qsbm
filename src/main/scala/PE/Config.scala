@@ -17,8 +17,14 @@ object Config {
 case class RegConfig(reg_depth: Int = Config.matrix_size,
                      addr_width: Int = Config.addr_width,
                      data_width: Int = Config.data_width)
-case class VertexConfig(stream_width: Int = Config.axi_width) extends RegConfig
-case class GlobalRegConfig() extends VertexConfig
+case class VertexConfig(stream_width: Int = Config.axi_width,
+                        reg_depth: Int = Config.matrix_size,
+                        addr_width: Int = Config.addr_width,
+                        data_width: Int = Config.data_width)
+case class GlobalRegConfig(stream_width: Int = Config.axi_width,
+                           reg_depth: Int = Config.matrix_size,
+                           addr_width: Int = Config.addr_width,
+                           data_width: Int = Config.data_width)
 case class PeCoreConfig(vertex_data_width: Int = 16,
                         vertex_addr_width: Int = 6,
                         edge_data_width: Int = 16,
