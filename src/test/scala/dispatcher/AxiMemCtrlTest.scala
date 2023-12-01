@@ -10,7 +10,8 @@ class AxiMemCtrlTest extends AnyFunSuite {
   val pe_top_config = PE.PETopConfig()
   val compiled= SimConfig
     .withWave
-//    .withIVerilog
+    .withXilinxDevice("xc7z030fbv484-3")
+    .withXSim
     .compile(PE.PeTop(pe_top_config))
 
   test("hello"){

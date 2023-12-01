@@ -43,6 +43,8 @@ bin/
 *.vcd
 !tester/src/test/resources/*.vhd
 
+# Xilinx
+xsim.dir/
 
 simWorkspace/
 tmp/

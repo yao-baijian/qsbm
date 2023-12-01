@@ -16,7 +16,6 @@
  */
 
 
-// Todo, FIFO need to be revised and connected
 // Todo, interface and corresponding apply method need to be added
 
 package PE
