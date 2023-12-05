@@ -96,7 +96,7 @@ case class Dispatcher() extends Component {
   val vexEdgeSelect = Reg(UInt(log2Up(2) bits)) init 0
   val vexEdgeOutStreams = StreamDemux(io.axiMemControlPort.r, vexEdgeSelect, 2)
   vexEdgeOutStreams(0).ready := False
-//  vexEdgeOutStreams(1).ready := False
+  vexEdgeOutStreams(1).ready := True
 
   //***********************  vexSwitchRegOutPorts Connection *******************//
   val vexSwitchRegOutSelect = Reg(UInt(log2Up(2) bits)) init 0
@@ -114,7 +114,8 @@ case class Dispatcher() extends Component {
   }
 
 //********************************** EDGE DATA DISPATCH ********************************************//
-val bigPeEdgeCompleted = vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(0) === 0 && //&&
+  //InFlag is from the perspective of the input of cacheFifo
+val allZeroInFlag = vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(0) === 0 && //&&
   vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(1) === 0 && //&&
   vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(2) === 0 && //&&
   vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(3) === 0 && //&&
@@ -123,16 +124,24 @@ val bigPeEdgeCompleted = vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(
   vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(6) === 0 &&
   vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(7) === 0
 
+  val allZeroInFlagReg = Reg(Bool()) init False
+
   val edgeCacheFifo = StreamFifo(
     dataType = AxiMemControllerPort(DispatcherConfig().size),
     depth = 4096
     //    pushClock = clockA,
     //    popClock = clockB
   )
+  edgeCacheFifo.io.push.payload.data := vexEdgeOutStreams(1).payload.data
+  edgeCacheFifo.io.push.valid := vexEdgeOutStreams(1).valid
+
+//  val allZeroOutFlag = edgeCacheFifo.io.pop.payload.data === 0
+//  edgeCacheFifo.io.pop.valid := True
 
   //edge data dispatch to 4 pe column stream,stream0 for vex, stream1 for edges
   val edgePeColumnSelect = Reg(UInt(log2Up(4) bits)) init 0
-  val edgePeColumnOutStreams = StreamDemux(vexEdgeOutStreams(1), edgePeColumnSelect, 4)
+//  val edgePeColumnOutStreams = StreamDemux(vexEdgeOutStreams(1), edgePeColumnSelect, 4)
+  val edgePeColumnOutStreams = StreamDemux(edgeCacheFifo.io.pop, edgePeColumnSelect, 4)
   for (i <- 0 until PeConfig().peColumnNum) { //i for ith column
     edgePeColumnOutStreams(i).ready := io.bigPeReadyFlagVec(i)
     for (j <- 0 until PeConfig().peNumEachColumn) { //j for the offset of the ith column
@@ -221,9 +230,7 @@ val bigPeEdgeCompleted = vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(
 
     val READ_EDGE = new StateFsm(fsm = internalFsm()){
       whenCompleted{
-        when(bigPeEdgeCompleted){
-          goto(READ_VEX_ADDR)
-        }
+        goto(READ_VEX_ADDR)
       }
     }
     def internalFsm() = new StateMachine {
@@ -251,13 +258,19 @@ val bigPeEdgeCompleted = vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(
 
           io.axiMemControlPort.ar.payload.addr := U"32'h0000_1000" + (256*16) * edgeAddrCnt
 
-          when(bigPeEdgeCompleted && io.axiMemControlPort.r.last){
+          when(allZeroInFlag){
+            allZeroInFlagReg := True
+          }
+          when((allZeroInFlag || allZeroInFlagReg) && io.axiMemControlPort.r.last){
             edgeAddrCnt := edgeAddrCnt + 1
             exit()
-          }.elsewhen (io.axiMemControlPort.r.last){
+          }.elsewhen ( io.axiMemControlPort.r.last){
             edgeAddrCnt := edgeAddrCnt + 1
             goto(READ_EDGE_ADDR)
           }
+        }
+        onExit{
+          allZeroInFlagReg := False
         }
       }
     }

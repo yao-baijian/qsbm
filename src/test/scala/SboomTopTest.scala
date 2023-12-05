@@ -1,11 +1,13 @@
+import dispatcher.Dispatcher
 import org.scalatest.funsuite.AnyFunSuite
 import spinal.core._
 import spinal.core.sim.{SimConfig, _}
 import spinal.lib._
 import spinal.lib.bus.amba4.axi.sim.{AxiMemorySim, AxiMemorySimConfig}
+import dispatcher._
 
 import java.io.{File, FileOutputStream}
-import java.lang.Long.parseUnsignedLong
+import java.lang.Long.{parseLong, parseUnsignedLong}
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
@@ -14,28 +16,40 @@ import scala.util.Random
 
 class SboomTopTest extends AnyFunSuite {
 
-  def vertexGen() = {
+  val compiled= SimConfig.withWave.compile(SboomTop())
+//  val axiMemSimConfig = AxiMemorySimConfig()
+//  val axiMemSimModel = AxiMemorySim(compiled.dut.io.topAxiMemControlPort, compiled.dut.clockDomain, axiMemSimConfig)
+
+  def dataGen(): Array[Byte] = {
+    val data = new Array[Byte](100)
+
+    for (i <- 0 until 100) {
+      data(i) = i.toByte
+    }
+    data
+  }
+
+  def vexGen() = {
+
     val random = new Random()
     val vertexBuffer = ArrayBuffer[Byte]()
     for (i <- 0 until 128 * 16) {
+
       val num = (random.nextInt(33) - 16).toByte
       vertexBuffer.append(num)
+
     }
     vertexBuffer.toArray
+
   }
 
   def edgeGen() = {
-
-    val filename = "./data/G1"
+    val filename = "./data/G34"
     val firstLine = Source.fromFile(filename).getLines().next()
     val firFields = firstLine.split(' ')
-    //    val secondLine = Source.fromFile(filename).getLines().drop(1).next()
-    //    val secFields = secondLine.split(' ')
     val width = scala.math.ceil(parseUnsignedLong(firFields(0)).toDouble / 64).toInt
-    val cnt = (0 to 3).find((i => (i + width) % 4 == 0)).get
-    val arrayWidth = width + cnt
+    val arrayWidth = width
     println(arrayWidth)
-
     //put a queue inside each block
     val blocks = Array.ofDim[mutable.Queue[ArrayBuffer[Byte]]](arrayWidth, arrayWidth)
     for (row <- 0 until arrayWidth) {
@@ -43,40 +57,38 @@ class SboomTopTest extends AnyFunSuite {
         blocks(row)(col) = mutable.Queue[ArrayBuffer[Byte]]()
       }
     }
-
-    val fileOutput = new FileOutputStream(new File("./dataSet/G1.bin"))
+    //    val fileOutput = new FileOutputStream(new File("./dataSet/G1.bin"))
     val remainLines = Source.fromFile(filename).getLines().drop(1)
-
     for (line <- remainLines) {
-      val row = parseUnsignedLong(line.split(' ')(0))
-      val col = parseUnsignedLong(line.split(' ')(1))
-      val value = parseUnsignedLong(line.split(' ')(2))
-      val edge = (row & ((1 << 10) - 1)) << 22 |
-        (col & ((1 << 10) - 1)) << 12 |
-        value & ((1 << 12) - 1)
-
+      val row = parseUnsignedLong(line.split(' ')(0)) - 1
+      val col = parseUnsignedLong(line.split(' ')(1)) - 1
+      val value = parseLong(line.split(' ')(2))
+      val edge = (row & ((1 << 6) - 1)) << 10 |
+        (col & ((1 << 6) - 1)) << 6 |
+        value & ((1 << 4) - 1)
       val edgeBytes = ArrayBuffer[Byte](
-        (edge >>> 24).toByte,
-        (edge >>> 16).toByte,
-        (edge >>> 8).toByte,
-        edge.toByte
+        edge.toByte,
+        (edge >>> 8).toByte
       )
 
       val block_row = (row / 64).toInt
       val block_col = (col / 64).toInt
       blocks(block_row)(block_col).enqueue(edgeBytes)
-    }
+      blocks(block_col)(block_row).enqueue(edgeBytes)
+    } //put all the edges into all queues
 
     val edgesArrayBuffer = ArrayBuffer[ArrayBuffer[Byte]]()
     var flag = 0
     var block_empty = 0
-    //    val tempArray = ArrayBuffer[ArrayBuffer[Byte]](4)
-    //    val loop = new Breaks
-    for (base <- 0 until (arrayWidth) by 4) {
+    val goodIntervalBound = arrayWidth / PeConfig().peNumEachColumn * PeConfig().peNumEachColumn
+    val remainder = arrayWidth % (PeConfig().peNumEachColumn)
+
+    // To deal with all lines within good interval and all column blocks
+    for (base <- 0 until (goodIntervalBound) by PeConfig().peNumEachColumn) {
       for (col <- 0 until arrayWidth) {
         do {
           flag = 0
-          for (offset <- 0 to 3) {
+          for (offset <- 0 until PeConfig().peNumEachColumn) {
             if (blocks(base + offset)(col).nonEmpty) {
               flag = flag + 1
               val edge = blocks(base + offset)(col).dequeue()
@@ -84,37 +96,84 @@ class SboomTopTest extends AnyFunSuite {
               //               tempArray(offset) = edge
               edgesArrayBuffer.append(edge)
             } else {
-              val edge = ArrayBuffer.fill(4)(0.toByte)
+              val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
               //               tempArray(offset) = edge
               edgesArrayBuffer.append(edge)
             }
           }
-          if (flag == 0) {
-            block_empty = block_empty + 1
-          }
-          //           println("loop")
-        } while (flag > 0)
-
+        } while (flag > 0) //flag>0 means that there is no allZeros
       }
     }
 
+    //To deal with remaining blocks
+    if (remainder > 0) {
+      for (col <- 0 until arrayWidth) {
+        do {
+          flag = 0
+          for (offset <- 0 until remainder) {
+            if (blocks(goodIntervalBound + offset)(col).nonEmpty) {
+              flag = flag + 1
+              val edge = blocks(goodIntervalBound)(col).dequeue()
+              edgesArrayBuffer.append(edge)
+            } else {
+              val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
+              //tempArray(offset) = edge
+              edgesArrayBuffer.append(edge)
+            }
+          }
+          // if there is no enough blocks, we need to add the extra blocks and edges to be the multiples of number of PEs
+          for (offset <- remainder until PeConfig().peNumEachColumn) {
+            val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
+            edgesArrayBuffer.append(edge)
+          }
+        } while (flag > 0)
+      }
+    }
+
+    //    println("edge_number", edgesArrayBuffer.mkString(","))
     val dataArray = ArrayBuffer[Byte]()
     for (i <- edgesArrayBuffer.indices) {
       val innerArr = edgesArrayBuffer(i)
       for (j <- innerArr.indices) {
         dataArray.append(innerArr(j))
       }
-
-      dataArray.toArray
-
     }
+
+    import java.io._
+    val fos = new FileOutputStream("data.bin")
+    val dos = new DataOutputStream(fos)
+    for (d <- dataArray) {
+      dos.write(d.toByte)
+    }
+    dos.close()
+    println("dataArrayLen", dataArray.toArray.length)
+    //    print(dataArray)
+    dataArray.toArray
   }
 
   test("SboomTopTest"){
 
+    compiled.doSim { dut =>
+
+      dut.clockDomain.forkStimulus(100) //产生周期为10个单位的时钟
+
+      val axiMemSimConfig = AxiMemorySimConfig()
+      val axiMemSimModel = AxiMemorySim(compiled.dut.io.topAxiMemControlPort, compiled.dut.clockDomain, axiMemSimConfig)
+      axiMemSimModel.start()
+      axiMemSimModel.memory.writeArray(0, vexGen())
+      axiMemSimModel.memory.writeArray(4096, edgeGen())
 
 
+      dut.clockDomain.waitSampling(count = 8)
+      dut.clockDomain.waitSampling(count = 100)
 
+      val dataRead = axiMemSimModel.memory.readArray(0, 10)
+      for (i <- 0 until 10) {
+        println(dataRead(i))
+      }
+      dut.clockDomain.waitSampling(1000)
+
+    }
   }
 
 
