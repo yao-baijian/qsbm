@@ -45,6 +45,9 @@ bin/
 
 # Xilinx
 xsim.dir/
+test.wdb
+vivado.jou
+PE.zip
 
 simWorkspace/
 tmp/
