@@ -32,7 +32,7 @@ case class PeTop(config:PETopConfig) extends Component {
         val last_update         = in Vec(Bool(), config.core_num)
         val edge_stream         = Vec(Vec(slave Stream (Bits(128 / 8 bits)), config.thread_num), config.core_num)
         val vertex_stream       = Vec(slave Stream (Bits(128 bits)), config.core_num)
-        val bundle_busy_table   = out Bits(4 bits)
+        val bundle_busy_table   = out Vec(Bool(), config.core_num)
         val vertex_stream_top   = slave Stream (Bits(128 bits))
         val writeback_stream    = Vec(master Stream (Bits(16 bits)), config.vertex_reg_num)
     }
@@ -46,7 +46,7 @@ case class PeTop(config:PETopConfig) extends Component {
     val vertex_reg_en           = Reg(Bits(config.vertex_reg_num bits)) init 1
     val vertex_reg_cnt          = Reg(UInt(3 bits)) init 0
     val bundle_busy             = Bool()
-    val bundle_busy_table       = Reg(Bits(config.core_num bits))
+    val bundle_busy_table       = Vec(Bool(), config.core_num)
     val last_update             = Bool()
     val need_update             = Reg(Bool()) init False
     val gather_pe_busy          = Bool()
@@ -187,7 +187,10 @@ case class PeTop(config:PETopConfig) extends Component {
         gather_pe_group(i).io_update_ram.rd_data := update_reg_group(i)(gather_pe_group(i).io_update_ram.rd_addr)
     }
 
-    io.bundle_busy_table := bundle_busy_table
+    for (i <- 0 until config.core_num) {
+        io.bundle_busy_table(i) := bundle_busy_table(i) | need_update
+    }
+
     bundle_busy := bundle_busy_table.andR
     gather_pe_busy := gather_pe_busy_table.andR
 
