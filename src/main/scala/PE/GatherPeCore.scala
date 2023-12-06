@@ -6,7 +6,7 @@ import spinal.lib.fsm._
 import scala.language.postfixOps
 
 case class GatherPeCore(config:GatherPeCoreConfig) extends Component {
-
+  
     val io_state = new Bundle {
         val switch_done = in Bool()
         val gather_pe_done = out Bool()

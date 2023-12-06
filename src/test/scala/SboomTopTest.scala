@@ -163,7 +163,6 @@ class SboomTopTest extends AnyFunSuite {
       axiMemSimModel.memory.writeArray(0, vexGen())
       axiMemSimModel.memory.writeArray(4096, edgeGen())
 
-
       dut.clockDomain.waitSampling(count = 8)
       dut.clockDomain.waitSampling(count = 100)
 
@@ -175,7 +174,6 @@ class SboomTopTest extends AnyFunSuite {
 
     }
   }
-
 
 }
 

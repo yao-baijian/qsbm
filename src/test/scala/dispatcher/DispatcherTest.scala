@@ -200,17 +200,17 @@ class DispatcherTest extends AnyFunSuite {
 //      cmdQueue3.enqueue { payload => payload.randomize() }
 //      cmdQueue3.enqueue { payload => payload.randomize() }
 
-      dut.io.bigPeReadyFlagVec(0) #= false
-      dut.io.bigPeReadyFlagVec(1) #= false
-      dut.io.bigPeReadyFlagVec(2) #= false
-      dut.io.bigPeReadyFlagVec(3) #= false
+//      dut.io.bigPeReadyFlagVec(0) #= false
+//      dut.io.bigPeReadyFlagVec(1) #= false
+//      dut.io.bigPeReadyFlagVec(2) #= false
+//      dut.io.bigPeReadyFlagVec(3) #= false
 
       dut.clockDomain.waitSampling(count = 8)
 
-      dut.io.bigPeReadyFlagVec(3) #= true
+//      dut.io.bigPeReadyFlagVec(3) #= true
       dut.clockDomain.waitSampling(count = 100)
 //
-      dut.io.bigPeReadyFlagVec(1) #= true
+//      dut.io.bigPeReadyFlagVec(1) #= true
 
 
       dut.clockDomain.waitSampling() //等一个时钟上升沿到来

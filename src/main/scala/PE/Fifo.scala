@@ -2,7 +2,7 @@
  * @Author: Yao Baijian eebyao@ust.hk
  * @Date: 2023-11-17 16:39:05
  * @LastEditors:  
- * @LastEditTime: 2023-11-30 10:12:30
+ * @LastEditTime: 2023-12-09 13:14:12
  * @FilePath: \sboom\src\main\scala\PE\Fifo.scala
  * @Description: 
  * 
@@ -16,8 +16,9 @@ import spinal.lib._
 import scala.language.postfixOps
 
 case class Fifo(config:FifoConfig) extends Component{
-
+  
     val io = new Bundle{
+        val new_edge = in(Bool())
         val in_stream = slave Stream(Bits(config.data_width bits))
         val out_stream = master Stream(Bits(config.data_width bits))
     }
@@ -29,7 +30,7 @@ case class Fifo(config:FifoConfig) extends Component{
     when(io.in_stream.payload === 0) {
         in_stream_valid := False
         in_stream_ready := False
-    } elsewhen (io.in_stream.valid === False) {
+    } elsewhen (io.new_edge === True) {
         in_stream_valid := True
         in_stream_ready := True
     }

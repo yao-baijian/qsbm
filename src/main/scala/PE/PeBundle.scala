@@ -13,8 +13,9 @@ case class PeBundle(config: PeBundleConfig) extends Component {
         val last_update = in Bool()
         val bundle_busy = out Bool()
     }
-
+  
     val io_fifo       =  new Bundle {
+        val need_new_vertex = out Vec(Bool(), 8)
         val pe_fifo = Vec(slave Stream (Bits(config.axi_width / 8 bits)), 8)
     }
 
@@ -60,6 +61,8 @@ case class PeBundle(config: PeBundleConfig) extends Component {
         io_fifo.pe_fifo(i).ready := pe_bundle(i).io_edge_fifo.edge_fifo_ready
         pe_bundle(i).io_edge_fifo.edge_fifo_valid := io_fifo.pe_fifo(i).valid
         pe_bundle(i).io_edge_fifo.edge_fifo_in := io_fifo.pe_fifo(i).payload
+        
+        io_fifo.need_new_vertex(i) := pe_bundle(i).io_state.need_new_vertex
 
     }
 

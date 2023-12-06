@@ -17,7 +17,7 @@ class Interface(val config: BramConfig) extends Bundle with IMasterSlave {
 //        if(useSlaveError) in(PSLVERROR)
     }
     //The asSlave is by default the flipped version of asMaster.
-}
+}  
 
 case class BramConfig(addressWidth: Int,
                         dataWidth: Int,

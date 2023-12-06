@@ -27,9 +27,9 @@ case class PeCore(config: PeCoreConfig) extends Component {
         val pe_busy = out Bool()
         val need_new_vertex = out Bool()
     }
-
+  
     val io_edge_fifo = new Bundle {
-        val edge_fifo_ready = out Bool() setAsReg() init(True)
+        val edge_fifo_ready = out Bool()
         val edge_fifo_in = in Bits (config.edge_data_width bits)
         val edge_fifo_valid = in Bool()
     }
@@ -72,7 +72,6 @@ case class PeCore(config: PeCoreConfig) extends Component {
     val ram_data_h3         = Reg(SInt(config.update_data_width bits)) init 0
     val update_ram_addr_h3  = Reg(UInt(config.update_addr_width bits)) init 0
 
-
     val pe_busy             = Reg(Bool()) init False
     val need_new_vertex     = Reg(Bool()) init False
     val rdy                 = Reg(Bool()) init False
@@ -103,20 +102,17 @@ case class PeCore(config: PeCoreConfig) extends Component {
         OPERATE
           .whenIsActive {
               when(io_edge_fifo.edge_fifo_in === 0 | io_edge_fifo.edge_fifo_valid === False) {
+                  rdy := False
                   goto(WAIT_DONE)
               }
           }
         WAIT_DONE
-          .onEntry{
-              rdy := False
-          }
           .whenIsActive {
               when(h3_valid === False) {
                   when (io_state.last_update) {
-                      rdy := False
-                      pe_busy := False
                       goto(PAUSE)
                   } otherwise{
+                      pe_busy := False
                       need_new_vertex  := True
                       rdy := True
                       goto(IDLE)
@@ -126,6 +122,7 @@ case class PeCore(config: PeCoreConfig) extends Component {
         PAUSE
           .whenIsActive {
               when(io_state.switch_done) {
+                  pe_busy := False
                   rdy := True
                   need_new_vertex  := True
                   goto(IDLE)

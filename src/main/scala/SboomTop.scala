@@ -29,12 +29,41 @@ case class SboomTop() extends Component{
   val pe_top_config = PE.PETopConfig()
   val peTop = PE.PeTop(pe_top_config)
 
-  peTop.io.vertex_stream_top.payload := dispatcher.io.dispatchToVexRegFilePorts(0).payload.data
   io.topAxiMemControlPort << dispatcher.io.axiMemControlPort
+
+  //******************************** control signals connection *********************//
+  for(i<- 0 until PeConfig().peColumnNum){
+    dispatcher.io.bigPeBusyFlagVec(i) := peTop.io.bundle_busy_table(i)
+    peTop.io.last_update(i) := dispatcher.io.switchBigLineFlag
+    dispatcher.io.edgeFifoReadyVec(i) := peTop.io.pe_rdy_table(i)
+  }
+
+
+
+  //********************************** vertex connection ***************************//
+  //RegOut4Gather connections
+  peTop.io.vertex_stream_top.payload := dispatcher.io.dispatchVexRegOut4Gather.payload.data
+  peTop.io.vertex_stream_top.valid := dispatcher.io.dispatchVexRegOut4Gather.valid
+//  dispatcher.io.dispatchVexRegOut4Gather.ready := peTop.io.vertex_stream_top.ready
+
+  // dispatch vertex to big PEs
+  for(i<-0 until PeConfig().peColumnNum){
+    peTop.io.vertex_stream(i).payload := dispatcher.io.dispatchToVexRegFilePorts(i).payload.data
+    peTop.io.vertex_stream(i).valid := dispatcher.io.dispatchToVexRegFilePorts(i).valid
+  }
+
+  //********************************** edge connection *****************************//
   for(i <- 0 until PeConfig().peColumnNum){
 
-    dispatcher.io.bigPeReadyFlagVec(i) := True
-
+//    val pe0Ready = dispatcher.io.dispatchToEdgeFifoPorts(i).reduceLeft(_.ready && _.ready)
+//    dispatcher.io.bigPeBusyFlagVec(i) := True
+    for(j <- 0 until PeConfig().peNumEachColumn){
+      peTop.io.edge_stream(i)(j).payload := dispatcher.io.dispatchToEdgeFifoPorts(i)(j).payload.data
+      peTop.io.edge_stream(i)(j).valid := dispatcher.io.dispatchToEdgeFifoPorts(i)(j).valid
+      dispatcher.io.dispatchToEdgeFifoPorts(i)(j).ready := peTop.io.edge_stream(i)(j).ready
+    }
   }
+
+//  val pe0Ready = dispatcher.io.dispatchToEdgeFifoPorts
 
 }

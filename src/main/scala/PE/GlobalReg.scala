@@ -2,22 +2,22 @@
  * @Author: Yao Baijian eebyao@ust.hk
  * @Date: 2023-11-17 16:39:05
  * @LastEditors:  
+<<<<<<< HEAD
+ * @LastEditTime: 2023-12-09 13:29:17
  * @LastEditTime: 2023-11-29 10:54:07
+>>>>>>> parent of d5da2ed (fifo fix)
  * @FilePath: \sboom\src\main\scala\PE\GlobalReg.scala
  * @Description: 
  * 
  * Copyright (c) 2023 by ${git_name_email}, All Rights Reserved. 
  */
-
-
-
 package PE
 
 import spinal.core._
 import spinal.lib._
 
 import scala.language.postfixOps
-
+   
 case class GlobalReg(config: GlobalRegConfig) extends Component{
 
     val io = new Bundle{

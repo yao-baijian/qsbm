@@ -2,7 +2,7 @@
  * @Author: Yao Baijian eebyao@ust.hk
  * @Date: 2023-11-24 12:10:55
  * @LastEditors:  
- * @LastEditTime: 2023-11-29 10:52:00
+ * @LastEditTime: 2023-12-09 10:35:39
  * @FilePath: \sboom\src\main\scala\PE\PeTop.scala
  * @Description: Parameterized PE top module:
     *               1. PE bundle array x4:  each PE bundle contains 8 PE and 8 FIFO
@@ -32,6 +32,7 @@ case class PeTop(config:PETopConfig) extends Component {
         val last_update         = in Vec(Bool(), config.core_num)
         val edge_stream         = Vec(Vec(slave Stream (Bits(128 / 8 bits)), config.thread_num), config.core_num)
         val vertex_stream       = Vec(slave Stream (Bits(128 bits)), config.core_num)
+        val pe_rdy_table        = out Vec(Bool(), config.core_num)
         val bundle_busy_table   = out Vec(Bool(), config.core_num)
         val vertex_stream_top   = slave Stream (Bits(128 bits))
         val writeback_stream    = Vec(master Stream (Bits(16 bits)), config.vertex_reg_num)
@@ -79,6 +80,7 @@ case class PeTop(config:PETopConfig) extends Component {
         edge_fifo(i) = new Array[Fifo] (config.thread_num)
         for (j <- 0 until config.thread_num) {
             edge_fifo(i)(j) = Fifo(config.pe_fifo_config)
+            edge_fifo(i)(j).setName("edge_fifo_" + i.toString + "_"+j.toString)
         }
     }
 
@@ -93,17 +95,22 @@ case class PeTop(config:PETopConfig) extends Component {
     //-----------------------------------------------------
     // Module Wiring
     //-----------------------------------------------------
-
+  
     for (i <- 0 until config.core_num) {
         pe_bundle_array(i).io_global_reg.vertex_stream << io.vertex_stream(i)
 
         pe_bundle_array(i).io_state.last_update <> io.last_update(i)
+
         bundle_busy_table(i) := pe_bundle_array(i).io_state.bundle_busy
+        io.pe_rdy_table(i) := edge_fifo(i)(0).io.in_stream.ready | edge_fifo(i)(1).io.in_stream.ready | edge_fifo(i)(2).io.in_stream.ready | edge_fifo(i)(3).io.in_stream.ready |
+                                edge_fifo(i)(4).io.in_stream.ready | edge_fifo(i)(5).io.in_stream.ready | edge_fifo(i)(6).io.in_stream.ready | edge_fifo(i)(7).io.in_stream.ready
+
         pe_bundle_array(i).io_state.switch_done <> switch_done
 
         for (j <- 0 until config.thread_num) {
             edge_fifo(i)(j).io.in_stream << io.edge_stream(i)(j)
             pe_bundle_array(i).io_fifo.pe_fifo(j) << edge_fifo(i)(j).io.out_stream
+            edge_fifo(i)(j).io.new_edge := pe_bundle_array(i).io_fifo.need_new_vertex(j)
 
             when (pe_bundle_array(i).io_update_reg.wr_valid(j)) {
                 pe_bundle_update_reg_group(i)(j)(pe_bundle_array(i).io_update_reg.wr_addr(j)) := pe_bundle_array(i).io_update_reg.wr_data(j)
@@ -187,8 +194,12 @@ case class PeTop(config:PETopConfig) extends Component {
         gather_pe_group(i).io_update_ram.rd_data := update_reg_group(i)(gather_pe_group(i).io_update_ram.rd_addr)
     }
 
+//     for (i <- 0 until config.core_num) {
+//         io.bundle_busy_table(i) := bundle_busy_table(i) | need_update
+//     }
+
     for (i <- 0 until config.core_num) {
-        io.bundle_busy_table(i) := bundle_busy_table(i) | need_update
+        io.bundle_busy_table(i) := bundle_busy_table(i)
     }
 
     bundle_busy := bundle_busy_table.andR

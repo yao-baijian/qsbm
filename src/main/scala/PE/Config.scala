@@ -13,7 +13,7 @@ object Config {
     }
     def main(args: Array[String]): Unit = {
         test()
-    }
+    }  
 }
 case class RegConfig(reg_depth: Int = Config.matrix_size,
                      addr_width: Int = Config.addr_width,

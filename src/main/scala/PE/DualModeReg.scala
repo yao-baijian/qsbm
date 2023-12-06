@@ -33,7 +33,7 @@ case class DualModeReg(config: VertexConfig) extends Component{
     } elsewhen (io.srst) {
         rdy := True
     }
-
+  
     io.in_stream.ready := rdy
 
     when(io.in_stream.valid && io.in_stream.ready) {
