@@ -1,5 +1,4 @@
 package PE
-
 import spinal.core._
 import spinal.lib._
 class Interface(val config: BramConfig) extends Bundle with IMasterSlave {
