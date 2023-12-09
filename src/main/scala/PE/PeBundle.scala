@@ -32,8 +32,8 @@ case class PeBundle(config: PeBundleConfig) extends Component {
         val rd_data = Vec(in Bits (config.vertex_width bits), 8)
     }
 
-    val last_update_r       = Reg(Bool())
-    val need_new_vertex_r   = Reg(Bool())
+    val last_update_r       = Reg(Bool()) init False
+    val need_new_vertex_r   = Reg(Bool()) init False
     val pe_bundle           = new Array[PeCore](8)
     val global_reg          = GlobalReg (config.global_reg_config)
 
