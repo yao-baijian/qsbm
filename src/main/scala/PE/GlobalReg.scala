@@ -35,6 +35,7 @@ case class GlobalReg(config: GlobalRegConfig) extends Component{
     val wr_pointer = Reg(UInt(3 bits)) init (0)
 
     val rdy = Reg(Bool()) init(True)
+    val reg_full = Reg(Bool()) init(False)
 
     when (wr_pointer === 7) {
         rdy := False
@@ -42,8 +43,14 @@ case class GlobalReg(config: GlobalRegConfig) extends Component{
         rdy := True
     }
 
+    when(wr_pointer === 7) {
+        reg_full := True
+    } otherwise {
+        reg_full := False
+    }
+
     io.in_stream.ready := rdy
-    io.reg_full := !io.in_stream.ready
+    io.reg_full := reg_full
 
     when(io.in_stream.valid && io.in_stream.ready) {
         for (i <- 0 until 8) {

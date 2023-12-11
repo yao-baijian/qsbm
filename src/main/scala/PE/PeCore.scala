@@ -89,10 +89,10 @@ case class PeCore(config: PeCoreConfig) extends Component {
 
         IDLE
           .whenIsActive {
-              when (io_state.globalreg_done ) {
+              when (io_state.globalreg_done) {
                   need_new_vertex  := False
               }
-              when (io_state.globalreg_done && io_edge_fifo.edge_fifo_valid === True) {
+              when (!need_new_vertex && io_edge_fifo.edge_fifo_valid === True) {
                   pe_busy := True
                   rdy := True
                   goto(OPERATE)

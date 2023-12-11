@@ -36,6 +36,7 @@ case class PeTop(config:PETopConfig) extends Component {
         val bundle_busy_table   = out Vec(Bool(), config.core_num)
         val vertex_stream_top   = slave Stream (Bits(128 bits))
         val writeback_stream    = Vec(master Stream (Bits(16 bits)), config.vertex_reg_num)
+        val bundle_sel          = in Vec(Bool(), config.core_num)
     }
 
     //-----------------------------------------------------
@@ -95,6 +96,8 @@ case class PeTop(config:PETopConfig) extends Component {
     //-----------------------------------------------------
     // Module Wiring
     //-----------------------------------------------------
+
+
   
     for (i <- 0 until config.core_num) {
         pe_bundle_array(i).io_global_reg.vertex_stream << io.vertex_stream(i)
@@ -110,7 +113,11 @@ case class PeTop(config:PETopConfig) extends Component {
         for (j <- 0 until config.thread_num) {
             edge_fifo(i)(j).io.in_stream << io.edge_stream(i)(j)
             pe_bundle_array(i).io_fifo.pe_fifo(j) << edge_fifo(i)(j).io.out_stream
-            edge_fifo(i)(j).io.new_edge := pe_bundle_array(i).io_fifo.need_new_vertex(j)
+
+            edge_fifo(i)(j).io.new_edge := pe_bundle_array(i).io_fifo.need_new_vertex
+
+            edge_fifo(i)(j).io.all_zero := (io.edge_stream(i)(0).payload === 0 & io.edge_stream(i)(1).payload === 0 & io.edge_stream(i)(2).payload === 0 & io.edge_stream(i)(3).payload === 0 &
+                                            io.edge_stream(i)(4).payload === 0 & io.edge_stream(i)(5).payload === 0 & io.edge_stream(i)(6).payload === 0 & io.edge_stream(i)(7).payload === 0 ) & io.bundle_sel(i)
 
             when (pe_bundle_array(i).io_update_reg.wr_valid(j)) {
                 pe_bundle_update_reg_group(i)(j)(pe_bundle_array(i).io_update_reg.wr_addr(j)) := pe_bundle_array(i).io_update_reg.wr_data(j)

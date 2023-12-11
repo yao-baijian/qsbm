@@ -13,27 +13,53 @@ package PE
 
 import spinal.core._
 import spinal.lib._
+import spinal.lib.fsm._
+
 import scala.language.postfixOps
 
 case class Fifo(config:FifoConfig) extends Component{
-  
+
     val io = new Bundle{
         val new_edge = in(Bool())
         val in_stream = slave Stream(Bits(config.data_width bits))
         val out_stream = master Stream(Bits(config.data_width bits))
+        val all_zero = in(Bool())
     }
 
     val edge_fifo = StreamFifo(Bits(config.data_width bits), config.fifo_depth)
     val in_stream_valid = Reg(Bool()) init True
     val in_stream_ready = Reg(Bool()) init True
 
-    when(io.in_stream.payload === 0 & io.in_stream.valid) {
-        in_stream_valid := False
-        in_stream_ready := False
-    } elsewhen (io.new_edge === True) {
-        in_stream_valid := True
-        in_stream_ready := True
-    }
+    val pe_fsm = new StateMachine {
+
+        val IDLE = new State with EntryPoint
+        val READ = new State
+        val WAIT = new State
+
+        IDLE
+          .whenIsActive {
+              when(io.in_stream.valid === True) {
+                  goto(READ)
+              }
+          }
+
+        READ
+          .whenIsActive {
+              when(io.all_zero) {
+                  in_stream_valid := False
+                  in_stream_ready := False
+                  goto(WAIT)
+              }
+          }
+        WAIT
+          .whenIsActive {
+              when(io.new_edge === True) {
+                  in_stream_valid := True
+                  in_stream_ready := True
+                  goto(IDLE)
+              }
+          }
+        }
 
     edge_fifo.io.push.valid := in_stream_valid & io.in_stream.valid
     io.in_stream.ready      := edge_fifo.io.push.ready &  in_stream_ready

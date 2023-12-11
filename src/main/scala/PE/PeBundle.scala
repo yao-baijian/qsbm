@@ -15,19 +15,19 @@ case class PeBundle(config: PeBundleConfig) extends Component {
     }
   
     val io_fifo       =  new Bundle {
-        val need_new_vertex = out Vec(Bool(), 8)
+        val need_new_vertex = out Bool()
         val pe_fifo = Vec(slave Stream (Bits(config.axi_width / 8 bits)), 8)
     }
 
     val io_global_reg =new Bundle {
         val vertex_stream = slave Stream (Bits(config.axi_width bits))
+        val reg_full = out Bool()
     }
 
     val io_update_reg = new Bundle {
         val wr_valid = Vec(out Bool(), 8)
         val wr_addr = Vec(out UInt (config.update_ram_addr_width bits), 8)
         val wr_data = Vec(out Bits (config.vertex_width bits), 8)
-
         val rd_addr = Vec(out UInt (config.update_ram_addr_width bits), 8)
         val rd_data = Vec(in Bits (config.vertex_width bits), 8)
     }
@@ -39,6 +39,9 @@ case class PeBundle(config: PeBundleConfig) extends Component {
 
     global_reg.io.in_stream << io_global_reg.vertex_stream
     global_reg.io.need_new_vertex <> need_new_vertex_r
+    io_fifo.need_new_vertex := need_new_vertex_r
+
+    io_global_reg.reg_full := global_reg.io.reg_full
 
     for (i <- 0 until 8) {
         pe_bundle (i) = PeCore(config.pe_core_config)
@@ -61,9 +64,6 @@ case class PeBundle(config: PeBundleConfig) extends Component {
         io_fifo.pe_fifo(i).ready := pe_bundle(i).io_edge_fifo.edge_fifo_ready
         pe_bundle(i).io_edge_fifo.edge_fifo_valid := io_fifo.pe_fifo(i).valid
         pe_bundle(i).io_edge_fifo.edge_fifo_in := io_fifo.pe_fifo(i).payload
-        
-        io_fifo.need_new_vertex(i) := pe_bundle(i).io_state.need_new_vertex
-
     }
 
     val bundle_busy_table = Bits(8 bits)
