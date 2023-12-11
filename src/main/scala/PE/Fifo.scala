@@ -27,7 +27,7 @@ case class Fifo(config:FifoConfig) extends Component{
     val in_stream_valid = Reg(Bool()) init True
     val in_stream_ready = Reg(Bool()) init True
 
-    when(io.in_stream.payload === 0) {
+    when(io.in_stream.payload === 0 & io.in_stream.valid) {
         in_stream_valid := False
         in_stream_ready := False
     } elsewhen (io.new_edge === True) {
