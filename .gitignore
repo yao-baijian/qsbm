@@ -46,3 +46,11 @@ bin/
 simWorkspace/
 tmp/
 null
+
+
+
+*.jou
+*.log
+*.wcfg
+*.wdb
+/xsim.dir

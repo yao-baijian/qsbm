@@ -69,7 +69,7 @@ case class PeTop(config:PETopConfig) extends Component {
     val vertex_reg_group_A          = new Array[DualModeReg](config.thread_num)
     val vertex_reg_group_B          = new Array[DualModeReg](config.thread_num)
     val pe_bundle_update_reg_group  = Vec(Vec(Vec(Reg(Bits(config.reg_config.data_width bits)),config.reg_config.reg_depth), config.gather_pe_num),config.core_num)
-    val update_reg_group            = Vec(Vec(Reg(Bits(config.reg_config.data_width bits)), config.reg_config.reg_depth), config.thread_num)
+    val update_reg_group            =     Vec(Vec(Reg(Bits(config.reg_config.data_width bits)),config.reg_config.reg_depth), config.thread_num)
 
     //-----------------------------------------------------
     // Module Instantiation
@@ -82,7 +82,9 @@ case class PeTop(config:PETopConfig) extends Component {
         for (j <- 0 until config.thread_num) {
             edge_fifo(i)(j) = Fifo(config.pe_fifo_config)
             edge_fifo(i)(j).setName("edge_fifo_" + i.toString + "_"+j.toString)
+            pe_bundle_update_reg_group(i)(j).foreach(_ init(0))
         }
+        update_reg_group(i).foreach(_ init(0))
     }
 
     for (i <- 0 until config.thread_num) {
@@ -96,8 +98,6 @@ case class PeTop(config:PETopConfig) extends Component {
     //-----------------------------------------------------
     // Module Wiring
     //-----------------------------------------------------
-
-
   
     for (i <- 0 until config.core_num) {
         pe_bundle_array(i).io_global_reg.vertex_stream << io.vertex_stream(i)
@@ -127,8 +127,9 @@ case class PeTop(config:PETopConfig) extends Component {
         // Update reg need soft reset, after all update result is sum up in 1 update reg
         when (update_reg_srst(i)) {
             for (k <- 0 until config.thread_num) {
-                for (l <- 0 until config.matrix_size)
-                pe_bundle_update_reg_group(i)(k)(l) := 0
+                for (l <- 0 until config.matrix_size) {
+                    pe_bundle_update_reg_group(i)(k)(l) := 0
+                }
             }
         }
     }
@@ -191,8 +192,7 @@ case class PeTop(config:PETopConfig) extends Component {
     when(need_update) {
         for (i <- 0 until config.thread_num) {
             for (j <- 0 until config.matrix_size) {
-                update_reg_group (i)(j) := (pe_bundle_update_reg_group(0)(i)(j).asSInt + pe_bundle_update_reg_group(1)(i)(j).asSInt +
-                                            pe_bundle_update_reg_group(2)(i)(j).asSInt + pe_bundle_update_reg_group(3)(i)(j).asSInt).asBits
+                update_reg_group (i)(j) := (pe_bundle_update_reg_group(0)(i)(j).asSInt + pe_bundle_update_reg_group(1)(i)(j).asSInt + pe_bundle_update_reg_group(2)(i)(j).asSInt + pe_bundle_update_reg_group(3)(i)(j).asSInt).asBits
             }
         }
     }
