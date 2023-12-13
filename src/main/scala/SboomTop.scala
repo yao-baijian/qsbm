@@ -39,7 +39,6 @@ case class SboomTop() extends Component{
   }
 
 
-
   //********************************** vertex connection ***************************//
   //RegOut4Gather connections
   peTop.io.vertex_stream_top.payload := dispatcher.io.dispatchVexRegOut4Gather.payload.data
@@ -55,6 +54,7 @@ case class SboomTop() extends Component{
   //********************************** edge connection *****************************//
   for(i <- 0 until PeConfig().peColumnNum){
 
+    peTop.io.bundle_sel(i) := dispatcher.io.edgePeColumnSelectOH(i)
 //    val pe0Ready = dispatcher.io.dispatchToEdgeFifoPorts(i).reduceLeft(_.ready && _.ready)
 //    dispatcher.io.bigPeBusyFlagVec(i) := True
     for(j <- 0 until PeConfig().peNumEachColumn){

@@ -1,5 +1,6 @@
 package dispatcher
 import spinal.core._
+import spinal.lib._
 import spinal.lib.{Stream, _}
 import spinal.lib.bus.amba4.axi.{Axi4, Axi4Config}
 import spinal.lib.tools.DataAnalyzer
@@ -26,7 +27,7 @@ case class Dispatcher() extends Component {
     val axiMemControlPort = master(Axi4(axiConfig))
     val result = out Bool()
 //    val test = in Bool()
-    val switchBigLineFlag = out(Reg(Bool()))
+    val switchBigLineFlag = out(Reg(Bool()) init False)
     val bigPeBusyFlagVec = in Vec(Bool(),4)
     val edgeFifoReadyVec = in Vec(Bool(),4)
 
@@ -35,9 +36,11 @@ case class Dispatcher() extends Component {
 
     //4 column PEs and in each column there are 4 master ports connected with 4 edge fifos
     val dispatchToEdgeFifoPorts = Vec(Vec(master(Stream(StreamFifoPort(DispatcherConfig().fifoWidth))), 8), 4)
+    val edgePeColumnSelectOH = out Vec(Bool(),PeConfig().peColumnNum)
 
     //2 switch regs port
     val dispatchVexRegOut4Gather = master(Flow(AxiMemControllerPort(DispatcherConfig().size)))
+
   }
 
   noIoPrefix()
@@ -101,6 +104,7 @@ case class Dispatcher() extends Component {
 
   //*************************** vexSwitchRegOutPorts Connection *********************************//
   val vexSwitchRegOutSelect = Reg(UInt(log2Up(2) bits)) init 0
+  // only need one port, leaving the allocation function to PE section
   io.dispatchVexRegOut4Gather.payload.data := vexEdgeOutStreams(0).payload.data
   io.dispatchVexRegOut4Gather.valid := vexEdgeOutStreams(0).valid
 
@@ -144,6 +148,10 @@ val allZeroInFlag = vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(0) ==
 
   //edge data dispatch to 4 pe column stream,stream0 for vex, stream1 for edges
   val edgePeColumnSelect = Reg(UInt(log2Up(4) bits)) init 0
+  val edgePeColumnSelectOH = B"1" << edgePeColumnSelect
+  for(i <- 0 until PeConfig().peColumnNum){
+    io.edgePeColumnSelectOH(i) := edgePeColumnSelectOH(i)
+  }
 //  val edgePeColumnOutStreams = StreamDemux(vexEdgeOutStreams(1), edgePeColumnSelect, 4)
 
   val edgePeColumnOutStreams = StreamDemux(edgeCacheFifo.io.pop, edgePeColumnSelect, 4)
