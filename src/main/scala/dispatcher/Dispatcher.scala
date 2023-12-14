@@ -173,6 +173,7 @@ val allZeroInFlag = vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(0) ==
     //FSM Internal Variables
     val axiReadVertexCnt = Reg(UInt(8 bits)) init 0
     val edgeAddrCnt = Reg(UInt(16 bits)) init 0
+    val peColumnSelectInOrderCnt = Reg(UInt(2 bits)) init 0
 
     //******************************* READ_IDLE ***********************************//
     val READ_IDLE = new State with EntryPoint {
@@ -183,37 +184,48 @@ val allZeroInFlag = vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(0) ==
     //******************************* READ_VEX_ADDR *********************************//
     val READ_VEX_ADDR: State = new State {
 
-      whenIsActive {
-        //startUp := False
+      whenIsActive{
+
         io.axiMemControlPort.ar.payload.len := U"8'b0000_0111" // (7+1) transfer in a burst
         io.axiMemControlPort.ar.payload.addr := U"32'h0000_0000"
-
-        when(io.bigPeBusyFlagVec(0) === False) {
-          vexPeColumnSelect := 0
-          io.axiMemControlPort.ar.valid := True
-          when(io.axiMemControlPort.ar.ready){
-            goto(READ_VEX_DATA)
-          }
-        }.elsewhen(io.bigPeBusyFlagVec(1) === False){
-          vexPeColumnSelect := 1
-          io.axiMemControlPort.ar.valid := True
-          when(io.axiMemControlPort.ar.ready) {
-            goto(READ_VEX_DATA)
-          }
-        }.elsewhen(io.bigPeBusyFlagVec(2) === False){
-          vexPeColumnSelect := 2
-          io.axiMemControlPort.ar.valid := True
-          when(io.axiMemControlPort.ar.ready) {
-            goto(READ_VEX_DATA)
-          }
-        }.elsewhen(io.bigPeBusyFlagVec(3) === False){
-          vexPeColumnSelect := 3
-          io.axiMemControlPort.ar.valid := True
-          when(io.axiMemControlPort.ar.ready) {
-            goto(READ_VEX_DATA)
-          }
+        vexPeColumnSelect := peColumnSelectInOrderCnt
+        io.axiMemControlPort.ar.valid := True
+        when(io.axiMemControlPort.ar.ready){
+          goto(READ_VEX_DATA)
         }
-      }   //end of whenIsActive
+      }
+
+//      whenIsActive {
+//        //startUp := False
+//        io.axiMemControlPort.ar.payload.len := U"8'b0000_0111" // (7+1) transfer in a burst
+//        io.axiMemControlPort.ar.payload.addr := U"32'h0000_0000"
+//
+//        when(io.bigPeBusyFlagVec(0) === False) {
+//          vexPeColumnSelect := 0
+//          io.axiMemControlPort.ar.valid := True
+//          when(io.axiMemControlPort.ar.ready){
+//            goto(READ_VEX_DATA)
+//          }
+//        }.elsewhen(io.bigPeBusyFlagVec(1) === False){
+//          vexPeColumnSelect := 1
+//          io.axiMemControlPort.ar.valid := True
+//          when(io.axiMemControlPort.ar.ready) {
+//            goto(READ_VEX_DATA)
+//          }
+//        }.elsewhen(io.bigPeBusyFlagVec(2) === False){
+//          vexPeColumnSelect := 2
+//          io.axiMemControlPort.ar.valid := True
+//          when(io.axiMemControlPort.ar.ready) {
+//            goto(READ_VEX_DATA)
+//          }
+//        }.elsewhen(io.bigPeBusyFlagVec(3) === False){
+//          vexPeColumnSelect := 3
+//          io.axiMemControlPort.ar.valid := True
+//          when(io.axiMemControlPort.ar.ready) {
+//            goto(READ_VEX_DATA)
+//          }
+//        }
+//      }   //end of whenIsActive
     }//end of new state
 
     //******************************* READ_VEX_DATA *********************************//
@@ -243,8 +255,10 @@ val allZeroInFlag = vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(0) ==
 
     val READ_EDGE = new StateFsm(fsm = internalFsm()){
       whenCompleted{
-        vexEdgeSelect := 0
+//        vexEdgeSelect := 0
+        peColumnSelectInOrderCnt := peColumnSelectInOrderCnt + 1
         goto(READ_VEX_ADDR)
+
       }
     }
     def internalFsm() = new StateMachine {
