@@ -23,6 +23,7 @@ case class PeCore(config: PeCoreConfig) extends Component {
         val last_update = in Bool()
         val globalreg_done = in Bool()
         val switch_done = in Bool()
+        val all_zero = in Bool()
 
         val pe_busy = out Bool()
         val need_new_vertex = out Bool()
@@ -101,8 +102,7 @@ case class PeCore(config: PeCoreConfig) extends Component {
 
         OPERATE
           .whenIsActive {
-              when(io_edge_fifo.edge_fifo_in === 0 | io_edge_fifo.edge_fifo_valid === False) {
-                  rdy := False
+              when(io_state.all_zero) {
                   goto(WAIT_DONE)
               }
           }
@@ -110,11 +110,11 @@ case class PeCore(config: PeCoreConfig) extends Component {
           .whenIsActive {
               when(h3_valid === False) {
                   when (io_state.last_update) {
+                      rdy := False
                       goto(PAUSE)
                   } otherwise{
                       pe_busy := False
                       need_new_vertex  := True
-                      rdy := True
                       goto(IDLE)
                   }
               }
@@ -129,9 +129,6 @@ case class PeCore(config: PeCoreConfig) extends Component {
               }
           }
     }
-    //-----------------------------------------------------------
-    // pipeline h0
-    //-----------------------------------------------------------
 
 //-----------------------------------------------------------
 // pipeline h0

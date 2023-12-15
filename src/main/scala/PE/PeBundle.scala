@@ -11,6 +11,7 @@ case class PeBundle(config: PeBundleConfig) extends Component {
     val io_state = new Bundle {
         val switch_done = in Bool()
         val last_update = in Bool()
+        val all_zero    = in Bool()
         val bundle_busy = out Bool()
     }
   
@@ -64,6 +65,8 @@ case class PeBundle(config: PeBundleConfig) extends Component {
         io_fifo.pe_fifo(i).ready := pe_bundle(i).io_edge_fifo.edge_fifo_ready
         pe_bundle(i).io_edge_fifo.edge_fifo_valid := io_fifo.pe_fifo(i).valid
         pe_bundle(i).io_edge_fifo.edge_fifo_in := io_fifo.pe_fifo(i).payload
+
+        pe_bundle(i).io_state.all_zero := io_state.all_zero
     }
 
     val bundle_busy_table = Bits(8 bits)
