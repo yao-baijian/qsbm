@@ -93,6 +93,10 @@ case class PeCore(config: PeCoreConfig) extends Component {
               when (io_state.globalreg_done) {
                   need_new_vertex  := False
               }
+              when (io_state.last_update) {
+                  rdy := False
+                  goto(PAUSE)
+              }
               when (!need_new_vertex && io_edge_fifo.edge_fifo_valid === True) {
                   pe_busy := True
                   rdy := True
