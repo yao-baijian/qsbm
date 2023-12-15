@@ -170,7 +170,7 @@ class SboomTopTest extends AnyFunSuite {
       for (i <- 0 until 10) {
         println(dataRead(i))
       }
-      dut.clockDomain.waitSampling(1000)
+      dut.clockDomain.waitSampling(10000)
 
     }
   }

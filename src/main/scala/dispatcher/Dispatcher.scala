@@ -296,7 +296,7 @@ val allZeroInFlag = vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(0) ==
 
         whenIsActive{
 
-          io.axiMemControlPort.ar.payload.addr := U"32'h0000_1000" + (256*16) * edgeAddrCnt
+          io.axiMemControlPort.ar.payload.addr := U"32'h0000_1000" + (64*16) * edgeAddrCnt
 
           when(allZeroInFlag){
             allZeroInFlagReg := True
