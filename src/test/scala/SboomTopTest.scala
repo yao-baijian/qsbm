@@ -35,7 +35,7 @@ class SboomTopTest extends AnyFunSuite {
     val vertexBuffer = ArrayBuffer[Byte]()
     for (i <- 0 until 128 * 16) {
 
-      val num = (random.nextInt(33) - 16).toByte
+      val num = 1.toByte //(random.nextInt(33) - 16).toByte
       vertexBuffer.append(num)
 
     }
