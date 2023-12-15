@@ -5,7 +5,6 @@ import spinal.lib.{Stream, _}
 import spinal.lib.bus.amba4.axi.{Axi4, Axi4Config}
 import spinal.lib.tools.DataAnalyzer
 import spinal.lib.fsm._
-
 //import scala.language.postfixOps
 //import scala.sys.exit
 //import spinal.core.{Bundle, Component}
@@ -173,6 +172,9 @@ val allZeroInFlag = vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(0) ==
     //FSM Internal Variables
     val axiReadVertexCnt = Reg(UInt(8 bits)) init 0
     val edgeAddrCnt = Reg(UInt(16 bits)) init 0
+    //endlineflag Control
+    val vexAddrCnt = Reg(UInt(16 bits)) init 0
+    val endLineFlag = Reg(Bool()) init False
     val peColumnSelectInOrderCnt = Reg(UInt(2 bits)) init 0
 
     //******************************* READ_IDLE ***********************************//
@@ -187,8 +189,12 @@ val allZeroInFlag = vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(0) ==
       whenIsActive{
 
         io.axiMemControlPort.ar.payload.len := U"8'b0000_0111" // (7+1) transfer in a burst
-        io.axiMemControlPort.ar.payload.addr := U"32'h0000_0000"
+        io.axiMemControlPort.ar.payload.addr := U"32'h0000_0000" + vexAddrCnt * 128
         vexPeColumnSelect := peColumnSelectInOrderCnt
+        when((vexAddrCnt+1) % DispatcherConfig().vexBigLineThreshold === 0){
+          endLineFlag := True
+        }
+
         io.axiMemControlPort.ar.valid := True
         when(io.axiMemControlPort.ar.ready){
           goto(READ_VEX_DATA)
@@ -248,6 +254,9 @@ val allZeroInFlag = vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(0) ==
           }
         }
       }
+      onExit{
+        vexAddrCnt := vexAddrCnt + 1
+      }
     }
 
     //******************************* READ_EDGE_DATA *********************************//
@@ -255,8 +264,11 @@ val allZeroInFlag = vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(0) ==
 
     val READ_EDGE = new StateFsm(fsm = internalFsm()){
       whenCompleted{
-//        vexEdgeSelect := 0
+        vexEdgeSelect := 0
         peColumnSelectInOrderCnt := peColumnSelectInOrderCnt + 1
+        when((vexAddrCnt+1) % DispatcherConfig().vexBigLineThreshold === 0){
+          endLineFlag := False
+        }
         goto(READ_VEX_ADDR)
 
       }
