@@ -6,7 +6,7 @@ object Config {
     val axi_width: Int = 128
     val data_width: Int = 16
     val matrix_size: Int = 64
-    val fifo_depth: Int = 2048
+    val fifo_depth: Int = 128
     val addr_width: Int = log2Up(matrix_size)
     def test(): Unit = {
         println(addr_width)
