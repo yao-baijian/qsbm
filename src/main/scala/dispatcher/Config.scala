@@ -2,7 +2,7 @@ package dispatcher
 
 case class DispatcherConfig(){
 
-  val matrixSize = 800
+  val matrixSize = 2000
   val blockSize = 64
 
   //AXI4
@@ -12,7 +12,7 @@ case class DispatcherConfig(){
   val fifoWidth = 16
   val vexSwitchRegWidth = 16
   val edgeByteLen = fifoWidth/8
-  val vexBigLineThreshold = math.ceil(matrixSize/blockSize).toInt
+  val vexBigLineThreshold = math.ceil(matrixSize.toFloat/blockSize).toInt
 
 }
 

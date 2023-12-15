@@ -255,7 +255,7 @@ val allZeroInFlag = vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(0) ==
         }
       }
       onExit{
-        vexAddrCnt := vexAddrCnt + 1
+
       }
     }
 
@@ -266,6 +266,8 @@ val allZeroInFlag = vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(0) ==
       whenCompleted{
         vexEdgeSelect := 0
         peColumnSelectInOrderCnt := peColumnSelectInOrderCnt + 1
+
+        vexAddrCnt := vexAddrCnt + 1
         when((vexAddrCnt+1) % DispatcherConfig().vexBigLineThreshold === 0){
           endLineFlag := False
         }
