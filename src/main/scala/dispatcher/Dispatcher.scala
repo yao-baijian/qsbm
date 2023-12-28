@@ -159,7 +159,7 @@ val allZeroInFlag = vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(0) ==
     for (j <- 0 until PeConfig().peNumEachColumn) { //j for the offset of the ith column
 //      edgePeColumnOutStreams(i).ready :=
       io.dispatchToEdgeFifoPorts(i)(j).payload.data := edgePeColumnOutStreams(i).payload.data.subdivideIn(16 bits)(j)
-      when(edgePeColumnOutStreams(i).payload.data.subdivideIn(16 bits)(j) === 0){
+      when(edgePeColumnOutStreams(i).payload.data.subdivideIn(16 bits)(j) === 0 && (~allZeroInFlag) ){
         io.dispatchToEdgeFifoPorts(i)(j).valid := False //make sure that zeros will not be sent to the edgefifos within PEs
       }.otherwise{
         io.dispatchToEdgeFifoPorts(i)(j).valid := edgePeColumnOutStreams(i).valid

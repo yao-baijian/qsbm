@@ -16,7 +16,21 @@ import scala.util.Random
 
 class SboomTopTest extends AnyFunSuite {
 
-  val compiled= SimConfig.withWave.compile(SboomTop())
+  object MySpinalConfig extends SpinalConfig(
+    defaultConfigForClockDomains = ClockDomainConfig(resetKind = ASYNC,resetActiveLevel = HIGH),
+    targetDirectory = "fpga/target",
+    oneFilePerComponent = false
+  )
+  val ipDir = "fpga/ip"
+  val xciSourcePaths = ArrayBuffer(
+    new File(ipDir).listFiles().map(ipDir + "/" + _.getName) :_*
+  )
+
+  val simConfig = SpinalSimConfig(_spinalConfig = MySpinalConfig)
+  val xSimConfig = simConfig.copy(_workspacePath = "xSimWorkspace").withXSim.withXSimSourcesPaths(xciSourcePaths,ArrayBuffer(""))
+
+//  val compiled= simConfig.withWave.compile(SboomTop())
+  val compiled= xSimConfig.withWave.compile(SboomTop())
 //  val axiMemSimConfig = AxiMemorySimConfig()
 //  val axiMemSimModel = AxiMemorySim(compiled.dut.io.topAxiMemControlPort, compiled.dut.clockDomain, axiMemSimConfig)
 
