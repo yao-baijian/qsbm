@@ -17,7 +17,7 @@ case class DispatcherConfig(){
   val size = 512
 
   //StreamFifo
-  val fifoWidth = 16
+  val fifoWidth = 512
   val vexSwitchRegWidth = 16
   val edgeByteLen = fifoWidth/8
   val vexBigLineThreshold = math.ceil(matrixSize.toFloat/blockSize).toInt
@@ -27,5 +27,6 @@ case class DispatcherConfig(){
 case class PeConfig(){
   val peColumnNum = 4
   val peNumEachColumn = 8
+  val peColumnWid = 128
 
 }

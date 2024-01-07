@@ -122,14 +122,19 @@ case class Dispatcher() extends Component {
 
 //********************************** EDGE DATA DISPATCH ********************************************//
   //InFlag is from the perspective of the input of cacheFifo
-val allZeroInFlag = vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(0) === 0 && //&&
-  vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(1) === 0 && //&&
-  vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(2) === 0 && //&&
-  vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(3) === 0 && //&&
-  vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(4) === 0 && //&&
-  vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(5) === 0 &&
-  vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(6) === 0 &&
-  vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(7) === 0
+//val allZeroInFlag = vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(0) === 0 && //&&
+//  vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(1) === 0 && //&&
+//  vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(2) === 0 && //&&
+//  vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(3) === 0 && //&&
+//  vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(4) === 0 && //&&
+//  vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(5) === 0 &&
+//  vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(6) === 0 &&
+//  vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(7) === 0
+
+  val dipatchInSeperator =  vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(0) === 0 || //&&
+                            vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(1) === 0 || //&&
+                            vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(2) === 0 || //&&
+                            vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(3) === 0    //&&
 
   val allZeroInFlagReg = Reg(Bool()) init False
 
@@ -153,19 +158,19 @@ val allZeroInFlag = vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(0) ==
   }
 //  val edgePeColumnOutStreams = StreamDemux(vexEdgeOutStreams(1), edgePeColumnSelect, 4)
 
-  val edgePeColumnOutStreams = StreamDemux(edgeCacheFifo.io.pop, edgePeColumnSelect, 4)
-  for (i <- 0 until PeConfig().peColumnNum) { //i for ith column
-    edgePeColumnOutStreams(i).ready := io.edgeFifoReadyVec(i)
-    for (j <- 0 until PeConfig().peNumEachColumn) { //j for the offset of the ith column
-//      edgePeColumnOutStreams(i).ready :=
-      io.dispatchToEdgeFifoPorts(i)(j).payload.data := edgePeColumnOutStreams(i).payload.data.subdivideIn(16 bits)(j)
-      when(edgePeColumnOutStreams(i).payload.data.subdivideIn(16 bits)(j) === 0 && (~allZeroInFlag) ){
-        io.dispatchToEdgeFifoPorts(i)(j).valid := False //make sure that zeros will not be sent to the edgefifos within PEs
-      }.otherwise{
-        io.dispatchToEdgeFifoPorts(i)(j).valid := edgePeColumnOutStreams(i).valid
-      }
-    }
-  }
+//  val edgePeColumnOutStreams = StreamDemux(edgeCacheFifo.io.pop, edgePeColumnSelect, 4)
+//  for (i <- 0 until PeConfig().peColumnNum) { //i for ith column
+//    edgePeColumnOutStreams(i).ready := io.edgeFifoReadyVec(i)
+//    for (j <- 0 until PeConfig().peNumEachColumn) { //j for the offset of the ith column
+////      edgePeColumnOutStreams(i).ready :=
+//      io.dispatchToEdgeFifoPorts(i)(j).payload.data := edgePeColumnOutStreams(i).payload.data.subdivideIn(16 bits)(j)
+//      when(edgePeColumnOutStreams(i).payload.data.subdivideIn(16 bits)(j) === 0 && (~allZeroInFlag) ){
+//        io.dispatchToEdgeFifoPorts(i)(j).valid := False //make sure that zeros will not be sent to the edgefifos within PEs
+//      }.otherwise{
+//        io.dispatchToEdgeFifoPorts(i)(j).valid := edgePeColumnOutStreams(i).valid
+//      }
+//    }
+//  }
 
   //********************************  FSM Control  *******************************************************//
   val axi4MemCtrlFsm = new StateMachine {
@@ -248,7 +253,7 @@ val allZeroInFlag = vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(0) ==
           when(dispatchVexCnt === DispatcherConfig().vexBigLineThreshold - 1){
             dispatchVexCnt := 0
           }
-          when(axiReadVertexCnt === 8 - 1) {
+          when(axiReadVertexCnt === 2 - 1) {
             axiReadVertexCnt := 0
             goto(READ_EDGE)
           }
