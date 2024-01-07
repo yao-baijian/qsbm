@@ -1,12 +1,20 @@
 package dispatcher
 
+case class AxiConfig(){
+
+  val addrWid = 32
+  val dataWid = 512
+  val idWid = 4
+
+}
+
 case class DispatcherConfig(){
 
   val matrixSize = 2000
   val blockSize = 64
 
   //AXI4
-  val size = 128
+  val size = 512
 
   //StreamFifo
   val fifoWidth = 16
@@ -18,6 +26,6 @@ case class DispatcherConfig(){
 
 case class PeConfig(){
   val peColumnNum = 4
-  val peNumEachColumn = DispatcherConfig().size/DispatcherConfig().fifoWidth
+  val peNumEachColumn = 8
 
 }

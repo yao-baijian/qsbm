@@ -18,7 +18,7 @@ case class StreamFifoPort(dataWidth:Int) extends Bundle{
 }
 case class Dispatcher() extends Component {
 
-  val axiConfig = Axi4Config(addressWidth = 32, dataWidth = 128, idWidth = 4)
+  val axiConfig = Axi4Config(addressWidth = AxiConfig().addrWid, dataWidth = AxiConfig().dataWid, idWidth = AxiConfig().idWid)
 
   val io = new Bundle {
 
@@ -27,14 +27,14 @@ case class Dispatcher() extends Component {
     val result = out Bool()
 //    val test = in Bool()
     val switchBigLineFlag = out(Reg(Bool()) init False)
-    val bigPeBusyFlagVec = in Vec(Bool(),4)
-    val edgeFifoReadyVec = in Vec(Bool(),4)
+    val bigPeBusyFlagVec = in Vec(Bool(),PeConfig().peColumnNum)
+    val edgeFifoReadyVec = in Vec(Bool(),PeConfig().peColumnNum)
 
     //4 column PEs
     val dispatchToVexRegFilePorts = Vec(master(Flow(AxiMemControllerPort(DispatcherConfig().size))), PeConfig().peColumnNum)
 
     //4 column PEs and in each column there are 4 master ports connected with 4 edge fifos
-    val dispatchToEdgeFifoPorts = Vec(Vec(master(Stream(StreamFifoPort(DispatcherConfig().fifoWidth))), 8), 4)
+    val dispatchToEdgeFifoPorts = Vec(Vec(master(Stream(StreamFifoPort(DispatcherConfig().fifoWidth))), PeConfig().peNumEachColumn), PeConfig().peColumnNum)
     val edgePeColumnSelectOH = out Vec(Bool(),PeConfig().peColumnNum)
 
     //2 switch regs port
@@ -85,7 +85,7 @@ case class Dispatcher() extends Component {
 
   //ar channel
   io.axiMemControlPort.ar.payload.prot := B"3'b000"
-  io.axiMemControlPort.ar.payload.size := U"3'b100" //16 bytes(128b) in a transfer
+  io.axiMemControlPort.ar.payload.size := U"3'b110" //64 bytes(512b) in a transfer
   io.axiMemControlPort.ar.payload.burst := B"2'b01" //incr type
   io.axiMemControlPort.ar.len := U"8'b0011_1111"
   io.axiMemControlPort.ar.valid := False
@@ -188,7 +188,7 @@ val allZeroInFlag = vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(0) ==
 
       whenIsActive{
 
-        io.axiMemControlPort.ar.payload.len := U"8'b0000_0111" // (7+1) transfer in a burst
+        io.axiMemControlPort.ar.payload.len := U"8'b0000_0001" // (1+1) transfer in a burst
         io.axiMemControlPort.ar.payload.addr := U"32'h0000_0000" + vexAddrCnt * 128
         vexPeColumnSelect := peColumnSelectInOrderCnt
         when((vexAddrCnt+1) % DispatcherConfig().vexBigLineThreshold === 0){
