@@ -29,8 +29,8 @@ class SboomTopTest extends AnyFunSuite {
   val simConfig = SpinalSimConfig(_spinalConfig = MySpinalConfig)
   val xSimConfig = simConfig.copy(_workspacePath = "xSimWorkspace").withXSim.withXSimSourcesPaths(xciSourcePaths,ArrayBuffer(""))
 
-//  val compiled= simConfig.withWave.compile(SboomTop())
-  val compiled= xSimConfig.withWave.compile(SboomTop())
+  val compiled= simConfig.withWave.compile(SboomTop())
+//  val compiled= xSimConfig.withWave.compile(SboomTop())
 //  val axiMemSimConfig = AxiMemorySimConfig()
 //  val axiMemSimModel = AxiMemorySim(compiled.dut.io.topAxiMemControlPort, compiled.dut.clockDomain, axiMemSimConfig)
 
@@ -116,6 +116,19 @@ class SboomTopTest extends AnyFunSuite {
             }
           }
         } while (flag > 0) //flag>0 means that there is no allZeros
+        if(flag == 0){
+          if(col%4 == 0){
+            val padding =  ArrayBuffer.fill(16 * 3)(0.toByte)
+            edgesArrayBuffer.append(padding)
+          } else if(col%4 == 1){
+            val padding = ArrayBuffer.fill(16 * 2)(0.toByte)
+            edgesArrayBuffer.append(padding)
+          } else
+          if (col % 4 == 2) {
+            val padding = ArrayBuffer.fill(16 * 1)(0.toByte)
+            edgesArrayBuffer.append(padding)
+          }
+        }
       }
     }
 
