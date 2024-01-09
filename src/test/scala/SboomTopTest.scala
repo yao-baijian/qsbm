@@ -116,6 +116,7 @@ class SboomTopTest extends AnyFunSuite {
             }
           }
         } while (flag > 0) //flag>0 means that there is no allZeros
+
         if(flag == 0){
           if(col%4 == 0){
             val padding =  ArrayBuffer.fill(16 * 3)(0.toByte)
@@ -123,8 +124,7 @@ class SboomTopTest extends AnyFunSuite {
           } else if(col%4 == 1){
             val padding = ArrayBuffer.fill(16 * 2)(0.toByte)
             edgesArrayBuffer.append(padding)
-          } else
-          if (col % 4 == 2) {
+          } else if (col % 4 == 2) {
             val padding = ArrayBuffer.fill(16 * 1)(0.toByte)
             edgesArrayBuffer.append(padding)
           }
@@ -154,6 +154,20 @@ class SboomTopTest extends AnyFunSuite {
             edgesArrayBuffer.append(edge)
           }
         } while (flag > 0)
+
+        if (flag == 0) {
+          if (col % 4 == 0) {
+            val padding = ArrayBuffer.fill(16 * 3)(0.toByte)
+            edgesArrayBuffer.append(padding)
+          } else if (col % 4 == 1) {
+            val padding = ArrayBuffer.fill(16 * 2)(0.toByte)
+            edgesArrayBuffer.append(padding)
+          } else if (col % 4 == 2) {
+            val padding = ArrayBuffer.fill(16 * 1)(0.toByte)
+            edgesArrayBuffer.append(padding)
+          }
+        }
+
       }
     }
 

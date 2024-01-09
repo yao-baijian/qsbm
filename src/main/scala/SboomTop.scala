@@ -38,7 +38,6 @@ case class SboomTop() extends Component{
     dispatcher.io.edgeFifoReadyVec(i) := peTop.io.pe_rdy_table(i)
   }
 
-
   //********************************** vertex connection ***************************//
   //RegOut4Gather connections
   peTop.io.vertex_stream_top.payload := dispatcher.io.dispatchVexRegOut4Gather.payload.data
@@ -57,11 +56,11 @@ case class SboomTop() extends Component{
     peTop.io.bundle_sel(i) := dispatcher.io.edgePeColumnSelectOH(i)
 //    val pe0Ready = dispatcher.io.dispatchToEdgeFifoPorts(i).reduceLeft(_.ready && _.ready)
 //    dispatcher.io.bigPeBusyFlagVec(i) := True
-    for(j <- 0 until PeConfig().peNumEachColumn){
-      peTop.io.edge_stream(i)(j).payload := dispatcher.io.dispatchToEdgeFifoPorts(i)(j).payload.data
-      peTop.io.edge_stream(i)(j).valid := dispatcher.io.dispatchToEdgeFifoPorts(i)(j).valid
-      dispatcher.io.dispatchToEdgeFifoPorts(i)(j).ready := peTop.io.edge_stream(i)(j).ready
-    }
+//    for(j <- 0 until PeConfig().peNumEachColumn){
+      peTop.io.raw_edge_stream(i).payload := dispatcher.io.dispatchToEdgePorts(i).payload.data
+      peTop.io.raw_edge_stream(i).valid := dispatcher.io.dispatchToEdgePorts(i).valid
+      dispatcher.io.dispatchToEdgePorts(i).ready := peTop.io.raw_edge_stream(i).ready
+//    }
   }
 
 //  val pe0Ready = dispatcher.io.dispatchToEdgeFifoPorts

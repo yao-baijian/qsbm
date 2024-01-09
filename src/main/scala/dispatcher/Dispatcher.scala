@@ -34,8 +34,9 @@ case class Dispatcher() extends Component {
     val dispatchToVexRegFilePorts = Vec(master(Flow(AxiMemControllerPort(DispatcherConfig().size))), PeConfig().peColumnNum)
 
     //4 column PEs and in each column there are 4 master ports connected with 4 edge fifos
-    val dispatchToEdgeFifoPorts = Vec(Vec(master(Stream(StreamFifoPort(DispatcherConfig().fifoWidth))), PeConfig().peNumEachColumn), PeConfig().peColumnNum)
+//    val dispatchToEdgeFifoPorts = Vec(Vec(master(Stream(StreamFifoPort(DispatcherConfig().fifoWidth))), PeConfig().peNumEachColumn), PeConfig().peColumnNum)
     val edgePeColumnSelectOH = out Vec(Bool(),PeConfig().peColumnNum)
+    val dispatchToEdgePorts = Vec(master(Stream(AxiMemControllerPort(DispatcherConfig().size))), PeConfig().peColumnNum)
 
     //2 switch regs port
     val dispatchVexRegOut4Gather = master(Flow(AxiMemControllerPort(DispatcherConfig().size)))
