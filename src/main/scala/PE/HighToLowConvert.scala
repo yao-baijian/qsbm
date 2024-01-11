@@ -18,7 +18,7 @@ case class HighToLowConvert(config:PeConfig) extends Component {
 
     val counter_group       = new Array[Counter](config.core_num)
     val convert_fifo        = new Array[StreamFifo[Bits]](config.core_num)
-    val all_zero_inval      = Vec(Bool(),config.core_num)
+    val all_zero_inval      = Vec(Bool() ,config.core_num)
     val single_zero_inval   = Vec(Vec(Bool(),config.thread_num),config.core_num)
     val ready_table         = Vec(Vec(Bool(),config.thread_num),config.core_num)
 
@@ -57,14 +57,23 @@ case class HighToLowConvert(config:PeConfig) extends Component {
 
         when(!convert_fifo(i).io.pop.valid) {
             all_zero_inval(i) := True
-        } elsewhen (convert_fifo(i).io.pop.payload.subdivideIn(config.axi_width bits)(counter_group(i)) === 0) {
-            all_zero_inval(i) := False
+        } otherwise {
+            when (convert_fifo(i).io.pop.payload.subdivideIn(config.axi_width bits)(counter_group(i)) === 0) {
+                all_zero_inval(i) := False
+            } otherwise {
+                all_zero_inval(i) := True
+            }
+
         }
 
         for (j <- 0 until config.thread_num) {
-            when(!(convert_fifo(i).io.pop.valid & all_zero_inval(i))) {
-                when(convert_fifo(i).io.pop.payload.subdivideIn(config.axi_width bits)(counter_group(i))(config.data_width * (j + 1) - 1 downto config.data_width * j) === 0) {
-                    single_zero_inval(i)(j) := False
+            when(!(convert_fifo(i).io.pop.valid)) {
+                when(!(convert_fifo(i).io.pop.payload.subdivideIn(config.axi_width bits)(counter_group(i)) === 0)) {
+                    when (convert_fifo(i).io.pop.payload.subdivideIn(config.axi_width bits)(counter_group(i))(config.data_width * (j + 1) - 1 downto config.data_width * j) === 0) {
+                        single_zero_inval(i)(j) := False
+                    } otherwise {
+                        single_zero_inval(i)(j) := True
+                    }
                 } otherwise {
                     single_zero_inval(i)(j) := True
                 }
