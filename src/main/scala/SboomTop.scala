@@ -6,7 +6,7 @@ import dispatcher._
 
 case class SboomTop() extends Component{
 
-  val axiConfig = Axi4Config(addressWidth = 32, dataWidth = 128, idWidth = 4)
+  val axiConfig = Axi4Config(addressWidth = 32, dataWidth = 512, idWidth = 4)
 
   val io = new Bundle {
     val topAxiMemControlPort = master(Axi4(axiConfig))

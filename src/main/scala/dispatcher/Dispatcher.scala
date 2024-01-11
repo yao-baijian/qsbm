@@ -80,7 +80,7 @@ case class Dispatcher() extends Component {
   io.axiMemControlPort.aw.payload.size := U"3'b110" //110 means that the 64 bytes in a transfer
 
   //w channel
-  io.axiMemControlPort.w.strb := B"16'hffff"
+  io.axiMemControlPort.w.strb := B"64'hffff_ffff"
 
   //b channel
 
