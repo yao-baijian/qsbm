@@ -17,37 +17,35 @@ import spinal.lib.fsm._
 
 import scala.language.postfixOps
 
-case class PeCore(config: PeCoreConfig) extends Component {
+case class PeCore(config: PeConfig) extends Component {
 
     val io_state = new Bundle {
-        val last_update = in Bool()
-        val globalreg_done = in Bool()
-        val switch_done = in Bool()
-        val all_zero = in Bool()
-
-        val pe_busy = out Bool()
+        val last_update     = in Bool()
+        val globalreg_done  = in Bool()
+        val switch_done     = in Bool()
+        val all_zero        = in Bool()
+        val pe_busy         = out Bool()
         val need_new_vertex = out Bool()
     }
   
     val io_edge_fifo = new Bundle {
-        val edge_fifo_ready = out Bool()
-        val edge_fifo_in = in Bits (config.edge_data_width bits)
+        val edge_fifo_in    = in Bits (config.data_width bits)
         val edge_fifo_valid = in Bool()
+        val edge_fifo_ready = out Bool()
     }
 
     val io_vertex_reg = new Bundle {
-        val addr = out UInt (config.vertex_addr_width bits)
-        val data = in Bits (config.vertex_data_width bits)
+        val addr            = out UInt (config.addr_width bits)
+        val data            = in Bits  (config.data_width bits)
     }
 
     val io_update_ram = new Bundle {
-        val wr_valid    = out Bool()
-        val wr_addr     = out UInt (config.update_addr_width bits)
-        val wr_data     = out Bits (config.update_data_width bits)
-
-        val rd_valid    = out Bool()
-        val rd_addr     = out UInt (config.update_addr_width bits)
-        val rd_data     = in  Bits (config.update_data_width bits)
+        val wr_valid        = out Bool()
+        val wr_addr         = out UInt (config.addr_width bits)
+        val wr_data         = out Bits (config.data_width bits)
+        val rd_valid        = out Bool()
+        val rd_addr         = out UInt (config.addr_width bits)
+        val rd_data         = in  Bits (config.data_width bits)
     }
 
     // Todo: test hazard signal
@@ -55,23 +53,22 @@ case class PeCore(config: PeCoreConfig) extends Component {
     val hazard_s1           = Reg(Bool())
     val hazard_s2           = Reg(Bool())
     val edge_value_h1       = Reg(SInt(config.edge_value_length bits)) init 0
-    val update_ram_addr_h1  = Reg(UInt(config.update_addr_width bits)) init 0
-    val vertex_reg_addr_h1  = Reg(UInt(config.vertex_addr_width bits)) init 0
-    val hazard_s1_h1        = Reg(Bool()) init False
-    val h1_valid            = Reg(Bool()) init False
+    val update_ram_addr_h1  = Reg(UInt(config.addr_width bits)) init 0
+    val vertex_reg_addr_h1  = Reg(UInt(config.addr_width bits)) init 0
+    val hazard_s1_h1        = Reg(Bool())                       init False
+    val h1_valid            = Reg(Bool())                       init False
 
-    val vertex_reg_data_h2  = Reg(SInt(config.vertex_data_width bits)) init 0
+    val vertex_reg_data_h2  = Reg(SInt(config.data_width bits)) init 0
     val edge_value_h2       = Reg(SInt(config.edge_value_length bits)) init 0
-    val h2_valid            = Reg(Bool()) init False
-    val updata_data_old_h2  = Reg(SInt(config.update_data_width bits)) init 0
-    val update_ram_addr_h2  = Reg(UInt(config.update_addr_width bits)) init 0
-    val hazard_s1_h2        = Reg(Bool()) init False
+    val h2_valid            = Reg(Bool())                       init False
+    val updata_data_old_h2  = Reg(SInt(config.data_width bits)) init 0
+    val update_ram_addr_h2  = Reg(UInt(config.addr_width bits)) init 0
+    val hazard_s1_h2        = Reg(Bool())                       init False
+    val updata_data_h2      = SInt(config.data_width bits)
 
-    val updata_data_h2      = SInt(config.update_data_width bits)
-
-    val h3_valid            = Reg(Bool()) init False
-    val ram_data_h3         = Reg(SInt(config.update_data_width bits)) init 0
-    val update_ram_addr_h3  = Reg(UInt(config.update_addr_width bits)) init 0
+    val h3_valid            = Reg(Bool())                       init False
+    val ram_data_h3         = Reg(SInt(config.data_width bits)) init 0
+    val update_ram_addr_h3  = Reg(UInt(config.addr_width bits)) init 0
 
     val pe_busy             = Reg(Bool()) init False
     val need_new_vertex     = Reg(Bool()) init False
@@ -185,7 +182,7 @@ case class PeCore(config: PeCoreConfig) extends Component {
         h2_valid       		:= False
     }
 
-    updata_data_h2 := (hazard_s1_h2 ? ram_data_h3 | updata_data_old_h2  + vertex_reg_data_h2 * edge_value_h2) (config.update_data_width - 1 downto 0);
+    updata_data_h2 := (hazard_s1_h2 ? ram_data_h3 | updata_data_old_h2  + vertex_reg_data_h2 * edge_value_h2) (config.data_width - 1 downto 0);
 
 //-----------------------------------------------------------
 // pipeline h3

@@ -18,43 +18,47 @@ import spinal.lib._
 
 import scala.language.postfixOps
    
-case class GlobalReg(config: GlobalRegConfig) extends Component{
+case class GlobalReg(config: PeConfig) extends Component{
 
     val io = new Bundle{
-        val in_stream = slave Stream(Bits(config.stream_width bits))
-
-        val rd_addr   = Vec(in UInt(config.addr_width bits), 8)
-        val rd_data   = Vec(out Bits(config.data_width bits), 8)
-
-        val need_new_vertex   = in Bool()
-        val reg_full  = out Bool()
+        val in_stream       = slave Stream(Bits(config.axi_extend_width bits))
+        val rd_addr         = Vec(in UInt(config.addr_width bits), config.thread_num)
+        val rd_data         = Vec(out Bits(config.data_width bits), config.thread_num)
+        val srst            = in Bool()
+        val reg_full        = out Bool()
     }
 
-    val vertex_reg = Vec.fill(config.reg_depth)(Reg(Bits(config.data_width bits)))
-    vertex_reg.foreach(_ init(0))
-    val wr_pointer = Reg(UInt(3 bits)) init (0)
+    //-----------------------------------------------------
+    // Module Declaration
+    //-----------------------------------------------------
 
-    val rdy = Reg(Bool()) init(True)
-    val reg_full = Reg(Bool()) init(False)
+    val vertex_reg  = Vec(Reg(Bits(config.data_width bits)) init(0), config.matrix_size)
+    val wr_pointer  = Reg(UInt(config.vertex_read_pointer_size bits)) init 0
+    val ready       = Reg(Bool()) init True
+    val reg_full    = Reg(Bool()) init False
 
-    when (wr_pointer === 2) {
-        rdy := False
-    } elsewhen (io.need_new_vertex) {
-        rdy := True
+    //-----------------------------------------------------
+    // Module Wiring
+    //-----------------------------------------------------
+
+    io.in_stream.ready  := ready
+    io.reg_full         := reg_full
+
+    when (wr_pointer === config.vertex_read_cnt_max) {
+        ready := False
+    } elsewhen (io.srst) {
+        ready := True
     }
 
-    when(wr_pointer === 2) {
+    when(wr_pointer === config.vertex_read_cnt_max) {
         reg_full := True
     } otherwise {
         reg_full := False
     }
 
-    io.in_stream.ready := rdy
-    io.reg_full := reg_full
-
     when(io.in_stream.valid && io.in_stream.ready) {
-        for (i <- 0 until 32) {
-            vertex_reg((wr_pointer * 32)(5 downto 0) + i) := io.in_stream.payload(16 * (i + 1) - 1 downto 16 * i )
+        for (i <- 0 until config.vertex_write_slice) {
+            vertex_reg((wr_pointer * config.vertex_write_slice)(5 downto 0) + i) := io.in_stream.payload(config.data_width * (i + 1) - 1 downto config.data_width * i )
             // TODO change this into right shift
         }
         wr_pointer := wr_pointer + 1
@@ -62,7 +66,7 @@ case class GlobalReg(config: GlobalRegConfig) extends Component{
         wr_pointer := 0
     }
 
-    for (i <- 0 until 8) {
+    for (i <- 0 until config.thread_num) {
         io.rd_data (i) := vertex_reg(io.rd_addr(i))
     }
 

@@ -26,7 +26,7 @@ case class SboomTop() extends Component{
 
 //  axiRename(io.topAxiMemPort, "M_AXI_")
   val dispatcher = Dispatcher()
-  val pe_top_config = PE.PETopConfig()
+  val pe_top_config = PE.PeConfig()
   val peTop = PE.PeTop(pe_top_config)
 
   io.topAxiMemControlPort << dispatcher.io.axiMemControlPort

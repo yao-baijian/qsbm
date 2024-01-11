@@ -6,7 +6,7 @@ import spinal.lib._
 import scala.language.postfixOps
 
 
-case class PeBundle(config: PeBundleConfig) extends Component {
+case class PeBundle(config: PeConfig) extends Component {
 
     val io_state = new Bundle {
         val switch_done = in Bool()
@@ -16,36 +16,38 @@ case class PeBundle(config: PeBundleConfig) extends Component {
     }
   
     val io_fifo       =  new Bundle {
-        val globalreg_done = out Bool()
-        val pe_fifo = Vec(slave Stream (Bits(config.axi_width / 8 bits)), 8)
+        val globalreg_done  = out Bool()
+        val pe_fifo         = Vec(slave Stream (Bits(config.data_width bits)), config.thread_num)
     }
 
     val io_global_reg =new Bundle {
-        val vertex_stream = slave Stream (Bits(config.axi_width bits))
-        val reg_full = out Bool()
+        val vertex_stream   = slave Stream (Bits(config.axi_extend_width bits))
+        val reg_full        = out Bool()
     }
 
     val io_update_reg = new Bundle {
-        val wr_valid = Vec(out Bool(), 8)
-        val wr_addr = Vec(out UInt (config.update_ram_addr_width bits), 8)
-        val wr_data = Vec(out Bits (config.vertex_width bits), 8)
-        val rd_addr = Vec(out UInt (config.update_ram_addr_width bits), 8)
-        val rd_data = Vec(in Bits (config.vertex_width bits), 8)
+        val wr_valid = Vec(out Bool(), config.thread_num)
+        val wr_addr = Vec(out UInt (config.addr_width bits), config.thread_num)
+        val wr_data = Vec(out Bits (config.data_width bits), config.thread_num)
+        val rd_addr = Vec(out UInt (config.addr_width bits), config.thread_num)
+        val rd_data = Vec(in Bits (config.data_width bits), config.thread_num)
     }
 
+    val pe_core_config      = PeConfig()
+    val global_reg_config   = PeConfig()
     val last_update_r       = Reg(Bool()) init False
     val need_new_vertex_r   = Reg(Bool()) init False
-    val pe_bundle           = new Array[PeCore](8)
-    val global_reg          = GlobalReg (config.global_reg_config)
+    val pe_bundle           = new Array[PeCore] (config.thread_num)
+    val global_reg          = GlobalReg (global_reg_config)
 
     global_reg.io.in_stream << io_global_reg.vertex_stream
-    global_reg.io.need_new_vertex <> need_new_vertex_r
+    global_reg.io.srst <> need_new_vertex_r
     io_fifo.globalreg_done := global_reg.io.reg_full
 
     io_global_reg.reg_full := global_reg.io.reg_full
 
     for (i <- 0 until 8) {
-        pe_bundle (i) = PeCore(config.pe_core_config)
+        pe_bundle (i) = PeCore(pe_core_config)
         pe_bundle (i).setName("pe_" + i.toString)
 
         pe_bundle(i).io_state.last_update <> last_update_r

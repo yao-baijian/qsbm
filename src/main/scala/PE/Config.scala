@@ -1,83 +1,72 @@
 package PE
-
 import spinal.core._
 
 object Config {
-    val axi_width: Int = 128
-    val axi_extend_width: Int = 128
-    val data_width: Int = 16
-    val matrix_size: Int = 64
-    val fifo_depth: Int = 128
-    val addr_width: Int = log2Up(matrix_size)
+    val axi_width:          Int = 128
+    val axi_extend_width:   Int = 512
+
+    val core_num:           Int = 4
+    val thread_num:         Int = 8
+    val matrix_size:        Int = 64
+
+    val data_width:         Int = 16
+    val addr_width:         Int = log2Up(matrix_size)
+    val edge_value_length : Int = 4
+    val vertex_read_cnt_max:Int = (matrix_size * data_width) / axi_extend_width
+    val vertex_read_pointer_size:Int = log2Up(vertex_read_cnt_max) + 1
+    val vertex_write_slice: Int = axi_extend_width / data_width
+
+    val fifo_depth_32:      Int = 32
+    val fifo_depth_128:     Int = 128
+    val fifo_depth_1024:    Int = 1024
+
+    val alpha:              Int = 1      //alpha = (np.linspace(0, 1, num_iters))
+    val beta:               Int = 8      // beta = (0.7 / math.sqrt(N))#
+    val xi_dt:              Int = 32
+    val positive_boundary:  Int = 127
+    val negetive_boundary:  Int = -1     // np.clip(x_comp,-1, 1)
+
+    val quant_precision_8:  Int = 8
+    val quant_precision_32: Int = 32
+
+    val xy_width:           Int = 8
+
     def test(): Unit = {
         println(addr_width)
+        println(vertex_read_cnt_max)
     }
     def main(args: Array[String]): Unit = {
         test()
-    }  
+    }
 }
-case class RegConfig(reg_depth: Int = Config.matrix_size,
-                     addr_width: Int = Config.addr_width,
-                     data_width: Int = Config.data_width)
 
-case class ConvertConfig(axi_extend_width: Int = 512,
-                         axi_width: Int = 128,
-                         thread_num: Int = 8,
-                         core_num: Int = 4,
-                         data_width: Int = 16,
-                         fifo_depth: Int = 1000)
+case class PeConfig(axi_width:          Int = Config.axi_width,
+                    axi_extend_width:   Int = Config.axi_extend_width,
+                    core_num:           Int = Config.core_num,
+                    thread_num:         Int = Config.thread_num,
+                    matrix_size:        Int = Config.matrix_size,
 
-case class FifoConfig(fifo_depth: Int = Config.fifo_depth,
-                        stream_width: Int = Config.axi_width,
-                        data_width: Int = Config.data_width)
-case class VertexConfig(stream_width: Int = Config.axi_width,
-                        reg_depth: Int = Config.matrix_size,
-                        addr_width: Int = Config.addr_width,
-                        data_width: Int = Config.data_width)
-case class GlobalRegConfig(stream_width: Int = Config.axi_extend_width,
-                           reg_depth: Int = Config.matrix_size,
-                           addr_width: Int = Config.addr_width,
-                           data_width: Int = Config.data_width)
-case class PeCoreConfig(vertex_data_width: Int = 16,
-                        vertex_addr_width: Int = 6,
-                        edge_data_width: Int = 16,
-                        edge_addr_width: Int = 6,
-                        update_addr_width : Int = 6,
-                        update_data_width : Int = 16,
-                        edge_value_length : Int = 4)
+                    data_width:         Int = Config.data_width,
+                    addr_width:         Int = Config.addr_width,
+                    edge_value_length:  Int = Config.edge_value_length,
+                    vertex_read_cnt_max:Int = Config.vertex_read_cnt_max,
+                    vertex_read_pointer_size:Int = Config.vertex_read_pointer_size,
+                    vertex_write_slice:Int = Config.vertex_write_slice,
 
-case class GatherPeCoreConfig(alpha: Int = 1, //alpha = (np.linspace(0, 1, num_iters))
-                              beta: Int = 8, // beta = (0.7 / math.sqrt(N))#
-                              xi_dt: Int = 32,
-                              positive_boundary: Int  = 127,
-                              negetive_boundary: Int  = -1, // np.clip(x_comp,-1, 1)
-                              addr_width: Int = 6,
-                              data_width: Int = 16)
-case class PETopConfig(core_num: Int = 4,
-                       thread_num: Int = 8,
-                       vertex_reg_num: Int = 8,
-                       gather_pe_num: Int = 8,
-                       data_width: Int = Config.data_width,
-                       matrix_size: Int = 64,
-                       vertex_config: VertexConfig  = VertexConfig(),
-                       reg_config: RegConfig  = RegConfig(),
-                       gather_pe_bundle_config: GatherPeCoreConfig = GatherPeCoreConfig(),
-                       pe_bundle_config: PeBundleConfig = PeBundleConfig(),
-                       pe_fifo_config: FifoConfig =FifoConfig(),
-                       high_to_low_converter_config: ConvertConfig =ConvertConfig())
 
-case class PeBundleConfig(axi_width: Int = 128,
-                          addr_width: Int = 6,
-                          vertex_width: Int = 16,
-                          update_ram_addr_width: Int = 6,
-                          vertex_ram_addr_width: Int = 6,
-                          update_ram_depth: Int = 64,
-                          vertex_ram_depth: Int = 64,
-                          update_ram_width: Int = 16,
-                          vertex_ram_width: Int = 16,
-                          global_reg_config: GlobalRegConfig = GlobalRegConfig(),
-                          reg_config: RegConfig = RegConfig(),
-                          pe_core_config: PeCoreConfig = PeCoreConfig())
+                    fifo_depth_32:      Int = Config.fifo_depth_32,
+                    fifo_depth_128:     Int = Config.fifo_depth_128,
+                    fifo_depth_1024:    Int = Config.fifo_depth_1024,
+
+                    alpha:              Int = Config.alpha,
+                    beta:               Int = Config.beta,
+                    xi_dt:              Int = Config.xi_dt,
+                    positive_boundary:  Int = Config.positive_boundary,
+                    negetive_boundary:  Int = Config.negetive_boundary,
+
+                    quant_precision_8:  Int = Config.quant_precision_8,
+                    quant_precision_32: Int = Config.quant_precision_32,
+                    xy_width:           Int = Config.xy_width)
 
 
 

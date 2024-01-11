@@ -17,16 +17,16 @@ import spinal.lib.fsm._
 
 import scala.language.postfixOps
 
-case class Fifo(config:FifoConfig) extends Component{
+case class Fifo(config:PeConfig) extends Component{
 
     val io = new Bundle{
-        val globalreg_done = in(Bool())
-        val in_stream = slave Stream(Bits(config.data_width bits))
-        val out_stream = master Stream(Bits(config.data_width bits))
-        val all_zero = in(Bool())
+        val globalreg_done  = in(Bool())
+        val in_stream       = slave Stream(Bits(config.data_width bits))
+        val out_stream      = master Stream(Bits(config.data_width bits))
+        val all_zero        = in(Bool())
     }
 
-    val edge_fifo = StreamFifo(Bits(config.data_width bits), config.fifo_depth)
+    val edge_fifo       = StreamFifo(Bits(config.data_width bits), config.fifo_depth_128)
     val in_stream_valid = Reg(Bool()) init True
     val in_stream_ready = Reg(Bool()) init True
 
@@ -61,9 +61,9 @@ case class Fifo(config:FifoConfig) extends Component{
           }
         }
 
-    edge_fifo.io.push.valid := in_stream_valid & io.in_stream.valid
-    io.in_stream.ready      := edge_fifo.io.push.ready &  in_stream_ready
-    edge_fifo.io.push.payload := io.in_stream.payload
+    edge_fifo.io.push.valid     := in_stream_valid & io.in_stream.valid
+    edge_fifo.io.push.payload   := io.in_stream.payload
+    io.in_stream.ready          := edge_fifo.io.push.ready & in_stream_ready
 
     edge_fifo.io.pop >> io.out_stream
 }
