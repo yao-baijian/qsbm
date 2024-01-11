@@ -88,8 +88,9 @@ case class Dispatcher() extends Component {
   io.axiMemControlPort.ar.payload.prot := B"3'b000"
   io.axiMemControlPort.ar.payload.size := U"3'b110" //64 bytes(512b) in a transfer
   io.axiMemControlPort.ar.payload.burst := B"2'b01" //incr type
-  io.axiMemControlPort.ar.len := U"8'b0011_1111"
+  io.axiMemControlPort.ar.len := U"8'b0000_0000"
   io.axiMemControlPort.ar.valid := False
+  io.axiMemControlPort.ar.payload.addr := 0
   //  io.axiMemControlPort.ar.payload.len := U"8'b0000_0111" // (7+1) transfer in a burst
 
   //r channel
@@ -219,7 +220,7 @@ case class Dispatcher() extends Component {
 
       whenIsActive {
         //startUp := False
-        io.axiMemControlPort.ar.payload.len := U"8'b0000_0111" // (7+1) transfer in a burst
+        io.axiMemControlPort.ar.payload.len := U"8'b0000_0001" // (7+1) transfer in a burst
         io.axiMemControlPort.ar.payload.addr := U"32'h0000_0000"
 
         when(io.bigPeBusyFlagVec(0) === False) {
