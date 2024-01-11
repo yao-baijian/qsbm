@@ -136,7 +136,7 @@ case class Dispatcher() extends Component {
                     vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(1) === 0 || //&&
                     vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(2) === 0 || //&&
                     vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(3) === 0  //&&
-  val seperatorInDly = Reg(seperatorIn) init False
+  val seperatorInDly = RegNext(seperatorIn) init False
 
 
 //  val allZeroInFlagReg = Reg(Bool()) init False
