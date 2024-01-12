@@ -170,9 +170,11 @@ case class Dispatcher() extends Component {
   }
 //  val edgePeColumnOutStreams = StreamDemux(vexEdgeOutStreams(1), edgePeColumnSelect, 4)
 
-//  val edgePeColumnOutStreams = StreamDemux(edgeCacheFifo.io.pop, edgePeColumnSelect, 4)
-//  for (i <- 0 until PeConfig().peColumnNum) { //i for ith column
-//    edgePeColumnOutStreams(i).ready := io.edgeFifoReadyVec(i)
+  val edgePeColumnOutStreams = StreamDemux(edgeCacheFifo.io.pop, edgePeColumnSelect, 4)
+  for (i <- 0 until PeConfig().peColumnNum) { //i for ith column
+    io.dispatchToEdgePorts(i).payload.data := edgePeColumnOutStreams(i).payload.data
+    io.dispatchToEdgePorts(i).valid := edgePeColumnOutStreams(i).valid
+    edgePeColumnOutStreams(i).ready := io.edgeFifoReadyVec(i)
 //    for (j <- 0 until PeConfig().peNumEachColumn) { //j for the offset of the ith column
 ////      edgePeColumnOutStreams(i).ready :=
 //      io.dispatchToEdgeFifoPorts(i)(j).payload.data := edgePeColumnOutStreams(i).payload.data.subdivideIn(16 bits)(j)
@@ -182,7 +184,7 @@ case class Dispatcher() extends Component {
 //        io.dispatchToEdgeFifoPorts(i)(j).valid := edgePeColumnOutStreams(i).valid
 //      }
 //    }
-//  }
+  }
 
   //********************************  FSM Control  *******************************************************//
   val axi4MemCtrlFsm = new StateMachine {
