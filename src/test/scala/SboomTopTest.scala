@@ -116,21 +116,20 @@ class SboomTopTest extends AnyFunSuite {
               //               tempArray(offset) = edge
               edgesArrayBuffer.append(edge)
             }
-
-            transfer_128 = transfer_128 + 1
-            if(flag == 0){
-              if(transfer_128 % 4 == 1){
-                val padding =  ArrayBuffer.fill(16 * 3)(0.toByte)
-                edgesArrayBuffer.append(padding)
-              } else if(transfer_128 % 4 == 2){
-                val padding = ArrayBuffer.fill(16 * 2)(0.toByte)
-                edgesArrayBuffer.append(padding)
-              } else if (transfer_128 % 4 == 3) {
-                val padding = ArrayBuffer.fill(16 * 1)(0.toByte)
-                edgesArrayBuffer.append(padding)
-              }
-            }
           }  // 128bits conccatenation and paddings
+          transfer_128 = transfer_128 + 1
+          if(flag == 0){
+            if(transfer_128 % 4 == 1){
+              val padding =  ArrayBuffer.fill(16 * 3)(0.toByte)
+              edgesArrayBuffer.append(padding)
+            } else if(transfer_128 % 4 == 2){
+              val padding = ArrayBuffer.fill(16 * 2)(0.toByte)
+              edgesArrayBuffer.append(padding)
+            } else if (transfer_128 % 4 == 3) {
+              val padding = ArrayBuffer.fill(16 * 1)(0.toByte)
+              edgesArrayBuffer.append(padding)
+            }
+          }
         } while (flag > 0) //  flag>0 means that there is no allZeros
       }
     }
