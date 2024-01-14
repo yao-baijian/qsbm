@@ -63,7 +63,7 @@ class SboomTopTest extends AnyFunSuite {
     val firFields = firstLine.split(' ')
     val width = scala.math.ceil(parseUnsignedLong(firFields(0)).toDouble / 64).toInt
     val arrayWidth = width
-    println(arrayWidth)
+    println("arrayWidth = ",arrayWidth)
     //put a queue inside each block
     val blocks = Array.ofDim[mutable.Queue[ArrayBuffer[Byte]]](arrayWidth, arrayWidth)
     for (row <- 0 until arrayWidth) {
@@ -93,14 +93,16 @@ class SboomTopTest extends AnyFunSuite {
 
     val edgesArrayBuffer = ArrayBuffer[ArrayBuffer[Byte]]()
     var flag = 0
+    var transfer_128 = 0
     var block_empty = 0
     val goodIntervalBound = arrayWidth / PeConfig().peNumEachColumn * PeConfig().peNumEachColumn
     val remainder = arrayWidth % (PeConfig().peNumEachColumn)
 
     // To deal with all lines within good interval and all column blocks
     for (base <- 0 until (goodIntervalBound) by PeConfig().peNumEachColumn) {
-      for (col <- 0 until arrayWidth) {
+      for (col <- 0 until arrayWidth) { //arrayWidth is the number of 64 * 64 blocks
         do {
+          // 128bits conccatenation
           flag = 0
           for (offset <- 0 until PeConfig().peNumEachColumn) {
             if (blocks(base + offset)(col).nonEmpty) {
@@ -114,21 +116,22 @@ class SboomTopTest extends AnyFunSuite {
               //               tempArray(offset) = edge
               edgesArrayBuffer.append(edge)
             }
-          }
-        } while (flag > 0) //flag>0 means that there is no allZeros
 
-        if(flag == 0){
-          if(col%4 == 0){
-            val padding =  ArrayBuffer.fill(16 * 3)(0.toByte)
-            edgesArrayBuffer.append(padding)
-          } else if(col%4 == 1){
-            val padding = ArrayBuffer.fill(16 * 2)(0.toByte)
-            edgesArrayBuffer.append(padding)
-          } else if (col % 4 == 2) {
-            val padding = ArrayBuffer.fill(16 * 1)(0.toByte)
-            edgesArrayBuffer.append(padding)
-          }
-        }
+            transfer_128 = transfer_128 + 1
+            if(flag == 0){
+              if(transfer_128 % 4 == 1){
+                val padding =  ArrayBuffer.fill(16 * 3)(0.toByte)
+                edgesArrayBuffer.append(padding)
+              } else if(transfer_128 % 4 == 2){
+                val padding = ArrayBuffer.fill(16 * 2)(0.toByte)
+                edgesArrayBuffer.append(padding)
+              } else if (transfer_128 % 4 == 3) {
+                val padding = ArrayBuffer.fill(16 * 1)(0.toByte)
+                edgesArrayBuffer.append(padding)
+              }
+            }
+          }  // 128bits conccatenation and paddings
+        } while (flag > 0) //  flag>0 means that there is no allZeros
       }
     }
 
@@ -153,20 +156,20 @@ class SboomTopTest extends AnyFunSuite {
             val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
             edgesArrayBuffer.append(edge)
           }
-        } while (flag > 0)
-
-        if (flag == 0) {
-          if (col % 4 == 0) {
-            val padding = ArrayBuffer.fill(16 * 3)(0.toByte)
-            edgesArrayBuffer.append(padding)
-          } else if (col % 4 == 1) {
-            val padding = ArrayBuffer.fill(16 * 2)(0.toByte)
-            edgesArrayBuffer.append(padding)
-          } else if (col % 4 == 2) {
-            val padding = ArrayBuffer.fill(16 * 1)(0.toByte)
-            edgesArrayBuffer.append(padding)
+          transfer_128 = transfer_128 + 1
+          if (flag == 0) {
+            if (transfer_128 % 4 == 0) {
+              val padding = ArrayBuffer.fill(16 * 3)(0.toByte)
+              edgesArrayBuffer.append(padding)
+            } else if (transfer_128 % 4 == 1) {
+              val padding = ArrayBuffer.fill(16 * 2)(0.toByte)
+              edgesArrayBuffer.append(padding)
+            } else if (transfer_128 % 4 == 2) {
+              val padding = ArrayBuffer.fill(16 * 1)(0.toByte)
+              edgesArrayBuffer.append(padding)
+            }
           }
-        }
+        } while (flag > 0)
 
       }
     }
@@ -188,7 +191,8 @@ class SboomTopTest extends AnyFunSuite {
     }
     dos.close()
     println("dataArrayLen", dataArray.toArray.length)
-    //    print(dataArray)
+//    print(dataArray)
+    println("transfer_128",transfer_128)
     dataArray.toArray
   }
 
