@@ -133,11 +133,14 @@ case class Dispatcher() extends Component {
 //  vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(6) === 0 &&
 //  vexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(7) === 0
 
-  val seperatorIn = vexEdgeOutStreams(1).payload.data.subdivideIn(128 bits)(0) === 0 || //&&
+  val seperatorIn = vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(0) === 0 || //&&
                     vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(1) === 0 || //&&
                     vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(2) === 0 || //&&
                     vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(3) === 0  //&&
-  val seperatorInDly = RegNext(seperatorIn) init False
+  val seperatorInReg = Reg(Bool()) init False
+  when(seperatorIn === True){
+    seperatorInReg := True
+  }
 
 
 //  val allZeroInFlagReg = Reg(Bool()) init False
@@ -161,6 +164,10 @@ case class Dispatcher() extends Component {
                      edgeCacheFifo.io.pop.payload.data.subdivideIn(PeConfig().peColumnWid bits)(2) === 0 || //&&
                      edgeCacheFifo.io.pop.payload.data.subdivideIn(PeConfig().peColumnWid bits)(3) === 0    //&&
 
+  val seperatorOutReg = Reg(Bool()) init False
+  when(seperatorOut === True) {
+    seperatorOutReg := True
+  }
 
   //edge data dispatch to 4 pe column stream,stream0 for vex, stream1 for edges
   val edgePeColumnSelect = Reg(UInt(log2Up(4) bits)) init 0
@@ -173,9 +180,14 @@ case class Dispatcher() extends Component {
   val edgePeColumnOutStreams = StreamDemux(edgeCacheFifo.io.pop, edgePeColumnSelect, 4)
   for (i <- 0 until PeConfig().peColumnNum) { //i for ith column
     io.dispatchToEdgePorts(i).payload.data := edgePeColumnOutStreams(i).payload.data
-    io.dispatchToEdgePorts(i).valid := edgePeColumnOutStreams(i).valid
+    when(seperatorOutReg){
+      io.dispatchToEdgePorts(i).valid := False
+    }.otherwise{
+      io.dispatchToEdgePorts(i).valid := edgePeColumnOutStreams(i).valid
+    }
     edgePeColumnOutStreams(i).ready := io.edgeFifoReadyVec(i)
-//    for (j <- 0 until PeConfig().peNumEachColumn) { //j for the offset of the ith column
+
+    //    for (j <- 0 until PeConfig().peNumEachColumn) { //j for the offset of the ith column
 ////      edgePeColumnOutStreams(i).ready :=
 //      io.dispatchToEdgeFifoPorts(i)(j).payload.data := edgePeColumnOutStreams(i).payload.data.subdivideIn(16 bits)(j)
 //      when(edgePeColumnOutStreams(i).payload.data.subdivideIn(16 bits)(j) === 0 && (~allZeroInFlag) ){
@@ -274,7 +286,7 @@ case class Dispatcher() extends Component {
         }
       }
       onExit{
-
+        seperatorInReg := False
       }
     }
 
@@ -311,6 +323,7 @@ case class Dispatcher() extends Component {
 
       val DISPATCH_EDGE_DATA = new State{
         onEntry{
+          seperatorOutReg := False
           vexEdgeSelect := 1
           edgePeColumnSelect := vexPeColumnSelect  //当确定vexPeColumn的时候，同时确定了edgePeColumn
         }
@@ -318,7 +331,7 @@ case class Dispatcher() extends Component {
         whenIsActive{
 
           io.axiMemControlPort.ar.payload.addr := U"32'h0000_1000" + (64*64) * edgeAddrCnt
-          when((seperatorInDly||seperatorIn) && io.axiMemControlPort.r.last){
+          when((seperatorInReg||seperatorIn) && io.axiMemControlPort.r.last){
             edgeAddrCnt := edgeAddrCnt + 1
             exit()
           }
