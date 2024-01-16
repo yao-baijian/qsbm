@@ -38,7 +38,11 @@ case class Fifo(config:PeConfig) extends Component{
 
         IDLE
           .whenIsActive {
-              when(io.in_stream.valid === True) {
+              when (io.all_zero) {
+                  in_stream_valid := False
+                  in_stream_ready := False
+                  goto(WAIT)
+              } elsewhen(io.in_stream.valid === True) {
                   goto(READ)
               }
           }

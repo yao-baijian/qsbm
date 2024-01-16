@@ -110,12 +110,11 @@ case class PeTop(config:PeConfig) extends Component {
 
         for (j <- 0 until config.thread_num) {
             pe_rdy_table_all(i)(j) := edge_fifo(i)(j).io.in_stream.ready
-            all_zero_table (i)(j) := high_to_low_converter.io.out_edge_stream(i)(j).payload === 0 &
-              high_to_low_converter.io.out_edge_stream(i)(j).valid
+            all_zero_table (i)(j) := (high_to_low_converter.io.out_edge_stream(i)(j).payload === 0) & high_to_low_converter.io.out_edge_stream(i)(j).valid
         }
         io.pe_rdy_table(i) :=  pe_rdy_table_all(i).orR
         pe_bundle_array(i).io_state.switch_done <> switch_done
-        all_zero(i) := all_zero_table (i).andR & io.bundle_sel(i)
+        all_zero(i) := all_zero_table (i).andR
         pe_bundle_array(i).io_state.all_zero := all_zero(i)
 
         for (j <- 0 until config.thread_num) {

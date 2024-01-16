@@ -90,6 +90,9 @@ case class PeCore(config: PeConfig) extends Component {
               when (io_state.globalreg_done) {
                   need_new_vertex  := False
               }
+              when(io_state.all_zero) {
+                  goto(WAIT_DONE)
+              }
               when (io_state.last_update) {
                   rdy := False
                   goto(PAUSE)

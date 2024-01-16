@@ -21,6 +21,7 @@ case class HighToLowConvert(config:PeConfig) extends Component {
     val all_zero_inval      = Vec(Reg(Bool()) init True ,config.core_num)
     val single_zero_inval   = Vec(Vec(Bool(),config.thread_num),config.core_num)
     val ready_table         = Vec(Vec(Bool(),config.thread_num),config.core_num)
+    val ready_reg           = Vec(Reg(Bool()) init True ,config.core_num)
 
     //-----------------------------------------------------
     // Module Instantiation
@@ -47,7 +48,12 @@ case class HighToLowConvert(config:PeConfig) extends Component {
             io.out_edge_stream(i)(j).payload := convert_fifo(i).io.pop.payload.subdivideIn(config.axi_width bits)(counter_group(i).value)(config.data_width * (j + 1) - 1 downto config.data_width * j)
             ready_table(i)(j) := io.out_edge_stream(i)(j).ready
         }
-        convert_fifo(i).io.pop.ready := ready_table(i).andR && (counter_group(i).value === 3)
+
+        when (counter_group(i).value === 0)  {
+            ready_reg(i) := ready_table(i).andR
+        }
+
+        convert_fifo(i).io.pop.ready := ready_reg(i) && (counter_group(i).value === 3)
 
         when(!convert_fifo(i).io.pop.valid) {
             counter_group(i).clear()
