@@ -312,8 +312,8 @@ case class Dispatcher() extends Component {
 
         whenIsActive{
           io.axiMemControlPort.ar.valid := True
-          io.axiMemControlPort.ar.payload.len := U"8'b0011_1111" //burst length = 63 + 1
-          io.axiMemControlPort.ar.payload.addr := U"32'h0000_1000" + (64 * 64) * edgeAddrCnt
+          io.axiMemControlPort.ar.payload.len := U"8'b0001_1111" //burst length = 31 + 1
+          io.axiMemControlPort.ar.payload.addr := U"32'h0000_1000" + (32 * 64) * edgeAddrCnt
           //io.axiMemControlPort.ar.payload.len := U"8'b0000_0111" // (7+1) transfer in a burst
           when(io.axiMemControlPort.ar.ready){
             goto(DISPATCH_EDGE_DATA)
@@ -330,10 +330,13 @@ case class Dispatcher() extends Component {
 
         whenIsActive{
 
-          io.axiMemControlPort.ar.payload.addr := U"32'h0000_1000" + (64*64) * edgeAddrCnt
+          io.axiMemControlPort.ar.payload.addr := U"32'h0000_1000" + (32*64) * edgeAddrCnt
           when((seperatorInReg||seperatorIn) && io.axiMemControlPort.r.last){
             edgeAddrCnt := edgeAddrCnt + 1
             exit()
+          }.elsewhen((seperatorInReg||seperatorIn) =/= True ){
+            edgeAddrCnt := edgeAddrCnt + 1
+            goto(READ_EDGE_ADDR)
           }
 //          when(/*(allZeroInFlag || allZeroInFlagReg) && */ io.axiMemControlPort.r.last){
 //            edgeAddrCnt := edgeAddrCnt + 1
