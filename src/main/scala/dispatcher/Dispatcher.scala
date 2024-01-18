@@ -334,7 +334,7 @@ case class Dispatcher() extends Component {
           when((seperatorInReg||seperatorIn) && io.axiMemControlPort.r.last){
             edgeAddrCnt := edgeAddrCnt + 1
             exit()
-          }.elsewhen((seperatorInReg||seperatorIn) =/= True ){
+          }.elsewhen((seperatorInReg||seperatorIn) =/= True && io.axiMemControlPort.r.last){
             edgeAddrCnt := edgeAddrCnt + 1
             goto(READ_EDGE_ADDR)
           }
