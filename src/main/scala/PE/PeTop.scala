@@ -68,7 +68,7 @@ case class PeTop(config:PeConfig) extends Component {
     // Module Declaration & Instantiation
     //-----------------------------------------------------
 
-    val edge_fifo                   = new Array[Array[Fifo]](config.core_num)
+//    val edge_fifo                   = new Array[Array[Fifo]](config.core_num)
     val pe_bundle_array             = new Array[PeBundle](config.core_num)
     val gather_pe_group             = new Array[GatherPeCore](config.thread_num)
     val vertex_reg_group_A          = new Array[DualModeReg](config.thread_num)
@@ -81,11 +81,11 @@ case class PeTop(config:PeConfig) extends Component {
     for (i <- 0 until config.core_num) {
         pe_bundle_array(i) = PeBundle(Config)
         pe_bundle_array(i).setName("pe_bundle_" + i.toString)
-        edge_fifo(i) = new Array[Fifo] (config.thread_num)
+//        edge_fifo(i) = new Array[Fifo] (config.thread_num)
         for (j <- 0 until config.thread_num) {
-            edge_fifo(i)(j) = Fifo(Config)
-            edge_fifo(i)(j).setName("edge_fifo_" + i.toString + "_"+j.toString)
-            pe_bundle_update_reg_group(i)(j).foreach(_ init(0))
+//            edge_fifo(i)(j) = Fifo(Config)
+//            edge_fifo(i)(j).setName("edge_fifo_" + i.toString + "_"+j.toString)
+            pe_bundle_update_reg_group(i)(j).foreach(_ init 0)
         }
         update_reg_group(i).foreach(_ init(0))
     }
@@ -109,7 +109,7 @@ case class PeTop(config:PeConfig) extends Component {
         high_to_low_converter.io.in_edge_stream(i) <> io.raw_edge_stream(i)
 
         for (j <- 0 until config.thread_num) {
-            pe_rdy_table_all(i)(j) := edge_fifo(i)(j).io.in_stream.ready
+            pe_rdy_table_all(i)(j) := pe_bundle_array(i).io_fifo.pe_fifo(j).ready
             all_zero_table (i)(j) := (high_to_low_converter.io.out_edge_stream(i)(j).payload === 0) & high_to_low_converter.io.out_edge_stream(i)(j).valid
         }
         io.pe_rdy_table(i) :=  pe_rdy_table_all(i).orR
@@ -118,10 +118,10 @@ case class PeTop(config:PeConfig) extends Component {
         pe_bundle_array(i).io_state.all_zero := all_zero(i)
 
         for (j <- 0 until config.thread_num) {
-            edge_fifo(i)(j).io.in_stream <> high_to_low_converter.io.out_edge_stream(i)(j)
-            pe_bundle_array(i).io_fifo.pe_fifo(j) << edge_fifo(i)(j).io.out_stream
-            edge_fifo(i)(j).io.globalreg_done := pe_bundle_array(i).io_fifo.globalreg_done
-            edge_fifo(i)(j).io.all_zero := all_zero(i)
+            pe_bundle_array(i).io_fifo.pe_fifo(j) <> high_to_low_converter.io.out_edge_stream(i)(j)
+//            pe_bundle_array(i).io_fifo.pe_fifo(j) << edge_fifo(i)(j).io.out_stream
+//            edge_fifo(i)(j).io.globalreg_done := pe_bundle_array(i).io_fifo.globalreg_done
+//            edge_fifo(i)(j).io.all_zero := all_zero(i)
 
             when (pe_bundle_array(i).io_update_reg.wr_valid(j)) {
                 pe_bundle_update_reg_group(i)(j)(pe_bundle_array(i).io_update_reg.wr_addr(j)) := pe_bundle_array(i).io_update_reg.wr_data(j)
