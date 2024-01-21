@@ -229,7 +229,7 @@ class SboomTopTest extends AnyFunSuite {
 //    print(edgeIndexBuffer.toArray.toString)
 //    print(dataArray)
 //    println("transfer_128",transfer_128)
-    (dataArray.toArray,edgeIndexBuffer.toArray)
+    (edgeIndexBuffer.toArray,dataArray.toArray)
   }
 
   test("SboomTopTest"){

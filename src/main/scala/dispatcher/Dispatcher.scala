@@ -124,6 +124,16 @@ case class Dispatcher() extends Component {
     io.dispatchToVexRegFilePorts(i).valid := vexIndexEdgeOutStreams(0).valid &&  vexPeColumnSelect === i
   }
 
+  //******************************** EDGE INDEX DISPATCH*********************************************//
+  val edgeIndexFifo = StreamFifo(
+    dataType = AxiMemControllerPort(DispatcherConfig().size),
+    depth = 4096
+    //    pushClock = clockA,
+    //    popClock = clockB
+  )
+  edgeIndexFifo.io.push.payload.data := vexIndexEdgeOutStreams(1).payload.data
+  edgeIndexFifo.io.push.valid := vexIndexEdgeOutStreams(1).valid
+
 //********************************** EDGE DATA DISPATCH ********************************************//
   //InFlag is from the perspective of the input of cacheFifo
 //val allZeroInFlag = vexIndexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(0) === 0 && //&&
@@ -145,13 +155,16 @@ case class Dispatcher() extends Component {
     seperatorInReg := True
   }
 
-  val edgeIndexFifo = StreamFifo(
 
-    dataType = Bits(32 bits),
-    depth = 4096
+//  val edgeIndexFifo = StreamFifo(
+//    dataType = AxiMemControllerPort(DispatcherConfig().size),
+//    depth = 4096
+//  )
+//  edgeIndexFifo.io.push.payload
 
-  )
-  edgeIndexFifo.io.push.payload :=
+//  edgeIndexFifo.io.push.payload.
+//  edgeIndexFifo.io.push.valid := vexIndexEdgeOutStreams(1).valid
+//  edgeIndexFifo.io.push.payload :=
 
 //  val allZeroInFlagReg = Reg(Bool()) init False
   val edgeCacheFifo = StreamFifo(
@@ -160,8 +173,8 @@ case class Dispatcher() extends Component {
     //    pushClock = clockA,
     //    popClock = clockB
   )
-  edgeCacheFifo.io.push.payload.data := vexIndexEdgeOutStreams(1).payload.data
-  edgeCacheFifo.io.push.valid := vexIndexEdgeOutStreams(1).valid
+  edgeCacheFifo.io.push.payload.data := vexIndexEdgeOutStreams(2).payload.data
+  edgeCacheFifo.io.push.valid := vexIndexEdgeOutStreams(2).valid
 
   val edgeCacheFifoOutRegDly1 = RegNextWhen(edgeCacheFifo.io.pop.payload.data, edgeCacheFifo.io.pop.valid)
   val edgeCacheFifoOutRegDly2 = RegNextWhen(edgeCacheFifoOutRegDly1,edgeCacheFifo.io.pop.valid)
@@ -298,7 +311,7 @@ case class Dispatcher() extends Component {
           }
           when(axiReadVertexCnt === 2 - 1) {
             axiReadVertexCnt := 0
-            goto(READ_EDGE)
+            goto(READ_EDGE_INDEX_ADDR)
           }
         }
       }
@@ -320,13 +333,15 @@ case class Dispatcher() extends Component {
           goto(READ_EDGE_INDEX_DATA)
         }
       }
-
     }
 
     val READ_EDGE_INDEX_DATA = new State {
+      onEntry{
+        vexIndexEdgeSelect := 1
+      }
       whenIsActive{
         when(io.axiMemControlPort.r.last){
-          goto(READ_VEX_ADDR)
+          goto(READ_EDGE)
         }
       }
     }
