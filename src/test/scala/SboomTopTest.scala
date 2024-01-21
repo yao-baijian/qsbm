@@ -34,6 +34,8 @@ class SboomTopTest extends AnyFunSuite {
 //  val axiMemSimConfig = AxiMemorySimConfig()
 //  val axiMemSimModel = AxiMemorySim(compiled.dut.io.topAxiMemControlPort, compiled.dut.clockDomain, axiMemSimConfig)
 
+
+
   def dataGen(): Array[Byte] = {
     val data = new Array[Byte](100)
 
@@ -92,6 +94,8 @@ class SboomTopTest extends AnyFunSuite {
     } //put all the edges into all queues
 
     val edgesArrayBuffer = ArrayBuffer[ArrayBuffer[Byte]]()
+    val edgeIndexBuffer = ArrayBuffer[Byte]()
+    var edgeIndexByte:Byte = 0
     var flag = 0
     var transfer_128 = 0
     var block_empty = 0
@@ -103,10 +107,12 @@ class SboomTopTest extends AnyFunSuite {
       for (col <- 0 until arrayWidth) { //arrayWidth is the number of 64 * 64 blocks
         do {
           // 128bits conccatenation
+          edgeIndexByte = 0
           flag = 0
           for (offset <- 0 until PeConfig().peNumEachColumn) {
             if (blocks(base + offset)(col).nonEmpty) {
               flag = flag + 1
+              edgeIndexByte = (edgeIndexByte | 0x01 << offset).toByte
               val edge = blocks(base + offset)(col).dequeue()
               //              println("edge size", edge.length)
               //               tempArray(offset) = edge
@@ -117,6 +123,8 @@ class SboomTopTest extends AnyFunSuite {
               edgesArrayBuffer.append(edge)
             }
           }  // 128bits conccatenation and paddings
+
+          edgeIndexBuffer.append(edgeIndexByte)
 
           if(flag == 0){
             println("transfer_128",transfer_128)
@@ -184,6 +192,7 @@ class SboomTopTest extends AnyFunSuite {
     }
 
     //    println("edge_number", edgesArrayBuffer.mkString(","))
+    //*************************************generate edge bin file ****************************//
     val dataArray = ArrayBuffer[Byte]()
     for (i <- edgesArrayBuffer.indices) {
       val innerArr = edgesArrayBuffer(i)
@@ -193,16 +202,34 @@ class SboomTopTest extends AnyFunSuite {
     }
 
     import java.io._
-    val fos = new FileOutputStream("data.bin")
+    val fos = new FileOutputStream("edge.bin")
     val dos = new DataOutputStream(fos)
     for (d <- dataArray) {
       dos.write(d.toByte)
     }
     dos.close()
+
+    //************************************generate edgeIndex bin file*************************************//
+//    val edgeIndexArray = ArrayBuffer[Byte]()
+//    for (i <- edgeIndexBuffer.indices) {
+//      val innerArr = edgesArrayBuffer(i)
+//      for (j <- innerArr.indices) {
+//        dataArray.append(innerArr(j))
+//      }
+//    }
+//
+    val fos1 = new FileOutputStream("edgeIndex.bin")
+    val dos1 = new DataOutputStream(fos1)
+    for (d <- edgeIndexBuffer) {
+      dos1.write(d.toByte)
+    }
+    dos1.close()
+
     println("dataArrayLen", dataArray.toArray.length)
+//    print(edgeIndexBuffer.toArray.toString)
 //    print(dataArray)
 //    println("transfer_128",transfer_128)
-    dataArray.toArray
+    (dataArray.toArray,edgeIndexBuffer.toArray)
   }
 
   test("SboomTopTest"){
@@ -215,7 +242,9 @@ class SboomTopTest extends AnyFunSuite {
       val axiMemSimModel = AxiMemorySim(compiled.dut.io.topAxiMemControlPort, compiled.dut.clockDomain, axiMemSimConfig)
       axiMemSimModel.start()
       axiMemSimModel.memory.writeArray(0, vexGen())
-      axiMemSimModel.memory.writeArray(4096, edgeGen())
+      val (edgeIndex, edge) = edgeGen()
+      axiMemSimModel.memory.writeArray(0x400000,edgeIndex)
+      axiMemSimModel.memory.writeArray(0x800000, edge)
 
       dut.clockDomain.waitSampling(count = 8)
       dut.clockDomain.waitSampling(count = 100)
