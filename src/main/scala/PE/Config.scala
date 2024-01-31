@@ -13,7 +13,8 @@ object Config {
     val addr_width:         Int = log2Up(matrix_size)
     val edge_value_length : Int = 4
     val vertex_read_cnt_max:Int = (matrix_size * data_width) / axi_extend_width
-    val vertex_read_pointer_size:Int = log2Up(vertex_read_cnt_max) + 1
+//    val vertex_read_pointer_size:Int = log2Up(vertex_read_cnt_max) + 1
+    val vertex_read_pointer_size:Int = 7
     val vertex_write_slice: Int = axi_extend_width / data_width
 
     val fifo_depth_32:      Int = 32

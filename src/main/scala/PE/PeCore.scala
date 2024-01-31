@@ -43,15 +43,14 @@ case class PeCore(config: PeConfig) extends Component {
         val wr_valid        = out Bool()
         val wr_addr         = out UInt (config.addr_width bits)
         val wr_data         = out Bits (config.data_width bits)
-        val rd_valid        = out Bool()
         val rd_addr         = out UInt (config.addr_width bits)
         val rd_data         = in  Bits (config.data_width bits)
     }
 
     // Todo: test hazard signal
     
-    val hazard_s1           = Reg(Bool())
-    val hazard_s2           = Reg(Bool())
+    val hazard_s1           = Bool()
+    val hazard_s2           = Bool()
     val edge_value_h1       = Reg(SInt(config.edge_value_length bits)) init 0
     val update_ram_addr_h1  = Reg(UInt(config.addr_width bits)) init 0
     val vertex_reg_addr_h1  = Reg(UInt(config.addr_width bits)) init 0
@@ -135,10 +134,10 @@ case class PeCore(config: PeConfig) extends Component {
 //-----------------------------------------------------------
 // pipeline h0
 //-----------------------------------------------------------
-
 // WRITE AFTER READ
     hazard_s1 := (io_edge_fifo.edge_fifo_in (9 downto 4).asUInt === update_ram_addr_h1) ? True | False
     hazard_s2 := (io_edge_fifo.edge_fifo_in (9 downto 4).asUInt === update_ram_addr_h2) ? True | False
+
 //-----------------------------------------------------------
 // pipeline h1
 //-----------------------------------------------------------
@@ -158,10 +157,8 @@ case class PeCore(config: PeConfig) extends Component {
         h1_valid            := False
     }
 
-    io_update_ram.rd_valid  := h1_valid
     io_update_ram.rd_addr   := update_ram_addr_h1
     io_vertex_reg.addr      := vertex_reg_addr_h1
-
 
 //-----------------------------------------------------------
 // pipeline h2

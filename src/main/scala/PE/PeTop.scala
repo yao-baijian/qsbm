@@ -78,6 +78,8 @@ case class PeTop(config:PeConfig) extends Component {
 
     val high_to_low_converter       = HighToLowConvert(Config)
 
+    val pe_bundle_wire              = Vec(Vec(Vec(SInt(config.data_width bits),config.matrix_size), config.thread_num),config.core_num / 2 )
+
     for (i <- 0 until config.core_num) {
         pe_bundle_array(i) = PeBundle(Config)
         pe_bundle_array(i).setName("pe_bundle_" + i.toString)
@@ -118,22 +120,16 @@ case class PeTop(config:PeConfig) extends Component {
         pe_bundle_array(i).io_state.all_zero := all_zero(i)
 
         for (j <- 0 until config.thread_num) {
+
             pe_bundle_array(i).io_fifo.pe_fifo(j) <> high_to_low_converter.io.out_edge_stream(i)(j)
-//            pe_bundle_array(i).io_fifo.pe_fifo(j) << edge_fifo(i)(j).io.out_stream
-//            edge_fifo(i)(j).io.globalreg_done := pe_bundle_array(i).io_fifo.globalreg_done
-//            edge_fifo(i)(j).io.all_zero := all_zero(i)
-
-            when (pe_bundle_array(i).io_update_reg.wr_valid(j)) {
-                pe_bundle_update_reg_group(i)(j)(pe_bundle_array(i).io_update_reg.wr_addr(j)) := pe_bundle_array(i).io_update_reg.wr_data(j)
-            }
             pe_bundle_array(i).io_update_reg.rd_data(j) := pe_bundle_update_reg_group(i)(j)(pe_bundle_array(i).io_update_reg.rd_addr(j))
-        }
 
-        when (update_reg_srst(i)) {
-            for (k <- 0 until config.thread_num) {
-                for (l <- 0 until config.matrix_size) {
-                    pe_bundle_update_reg_group(i)(k)(l) := 0
+            when (update_reg_srst(i)) {
+                for (k <- 0 until config.matrix_size) {
+                    pe_bundle_update_reg_group(i)(j)(k) := 0
                 }
+            } elsewhen (pe_bundle_array(i).io_update_reg.wr_valid(j)) {
+                pe_bundle_update_reg_group(i)(j)(pe_bundle_array(i).io_update_reg.wr_addr(j)) := pe_bundle_array(i).io_update_reg.wr_data(j)
             }
         }
     }
@@ -194,13 +190,18 @@ case class PeTop(config:PeConfig) extends Component {
     }
 
     // Todo this part is not capable of parameterize
+    for (i <- 0 until config.thread_num) {
+        for (j <- 0 until config.matrix_size) {
+            pe_bundle_wire(0)(i)(j) := 0
+            pe_bundle_wire(1)(i)(j) := 0
+        }
+    }
     when(need_update) {
         for (i <- 0 until config.thread_num) {
             for (j <- 0 until config.matrix_size) {
-                update_reg_group (i)(j) := (pe_bundle_update_reg_group(0)(i)(j).asSInt +
-                  pe_bundle_update_reg_group(1)(i)(j).asSInt +
-                  pe_bundle_update_reg_group(2)(i)(j).asSInt +
-                  pe_bundle_update_reg_group(3)(i)(j).asSInt).asBits
+                pe_bundle_wire(0)(i)(j) := pe_bundle_update_reg_group(0)(i)(j).asSInt + pe_bundle_update_reg_group(1)(i)(j).asSInt
+                pe_bundle_wire(1)(i)(j) := pe_bundle_update_reg_group(2)(i)(j).asSInt + pe_bundle_update_reg_group(3)(i)(j).asSInt
+                update_reg_group (i)(j) := (pe_bundle_wire(0)(i)(j) + pe_bundle_wire(1)(i)(j)).asBits
             }
         }
     }
