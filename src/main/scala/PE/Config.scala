@@ -11,11 +11,13 @@ object Config {
 
     val data_width:         Int = 16
     val addr_width:         Int = log2Up(matrix_size)
-    val edge_value_length : Int = 4
+    val tag_width:          Int = 3
+    val edge_width :        Int = 4
     val vertex_read_cnt_max:Int = (matrix_size * data_width) / axi_extend_width
 //    val vertex_read_pointer_size:Int = log2Up(vertex_read_cnt_max) + 1
     val vertex_read_pointer_size:Int = 7
     val vertex_write_slice: Int = axi_extend_width / data_width
+    val extra_adder_num:    Int = 4
 
     val fifo_depth_32:      Int = 32
     val fifo_depth_128:     Int = 128
@@ -49,11 +51,12 @@ case class PeConfig(axi_width:          Int = Config.axi_width,
 
                     data_width:         Int = Config.data_width,
                     addr_width:         Int = Config.addr_width,
-                    edge_value_length:  Int = Config.edge_value_length,
+                    tag_width:          Int = Config.tag_width,
+                    edge_width:        Int = Config.edge_width,
                     vertex_read_cnt_max:Int = Config.vertex_read_cnt_max,
                     vertex_read_pointer_size:Int = Config.vertex_read_pointer_size,
-                    vertex_write_slice:Int = Config.vertex_write_slice,
-
+                    vertex_write_slice: Int = Config.vertex_write_slice,
+                    extra_adder_num:    Int = Config.extra_adder_num,
 
                     fifo_depth_32:      Int = Config.fifo_depth_32,
                     fifo_depth_128:     Int = Config.fifo_depth_128,

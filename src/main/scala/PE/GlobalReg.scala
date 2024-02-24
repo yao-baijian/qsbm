@@ -44,13 +44,13 @@ case class GlobalReg(config: PeConfig) extends Component{
     io.in_stream.ready  := ready
     io.reg_full         := reg_full
 
-    when (wr_pointer === config.vertex_read_cnt_max *  config.vertex_write_slice) {
+    when (wr_pointer === config.vertex_read_cnt_max * config.vertex_write_slice) {
         ready := False
     } elsewhen (io.srst) {
         ready := True
     }
 
-    when(wr_pointer === config.vertex_read_cnt_max *  config.vertex_write_slice) {
+    when(wr_pointer === config.vertex_read_cnt_max * config.vertex_write_slice) {
         reg_full := True
     } otherwise {
         reg_full := False

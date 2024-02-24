@@ -62,34 +62,30 @@ case class PeTop(config:PeConfig) extends Component {
     val all_zero                = Vec(Bool(), config.core_num)
     val all_zero_table          = Vec(Vec(Bool(), config.thread_num), config.core_num)
 
-    val Config = PeConfig()
+    val Config                  = PeConfig()
 
     //-----------------------------------------------------
     // Module Declaration & Instantiation
     //-----------------------------------------------------
 
-//    val edge_fifo                   = new Array[Array[Fifo]](config.core_num)
     val pe_bundle_array             = new Array[PeBundle](config.core_num)
     val gather_pe_group             = new Array[GatherPeCore](config.thread_num)
     val vertex_reg_group_A          = new Array[DualModeReg](config.thread_num)
     val vertex_reg_group_B          = new Array[DualModeReg](config.thread_num)
-    val pe_bundle_update_reg_group  = Vec(Vec(Vec(Reg(Bits(config.data_width bits)),config.matrix_size), config.thread_num),config.core_num)
-    val update_reg_group            = Vec(Vec(Reg(Bits(config.data_width bits)),config.matrix_size), config.thread_num)
 
+    val pe_core_update_reg          = Vec(Vec(Reg(Bits(config.data_width bits)),config.matrix_size * config.thread_num), config.core_num)
+    val update_reg_group            = Vec(Reg(Bits(config.data_width bits)),config.matrix_size * config.thread_num)
     val high_to_low_converter       = HighToLowConvert(Config)
+    val pe_bundle_wire              = Vec(Vec(SInt(config.data_width bits),config.matrix_size * config.thread_num), config.core_num / 2 )
 
-    val pe_bundle_wire              = Vec(Vec(Vec(SInt(config.data_width bits),config.matrix_size), config.thread_num),config.core_num / 2 )
-
+    // Fix update reg and vertex reg size
     for (i <- 0 until config.core_num) {
         pe_bundle_array(i) = PeBundle(Config)
         pe_bundle_array(i).setName("pe_bundle_" + i.toString)
-//        edge_fifo(i) = new Array[Fifo] (config.thread_num)
         for (j <- 0 until config.thread_num) {
-//            edge_fifo(i)(j) = Fifo(Config)
-//            edge_fifo(i)(j).setName("edge_fifo_" + i.toString + "_"+j.toString)
-            pe_bundle_update_reg_group(i)(j).foreach(_ init 0)
+            pe_core_update_reg(i).foreach(_ init 0)
         }
-        update_reg_group(i).foreach(_ init(0))
+        update_reg_group.foreach(_ init 0)
     }
 
     for (i <- 0 until config.thread_num) {
@@ -103,7 +99,6 @@ case class PeTop(config:PeConfig) extends Component {
     //-----------------------------------------------------
     // Module Wiring
     //-----------------------------------------------------
-  
     for (i <- 0 until config.core_num) {
         pe_bundle_array(i).io_global_reg.vertex_stream << io.vertex_stream(i)
         pe_bundle_array(i).io_state.last_update <> io.last_update(i)
@@ -114,22 +109,21 @@ case class PeTop(config:PeConfig) extends Component {
             pe_rdy_table_all(i)(j) := pe_bundle_array(i).io_fifo.pe_fifo(j).ready
             all_zero_table (i)(j) := (high_to_low_converter.io.out_edge_stream(i)(j).payload === 0) & high_to_low_converter.io.out_edge_stream(i)(j).valid
         }
+
         io.pe_rdy_table(i) :=  pe_rdy_table_all(i).orR
         pe_bundle_array(i).io_state.switch_done <> switch_done
         all_zero(i) := all_zero_table (i).andR
         pe_bundle_array(i).io_state.all_zero := all_zero(i)
 
         for (j <- 0 until config.thread_num) {
-
-            pe_bundle_array(i).io_fifo.pe_fifo(j) <> high_to_low_converter.io.out_edge_stream(i)(j)
-            pe_bundle_array(i).io_update_reg.rd_data(j) := pe_bundle_update_reg_group(i)(j)(pe_bundle_array(i).io_update_reg.rd_addr(j))
-
-            when (update_reg_srst(i)) {
-                for (k <- 0 until config.matrix_size) {
-                    pe_bundle_update_reg_group(i)(j)(k) := 0
+            pe_bundle_array(i).io_fifo.pe_fifo(j)       <> high_to_low_converter.io.out_edge_stream(i)(j)
+            pe_bundle_array(i).io_update_reg.rd_data(j) <> pe_core_update_reg(i)(pe_bundle_array(i).io_update_reg.rd_addr(j))
+            when(update_reg_srst(i)) {
+                for (k <- 0 until config.matrix_size ) {
+                    pe_core_update_reg(i)(j * config.matrix_size + k) := 0
                 }
             } elsewhen (pe_bundle_array(i).io_update_reg.wr_valid(j)) {
-                pe_bundle_update_reg_group(i)(j)(pe_bundle_array(i).io_update_reg.wr_addr(j)) := pe_bundle_array(i).io_update_reg.wr_data(j)
+                pe_core_update_reg(i)(pe_bundle_array(i).io_update_reg.wr_addr(j)) := pe_bundle_array(i).io_update_reg.wr_data(j)
             }
         }
     }
@@ -197,17 +191,15 @@ case class PeTop(config:PeConfig) extends Component {
         }
     }
     when(need_update) {
-        for (i <- 0 until config.thread_num) {
-            for (j <- 0 until config.matrix_size) {
-                pe_bundle_wire(0)(i)(j) := pe_bundle_update_reg_group(0)(i)(j).asSInt + pe_bundle_update_reg_group(1)(i)(j).asSInt
-                pe_bundle_wire(1)(i)(j) := pe_bundle_update_reg_group(2)(i)(j).asSInt + pe_bundle_update_reg_group(3)(i)(j).asSInt
-                update_reg_group (i)(j) := (pe_bundle_wire(0)(i)(j) + pe_bundle_wire(1)(i)(j)).asBits
-            }
+        for (i <- 0 until config.thread_num * config.matrix_size) {
+            pe_bundle_wire(0)(i) := pe_core_update_reg(0)(i).asSInt + pe_core_update_reg(1)(i).asSInt
+            pe_bundle_wire(1)(i) := pe_core_update_reg(2)(i).asSInt + pe_core_update_reg(3)(i).asSInt
+            update_reg_group (i) := (pe_bundle_wire(0)(i) + pe_bundle_wire(1)(i)).asBits
         }
     }
 
     for (i <- 0 until config.thread_num) {
-        gather_pe_group(i).io_update_ram.rd_data := update_reg_group(i)(gather_pe_group(i).io_update_ram.rd_addr)
+        gather_pe_group(i).io_update_ram.rd_data := update_reg_group(gather_pe_group(i).io_update_ram.rd_addr)
     }
 
     io.bundle_busy_table <> bundle_busy_table
