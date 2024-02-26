@@ -65,13 +65,13 @@ case class PeCore(config: PeConfig) extends Component {
     val intrahaz_poz_add_p2 = Vec(UInt(3 bits), 1)
 
     val f1_valid            = Vec(Reg(Bool()) init False, config.thread_num )
-    val real_addr_f1        = Vec(Reg(Bits(3 + 6 bits)) init 0, config.thread_num)
+    val real_addr_f1        = Vec(Reg(UInt(config.extend_addr_width bits)) init 0, config.thread_num)
     val interhaz_vec_f1     = Vec(Vec(Bool(), config.thread_num), config.thread_num)
     val intrahaz_poz_f1     = Vec(Bool(), config.thread_num )
     // TODO invalidate redundunt address here
     val real_addr_valid_f1  = Vec(Reg(Bool()) init False, config.thread_num )
     val edge_value_f1       = Vec(Reg(SInt(config.edge_width bits)) init 0, config.thread_num)
-    val update_ram_addr_f1  = Vec(Reg(UInt(config.addr_width bits)) init 0, config.thread_num)
+    val update_ram_addr_f1  = Vec(Reg(UInt(config.extend_addr_width bits)) init 0, config.thread_num)
     val vertex_reg_addr_f1  = Vec(Reg(UInt(config.addr_width bits)) init 0, config.thread_num)
 
     val interhaz_adder_vec  = Vec(Bits (3 bits), config.extra_adder_num)
@@ -79,41 +79,35 @@ case class PeCore(config: PeConfig) extends Component {
     //-----------------------------------------------------------
     // Pipeline
     //-----------------------------------------------------------
-    val real_addr_h1        = Vec(Reg(Bits(3 + 6 bits)) init 0, config.thread_num)
-    val real_addr_valid_h1  = Vec(Reg(Bool()) init False, config.thread_num )
-    val vertex_reg_data_h1  = Vec(Reg(SInt(config.data_width bits)) init 0, config.thread_num)
-    val edge_value_h1       = Vec(Reg(SInt(config.edge_width bits)) init 0, config.thread_num)
-    val update_ram_addr_h1  = Vec(Reg(UInt(config.addr_width bits)) init 0, config.thread_num)
     val h1_valid            = Vec(Reg(Bool()) init False, config.thread_num)
+    val entry_valid_h1      = Vec(Reg(Bool()) init False, config.thread_num)
+    val edge_value_h1       = Vec(Reg(SInt(config.edge_width bits)) init 0, config.thread_num)
+    val vertex_reg_data_h1  = Vec(Reg(SInt(config.data_width bits)) init 0, config.thread_num)
+    val update_ram_addr_h1  = Vec(Reg(UInt(config.extend_addr_width bits)) init 0, config.thread_num)
+    val interhaz_table_h1   = Vec(Reg(Bits(config.haz_table_width bits)) init 0, config.thread_num)
+    val intrahaz_table_h1   = Vec(Reg(Bits(config.haz_table_width bits)) init 0, config.thread_num)
+    val adder_en_h1         = Vec(Reg(Bits(config.haz_table_width bits)) init 0, config.extra_adder_num)
     val multiply_data_h1    = Vec(SInt(config.data_width bits), config.thread_num)
 
     val h2_valid            = Vec(Reg(Bool()) init False, config.thread_num)
     val multiply_data_h2    = Vec(Reg(SInt(config.data_width bits)) init 0, config.thread_num)
-    val entry_valid         = Vec(Reg(Bool()) init False, config.thread_num)
-//  TODO expand intrahaz_index to multi bits
-    val intrahaz_index      = Vec(Reg(Bool()) init False, config.thread_num)
-    val interhaz_valid_h2   = Vec(Reg(Bool()) init False, config.thread_num)
-    val interhaz_index      = Vec(Reg(Bits(3 bits)) init 0, config.thread_num)
-    // 8 + 4 calculate result
+    val entry_valid_h2      = Vec(Reg(Bool()) init False, config.thread_num)
+    val interhaz_table_h2   = Vec(Reg(Bits(config.haz_table_width bits)) init 0, config.thread_num)
+    val intrahaz_table_h2   = Vec(Reg(Bits(config.haz_table_width bits)) init 0, config.thread_num)
     val updata_data_old_h2  = Vec(Reg(SInt(config.data_width bits)) init 0, config.thread_num)
+    val update_ram_addr_h2  = Vec(Reg(UInt(config.extend_addr_width bits)) init 0, config.thread_num)
     val normal_haz_data_h2  = Vec(SInt(config.data_width bits), config.thread_num)
     val normal_update_data_h2= Vec(SInt(config.data_width bits), config.thread_num)
-    val extra_haz_data_h2   = Vec(SInt(config.data_width bits), 4)
-    val extra_update_data_h2= Vec(SInt(config.data_width bits), 4)
-
-    val update_ram_addr_h2  = Vec(Reg(UInt(config.addr_width bits)) init 0, config.thread_num)
-    val updata_data_h2      = Vec(SInt(config.data_width bits), 8)
-
-    val adder_en_1          = Vec(Bool(), 4)
-    val adder_en            = Vec(Bits(4 bits), 8)
-    val intrahaz_table      = Vec(Vec(Bool(), 8), 8)
-    val adder_h2_s1         = Vec(Vec(SInt(config.data_width bits), config.thread_num), 4)
-    val adder_h2_s4         = Vec(SInt(config.data_width bits), 4)
+    val updata_data_h2      = Vec(SInt(config.data_width bits), config.thread_num)
+    val adder_en_h2         = Vec(Reg(Bits(config.haz_table_width bits)) init 0, config.extra_adder_num)
+    val extra_haz_data_h2   = Vec(SInt(config.data_width bits), config.extra_adder_num)
+    val extra_update_data_h2= Vec(SInt(config.data_width bits), config.extra_adder_num)
+    val adder_s1_h2         = Vec(Vec(SInt(config.data_width bits), config.thread_num), config.extra_adder_num)
 
     val h3_valid            = Vec(Reg(Bool()) init False, config.thread_num)
     val update_data_h3      = Vec(SInt(config.data_width bits), config.thread_num)
     val ram_data_h3         = Vec(Reg(SInt(config.data_width bits)) init 0, config.thread_num)
-    val update_ram_addr_h3  = Vec(Reg(UInt(config.addr_width bits)) init 0, config.thread_num)
+    val update_ram_addr_h3  = Vec(Reg(UInt(config.extend_addr_width bits)) init 0, config.thread_num)
 
     //-----------------------------------------------------------
     // Misc
@@ -127,16 +121,20 @@ case class PeCore(config: PeConfig) extends Component {
     // Wiring
     //-----------------------------------------------------------
 
+    io_state.pe_busy            := pe_busy
+    io_state.need_new_vertex    := need_new_vertex
     for (i <- 0 until config.thread_num) {
         io_edge.edge_ready(i)       := fifo_rdy(i)
-        io_state.pe_busy            := pe_busy
-        io_state.need_new_vertex    := need_new_vertex
     }
+
+    //-----------------------------------------------------------
+    // State Machine
+    //-----------------------------------------------------------
 
     val pe_fsm = new StateMachine {
         val IDLE = new State with EntryPoint
         val OPERATE = new State
-        val WAIT_DONE = new State
+        val WAIT = new State
         val PAUSE = new State
 
         IDLE
@@ -160,10 +158,10 @@ case class PeCore(config: PeConfig) extends Component {
         OPERATE
           .whenIsActive {
               when(io_state.all_zero) {
-                  goto(WAIT_DONE)
+                  goto(WAIT)
               }
           }
-        WAIT_DONE
+        WAIT
           .whenIsActive {
               when(h3_valid.orR === False) {
                   when (io_state.last_update) {
@@ -252,102 +250,126 @@ case class PeCore(config: PeConfig) extends Component {
 
     for (i <- 0 until config.thread_num) {
         for (j <- 0 until config.thread_num) {
-            interhaz_vec_f1 (i)(j) := ((real_addr_f1(i) === real_addr_h1(j))&&
-              real_addr_valid_f1(i) && real_addr_valid_h1(j)) ? True | False
+            interhaz_vec_f1 (i)(j) := ((real_addr_f1(i) === update_ram_addr_h1(j))&&
+              real_addr_valid_f1(i) && entry_valid_h1(j)) ? True | False
         }
-    }
-
-    for (i <- 0 until config.thread_num) {
         io_vertex.addr(i)      := vertex_reg_addr_f1(i)
     }
 
     //-----------------------------------------------------------
     // pipeline h1: Multiplication
     //-----------------------------------------------------------
-
+    // TODO extend update ram addr to real_addr (9 bit)
     for (i <- 0 until config.thread_num) {
         when(f1_valid(i)) {
-            edge_value_h1(i) := edge_value_f1(i)
-            update_ram_addr_h1(i) := update_ram_addr_f1(i)
-            //            updata_data_old_h2      := io_update_ram.rd_data.asSInt
-            vertex_reg_data_h1(i) := io_vertex.data(i).asSInt
-            //            hazard_s1_h2            := hazard_s1_h1
-            h1_valid(i) := True
+            h1_valid(i)             := True
+            entry_valid_h1(i)       := real_addr_valid_f1(i)
+            edge_value_h1(i)        := edge_value_f1(i)
+            vertex_reg_data_h1(i)   := io_vertex.data(i).asSInt
+            update_ram_addr_h1(i)   := real_addr_f1(i)
+            interhaz_table_h1(i)    := interhaz_table_f1(i)
+            intrahaz_table_h1(i)    := intrahaz_table_f1(i)
         } otherwise {
-            edge_value_h1(i) := 0
-            update_ram_addr_h1(i) := 0
-            vertex_reg_data_h1(i) := 0
-            h1_valid(i) := True
+            h1_valid(i)             := False
+            entry_valid_h1(i)       := False
+            edge_value_h1(i)        := 0
+            vertex_reg_data_h1(i)   := 0
+            update_ram_addr_h1(i)   := 0
+            interhaz_table_h1(i)    := 0
+            intrahaz_table_h1(i)    := 0
+        }
+    }
+
+    for (i <- 0 until 4) {
+        when(adder_en_h1(i)(3)) {
+            adder_en_h1(i) := adder_en_f1(i)
+        } otherwise {
+            adder_en_h1(i) := 0
         }
     }
 
     for (i <- 0 until config.thread_num) {
-        multiply_data_h1(i) := vertex_reg_data_h1(i) * edge_value_h1(i)
+    // TODO clip data
+        multiply_data_h1(i)     := vertex_reg_data_h1(i) * edge_value_h1(i)
+        io_update.rd_addr(i)    := update_ram_addr_h1(i)
     }
-    //    io_update_ram.rd_addr   := update_ram_addr_h1
-
 
     //-----------------------------------------------------------
     // pipeline h2
     //-----------------------------------------------------------
     for (i <- 0 until config.thread_num) {
         when(h1_valid(i)) {
-            h2_valid(i)         := True
-            interhaz_valid_h2(i):=
-            multiply_data_h2(i) := multiply_data_h1(i)
-            updata_data_old_h2(i) :=
+            h2_valid(i)             := True
+            multiply_data_h2(i)     := multiply_data_h1(i)
+            entry_valid_h2(i)       := entry_valid_h1(i)
+            interhaz_table_h2(i)    := interhaz_table_h1(i)
+            intrahaz_table_h2(i)    := intrahaz_table_h1(i)
+            updata_data_old_h2(i)   := io_update.rd_data(i)
+            update_ram_addr_h2 (i)  := update_ram_addr_h1 (i)
         } otherwise {
-            //            edge_value_h2 := 0
-            //            update_ram_addr_h2 := 0
-            //            updata_data_old_h2 := 0
-            //            vertex_reg_data_h2 := 0
-            //            hazard_s1_h2 := False
-            h2_valid(i) := False
+            h2_valid(i)             := False
+            multiply_data_h2(i)     := 0
+            entry_valid_h2(i)       := False
+            interhaz_table_h2(i)    := 0
+            intrahaz_table_h2(i)    := 0
+            updata_data_old_h2(i)   := 0
+            update_ram_addr_h2(i)   := 0
         }
     }
 
-    //  TODO fix bit width here
-    for (i <- 0 until config.thread_num) {
-        normal_haz_data_h2(i) := (interhaz_valid_h2(i) ? update_data_h3(interhaz_index(i).asUInt) | updata_data_old_h2(i))
-        normal_update_data_h2(i) := (entry_valid(i) && !intrahaz_index(i)) ? (normal_haz_data_h2(i) + multiply_data_h2(i))(config.data_width - 1 downto 0) | 0
+    for (i <- 0 until 4) {
+        when(adder_en_h2(i)(3)) {
+            adder_en_h2(i)          := adder_en_h1(i)
+        } otherwise {
+            adder_en_h2(i)          := 0
+        }
     }
 
     for (i <- 0 until config.thread_num) {
-        extra_haz_data_h2(i) := (interhaz_valid_h2(i) ? update_data_h3(interhaz_index(i).asUInt) | updata_data_old_h2(i))(config.data_width - 1 downto 0)
+        normal_haz_data_h2(i) := (interhaz_table_h2(i)(3) ? update_data_h3(interhaz_table_h2(i)(2 downto 0).asUInt) | updata_data_old_h2(i))(config.data_width - 1 downto 0)
+        normal_update_data_h2(i) := (entry_valid_h2(i) && !intrahaz_table_h2(i)(3)) ? (normal_haz_data_h2(i) + multiply_data_h2(i))(config.data_width - 1 downto 0) | 0
+    }
+
+    for (i <- 0 until config.thread_num) {
+        extra_haz_data_h2(i) := (interhaz_table_h2(i)(3) ? update_data_h3(interhaz_table_h2(i)(2 downto 0).asUInt) | updata_data_old_h2(i))(config.data_width - 1 downto 0)
     }
 
     // TODO it is possible to reduce adder number into 2 or 1
-    // Pass intar hazard date into extra adder matrix
-    for (i <- 0 until config.thread_num) {
-        for (j <- 0 until config.thread_num) {
-            adder_h2_s1(adder_en(i)(2 downto 0).asUInt)(j) := (adder_en(i)(3) && intrahaz_table(adder_en(i)(2 downto 0).asUInt)(j)) ? multiply_data_h2(j) | 0
-        }
-    }
+    // TODO Pass intar hazard date into extra adder matrix
+    // TODO convert hazard table to adder_en
+    // TODO entry valid
 
-    // TODO add extra_haz_data_h2 here and sum them up to updata_data_h2
-    // Use balanced adder to add up intra hazard data
     for (i <- 0 until 4) {
-        adder_h2_s4(i) := adder_en_1(i) ? adder_h2_s1(i).reduceBalancedTree(_ + _) | 0
+    // TODO adder number is 8 here
+        for (j <- 0 until 8) {
+            when (adder_en_h2(i)(3)) {
+                adder_s1_h2(i)(j) :=  intrahaz_table_h2(adder_en_h2(i)(2 downto 0).asUInt)(j) ? multiply_data_h2(j) | 0
+            } otherwise {
+                adder_s1_h2(i)(j) := 0
+            }
+        }
+        // TODO add extra_haz_data_h2 here and sum them up to updata_data_h2
+        extra_update_data_h2(i) := adder_en_h2(i)(3) ? adder_s1_h2(i).reduceBalancedTree(_ + _) | 0
     }
-
-    //    updata_data_h2 := (hazard_s1_h2 ? ram_data_h3 | updata_data_old_h2  + vertex_reg_data_h2 * edge_value_h2) (config.data_width - 1 downto 0);
 
     //-----------------------------------------------------------
     // pipeline h3 write back
     //-----------------------------------------------------------
     for (i <- 0 until config.thread_num) {
         when(h2_valid(i)) {
+            h3_valid(i)             := True
             update_ram_addr_h3(i)   := update_ram_addr_h2(i)
             ram_data_h3(i)          := updata_data_h2(i)
-            h3_valid(i)             := True
         } otherwise {
+            h3_valid(i)             := False
             update_ram_addr_h3(i)   := 0
             ram_data_h3(i)          := 0
-            h3_valid(i)             := False
         }
+    }
 
-        io_update.wr_valid(i) := h3_valid(i)
-        io_update.wr_addr(i) := update_ram_addr_h3(i)
-        io_update.wr_data(i) := ram_data_h3(i).asBits
+    for (i <- 0 until config.thread_num) {
+        io_update.wr_valid(i)       := h3_valid(i)
+        io_update.wr_addr(i)        := update_ram_addr_h3(i)
+        io_update.wr_data(i)        := ram_data_h3(i).asBits
     }
 }

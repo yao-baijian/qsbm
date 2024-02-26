@@ -69,6 +69,7 @@ case class PeTop(config:PeConfig) extends Component {
     //-----------------------------------------------------
 
     val pe_bundle_array             = new Array[PeBundle](config.core_num)
+
     val gather_pe_group             = new Array[GatherPeCore](config.thread_num)
     val vertex_reg_group_A          = new Array[DualModeReg](config.thread_num)
     val vertex_reg_group_B          = new Array[DualModeReg](config.thread_num)
@@ -199,7 +200,7 @@ case class PeTop(config:PeConfig) extends Component {
     }
 
     for (i <- 0 until config.thread_num) {
-        gather_pe_group(i).io_update_ram.rd_data := update_reg_group(gather_pe_group(i).io_update_ram.rd_addr)
+        gather_pe_group(i).io_update.rd_data := update_reg_group(gather_pe_group(i).io_update.rd_addr)
     }
 
     io.bundle_busy_table <> bundle_busy_table

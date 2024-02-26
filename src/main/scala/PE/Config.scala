@@ -11,6 +11,7 @@ object Config {
 
     val data_width:         Int = 16
     val addr_width:         Int = log2Up(matrix_size)
+    val extend_addr_width:  Int = log2Up(matrix_size * thread_num)
     val tag_width:          Int = 3
     val edge_width :        Int = 4
     val vertex_read_cnt_max:Int = (matrix_size * data_width) / axi_extend_width
@@ -33,6 +34,7 @@ object Config {
     val quant_precision_32: Int = 32
 
     val xy_width:           Int = 8
+    val haz_table_width:    Int = 4
 
     def test(): Unit = {
         println(addr_width)
@@ -51,6 +53,7 @@ case class PeConfig(axi_width:          Int = Config.axi_width,
 
                     data_width:         Int = Config.data_width,
                     addr_width:         Int = Config.addr_width,
+                    extend_addr_width:  Int = Config.extend_addr_width,
                     tag_width:          Int = Config.tag_width,
                     edge_width:        Int = Config.edge_width,
                     vertex_read_cnt_max:Int = Config.vertex_read_cnt_max,
@@ -70,7 +73,9 @@ case class PeConfig(axi_width:          Int = Config.axi_width,
 
                     quant_precision_8:  Int = Config.quant_precision_8,
                     quant_precision_32: Int = Config.quant_precision_32,
-                    xy_width:           Int = Config.xy_width)
+                    xy_width:           Int = Config.xy_width,
+                    haz_table_width:    Int = Config.haz_table_width)
+
 
 
 
