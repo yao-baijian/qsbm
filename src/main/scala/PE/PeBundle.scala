@@ -27,9 +27,9 @@ case class PeBundle(config: PeConfig) extends Component {
 
     val io_update_reg = new Bundle {
         val wr_valid = Vec(out Bool(), config.thread_num)
-        val wr_addr = Vec(out UInt (config.addr_width bits), config.thread_num)
+        val wr_addr = Vec(out UInt (config.extend_addr_width bits), config.thread_num)
         val wr_data = Vec(out Bits (config.data_width bits), config.thread_num)
-        val rd_addr = Vec(out UInt (config.addr_width bits), config.thread_num)
+        val rd_addr = Vec(out UInt (config.extend_addr_width bits), config.thread_num)
         val rd_data = Vec(in Bits (config.data_width bits), config.thread_num)
     }
 

@@ -185,12 +185,11 @@ case class PeTop(config:PeConfig) extends Component {
     }
 
     // Todo this part is not capable of parameterize
-    for (i <- 0 until config.thread_num) {
-        for (j <- 0 until config.matrix_size) {
-            pe_bundle_wire(0)(i)(j) := 0
-            pe_bundle_wire(1)(i)(j) := 0
-        }
+    for (i <- 0 until config.thread_num * config.matrix_size) {
+        pe_bundle_wire(0)(i) := 0
+        pe_bundle_wire(1)(i) := 0
     }
+
     when(need_update) {
         for (i <- 0 until config.thread_num * config.matrix_size) {
             pe_bundle_wire(0)(i) := pe_core_update_reg(0)(i).asSInt + pe_core_update_reg(1)(i).asSInt
@@ -199,8 +198,12 @@ case class PeTop(config:PeConfig) extends Component {
         }
     }
 
+    val addr_mapper = Vec(UInt(9 bits), config.thread_num)
     for (i <- 0 until config.thread_num) {
-        gather_pe_group(i).io_update.rd_data := update_reg_group(gather_pe_group(i).io_update.rd_addr)
+        addr_mapper(i) := i*64
+    }
+    for (i <- 0 until config.thread_num) {
+        gather_pe_group(i).io_update.rd_data := update_reg_group(addr_mapper(i) + gather_pe_group(i).io_update.rd_addr)
     }
 
     io.bundle_busy_table <> bundle_busy_table

@@ -39,6 +39,7 @@ object Config {
     def test(): Unit = {
         println(addr_width)
         println(vertex_read_cnt_max)
+        println(extend_addr_width)
     }
     def main(args: Array[String]): Unit = {
         test()

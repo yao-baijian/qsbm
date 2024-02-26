@@ -12,7 +12,7 @@ case class GatherPeCore(config:PeConfig) extends Component {
         val gather_pe_done  = out Bool()
         val gather_pe_busy  = out Bool()
     }
-
+    //  TODO address width is not fit with gather pe
     val io_update = new Bundle {
         val rd_addr     = out UInt (config.addr_width bits)
         val rd_data     = in Bits (config.data_width bits)
@@ -40,10 +40,10 @@ case class GatherPeCore(config:PeConfig) extends Component {
     val y_old_h2            = Reg(SInt(config.xy_width bits))           init 0
     val updated_value_h2    = Reg(SInt(config.data_width bits))         init 0
     val x_old_h2            = Reg(SInt(config.xy_width bits))           init 0
-    val y_temp_h2           = SInt(config.quant_precision_32 bits)
+    val y_temp_h2           = SInt(24 bits)
 
     val h3_valid            = Reg(Bool())                               init False
-    val y_temp_h3           = SInt(config.quant_precision_32 bits)
+    val y_temp_h3           = SInt(24 bits)
     val y_old_h3            = Reg(SInt(config.xy_width bits))           init 0
     val y_new_h3            = SInt(config.quant_precision_32 bits)
     val x_old_h3            = Reg(SInt(config.xy_width bits))           init 0
