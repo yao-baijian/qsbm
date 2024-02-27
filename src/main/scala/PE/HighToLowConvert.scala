@@ -11,7 +11,7 @@ case class HighToLowConvert(config:PeConfig) extends Component {
         val in_edge_stream = Vec(slave Stream (Bits(config.axi_extend_width bits)), config.core_num)
         val in_tag_stream = Vec(slave Stream (Bits(config.tag_extend_width bits)), config.core_num)
         val out_edge_stream = Vec(Vec(master Stream (Bits(config.data_width bits)), config.thread_num), config.core_num)
-        val out_tag_stream = Vec(Vec(master Stream (Bits(config.tag_width bits)), config.thread_num), config.core_num)
+        val out_tag_stream = Vec(Vec(master Stream (Bits(config.tag_width - 1 bits)), config.thread_num), config.core_num)
     }
 
     //-----------------------------------------------------
@@ -53,7 +53,7 @@ case class HighToLowConvert(config:PeConfig) extends Component {
             io.out_edge_stream(i)(j).valid  := edge_convert_fifo(i).io.pop.valid & all_zero_inval(i) & single_zero_inval(i)(j)
             io.out_tag_stream(i)(j).valid   := io.out_edge_stream(i)(j).valid
             io.out_edge_stream(i)(j).payload:= edge_convert_fifo(i).io.pop.payload.subdivideIn(config.axi_width bits)(counter_group(i).value)(config.data_width * (j + 1) - 1 downto config.data_width * j)
-            io.out_tag_stream(i)(j).payload := tag_convert_fifo(i).io.pop.payload.subdivideIn(config.tag_width_full bits)(counter_group(i).value)(config.tag_width * (j + 1) - 1 downto config.tag_width * j)
+            io.out_tag_stream(i)(j).payload := tag_convert_fifo(i).io.pop.payload.subdivideIn(config.tag_width_full bits)(counter_group(i).value)(config.tag_width * (j + 1) - 2 downto config.tag_width * j)
             ready_table(i)(j)               := io.out_edge_stream(i)(j).ready
         }
 

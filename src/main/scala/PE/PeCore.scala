@@ -31,7 +31,7 @@ case class PeCore(config: PeConfig) extends Component {
   
     val io_edge = new Bundle {
         val edge_value  = Vec(in Bits(config.data_width bits), config.thread_num)
-        val tag_value   = Vec(in Bits(config.tag_width bits), config.thread_num)
+        val tag_value   = Vec(in Bits(config.tag_width - 1 bits), config.thread_num)
         val edge_valid  = Vec(in Bool(), config.thread_num)
         val edge_ready  = Vec(out Bool(), config.thread_num)
     }
