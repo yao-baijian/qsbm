@@ -18,6 +18,7 @@ case class PeBundle(config: PeConfig) extends Component {
     val io_fifo       =  new Bundle {
         val globalreg_done  = out Bool()
         val pe_fifo         = Vec(slave Stream (Bits(config.data_width bits)), config.thread_num)
+        val pe_tag          = Vec(slave Stream (Bits(config.tag_width bits)), config.thread_num)
     }
 
     val io_global_reg =new Bundle {
@@ -34,12 +35,11 @@ case class PeBundle(config: PeConfig) extends Component {
     }
 
     val need_vertex         = Bool()
-    val pe_core_config      = PeConfig()
-    val global_reg_config   = PeConfig()
+    val pe_config           = PeConfig()
     val last_update_r       = Reg(Bool()) init False
     val need_new_vertex_r   = Reg(Bool()) init False
-    val pe_core             = PeCore(pe_core_config)
-    val global_reg          = GlobalReg (global_reg_config)
+    val pe_core             = PeCore(pe_config)
+    val global_reg          = GlobalReg (pe_config)
 
     global_reg.io.in_stream         <> io_global_reg.vertex_stream
     global_reg.io.srst              <> need_new_vertex_r
@@ -64,8 +64,10 @@ case class PeBundle(config: PeConfig) extends Component {
         pe_core.io_update.rd_data(i)    <>  io_update_reg.rd_data(i)
 
         io_fifo.pe_fifo(i).ready        <> pe_core.io_edge.edge_ready(i)
+        io_fifo.pe_tag(i).ready         <> pe_core.io_edge.edge_ready(i)
         pe_core.io_edge.edge_valid(i)   <> io_fifo.pe_fifo(i).valid
         pe_core.io_edge.edge_value(i)   <> io_fifo.pe_fifo(i).payload
+        pe_core.io_edge.tag_value(i)    <> io_fifo.pe_tag(i).payload
     }
 
     when (io_state.last_update) {
