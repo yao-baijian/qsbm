@@ -20,11 +20,15 @@ case class StreamFifoPort(dataWidth:Int) extends Bundle{
 case class Dispatcher() extends Component {
 
   val axiConfig = Axi4Config(addressWidth = AxiConfig().addrWid, dataWidth = AxiConfig().dataWid, idWidth = AxiConfig().idWid)
+  val axiEdgeIndexPortConfig = Axi4Config(addressWidth = 32, dataWidth = 128, idWidth = 4)
 
   val io = new Bundle {
 
-    val read_flag = in Bool()
     val axiMemControlPort = master(Axi4(axiConfig))
+    val axiEdgeIndexPort = master(Axi4(axiEdgeIndexPortConfig))
+
+    val read_flag = in Bool()
+
     val result = out Bool()
 //    val test = in Bool()
     val switchBigLineFlag = out(Reg(Bool()) init False)
@@ -64,6 +68,7 @@ case class Dispatcher() extends Component {
   })
 
   axiRename(io.axiMemControlPort, "M_AXI_")
+//  axiRename(io.axiEdgeIndexPort, "M_AXI_")
 
   def axiRename(axi: Axi4, prefix: String): Unit = {
     axi.flattenForeach { bt =>
@@ -133,6 +138,37 @@ case class Dispatcher() extends Component {
   )
   edgeIndexFifo.io.push.payload.data := vexIndexEdgeOutStreams(1).payload.data
   edgeIndexFifo.io.push.valid := vexIndexEdgeOutStreams(1).valid
+  val edgeIndexFifoValDly1 = RegNext(edgeIndexFifo.io.pop.valid)
+  val edgeIndexFifoValDly2 = RegNext(edgeIndexFifo.io.pop.valid)
+
+  val padder = new Area {
+//    val paddedData = UInt(512 bits)
+//    paddedData := 0
+//    val sum0_0 = edgeIndexFifo.io.pop.payload.data(0)
+//    val sum0_1 = edgeIndexFifo.io.pop.payload.data(0).asUInt + edgeIndexFifo.io.pop.payload.data(1).asUInt
+//    val sum0_2 = edgeIndexFifo.io.pop.payload.data(2 downto(0)).
+
+    val dataArr2d = Vec(Vec(Bits(528 bits),8),32)
+
+    //init dataArr2d
+    for(dataArr1d <- dataArr2d){
+      for(data <- dataArr1d){
+        data := 0 //B"16'h0000" ## edgeCacheFifo.io.pop.payload.data
+      }
+    }
+
+//    for(dataArr1d <- dataArr2d){
+//      for(data <- dataArr1d){
+//        for(i <- 0 until data.subdivideIn(16 bits).length){
+//          data.subdivideIn(16 bits)(i)
+//        }
+//      }
+//
+//    }
+
+  }
+
+
 
 //********************************** EDGE DATA DISPATCH ********************************************//
   //InFlag is from the perspective of the input of cacheFifo
@@ -179,8 +215,10 @@ case class Dispatcher() extends Component {
   val edgeCacheFifoOutRegDly1 = RegNextWhen(edgeCacheFifo.io.pop.payload.data, edgeCacheFifo.io.pop.valid)
   val edgeCacheFifoOutRegDly2 = RegNextWhen(edgeCacheFifoOutRegDly1,edgeCacheFifo.io.pop.valid)
 
+  val onesNum = UInt(10 bits)
+  onesNum := 0
   when(edgeCacheFifo.io.pop.valid){
-    val onesCount = CountOne(edgeCacheFifo.io.pop.payload.data.asBits)
+    onesNum := CountOne(edgeIndexFifo.io.pop.payload.data.asBits)
   }
 
 
@@ -225,6 +263,8 @@ case class Dispatcher() extends Component {
 //      }
 //    }
   }
+
+
 
   //********************************  FSM Control  *******************************************************//
   val axi4MemCtrlFsm = new StateMachine {
@@ -326,8 +366,8 @@ case class Dispatcher() extends Component {
 
       whenIsActive{
 
-        io.axiMemControlPort.ar.payload.len := U"8'b0000_0001" // (7+1) transfer in a burst
-        io.axiMemControlPort.ar.payload.addr := U"32'h0040_0000"
+        io.axiMemControlPort.ar.payload.len := U"8'b0000_00001" // (1+1) transfer in a burst
+        io.axiMemControlPort.ar.payload.addr := U"32'h0040_0000"+(2 * 64) * edgeAddrCnt
         io.axiMemControlPort.ar.valid := True
         when(io.axiMemControlPort.ar.ready){
           goto(READ_EDGE_INDEX_DATA)

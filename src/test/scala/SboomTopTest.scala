@@ -59,6 +59,7 @@ class SboomTopTest extends AnyFunSuite {
 
   }
 
+  //generate edges and corresponding indices
   def edgeGen() = {
     val filename = "./data/G34"
     val firstLine = Source.fromFile(filename).getLines().next()
@@ -95,10 +96,11 @@ class SboomTopTest extends AnyFunSuite {
 
     val edgesArrayBuffer = ArrayBuffer[ArrayBuffer[Byte]]()
     val edgeIndexBuffer = ArrayBuffer[Byte]()
-    var edgeIndexByte:Byte = 0
+    var edgeIndexByte:Int = 0
     var flag = 0
     var transfer_128 = 0
     var block_empty = 0
+    var edgeCnt = 0
     val goodIntervalBound = arrayWidth / PeConfig().peNumEachColumn * PeConfig().peNumEachColumn
     val remainder = arrayWidth % (PeConfig().peNumEachColumn)
 
@@ -112,37 +114,82 @@ class SboomTopTest extends AnyFunSuite {
           for (offset <- 0 until PeConfig().peNumEachColumn) {
             if (blocks(base + offset)(col).nonEmpty) {
               flag = flag + 1
-              edgeIndexByte = (edgeIndexByte | 0x01 << offset).toByte
+              edgeCnt = edgeCnt + 1
+
+              //generating edge indices
+              if(edgeCnt%2 == 1){
+                edgeIndexByte = (edgeIndexByte | (offset.toByte)<<4)
+              }
+              else{
+                edgeIndexByte = (edgeIndexByte | (offset.toByte))
+                edgeIndexBuffer.append(edgeIndexByte.toByte)
+                edgeIndexByte = 0
+              }
+
+              //put the edges into the buffer
               val edge = blocks(base + offset)(col).dequeue()
               //              println("edge size", edge.length)
               //               tempArray(offset) = edge
               edgesArrayBuffer.append(edge)
             } else {
-              val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
+              // Do nothing
+//              val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
               //               tempArray(offset) = edge
-              edgesArrayBuffer.append(edge)
+//              edgesArrayBuffer.append(edge)
             }
-          }  // 128bits conccatenation and paddings
 
-          edgeIndexBuffer.append(edgeIndexByte)
+            if(edgeCnt > 0 && edgeCnt%8 == 0){ //128b = 8 edges * 16b
+              transfer_128 = transfer_128 + 1
+            }
+          } // 128bits conccatenation and paddings
+
+//          edgeIndexBuffer.append(edgeIndexByte)
 
           if(flag == 0){
             println("transfer_128",transfer_128)
-            if(transfer_128 % 4 == 0){
-              val padding =  ArrayBuffer.fill(16 * 3)(0.toByte)
+
+
+            var edgePaddingTo128Remainder = edgeCnt % 8
+            var edgeIndexPaddingByteNum = (8 - edgePaddingTo128Remainder)/2
+            //padding to make a 128b packet
+            for(i <- 0 until 8-edgePaddingTo128Remainder){
+              val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
+              edgesArrayBuffer.append(edge)
+            }
+            //edgeIndexPadding to make 32b index packet
+            for(i <- 0 until edgeIndexPaddingByteNum){
+              edgeIndexBuffer.append(0.toByte)
+            }
+            transfer_128 = transfer_128 + 1
+
+            //judge the number of 128b transfers
+            if(transfer_128 % 4 == 1){
+              val edgePadding =  ArrayBuffer.fill(16 * 3)(0.toByte)
               transfer_128 = transfer_128 + 3
-              edgesArrayBuffer.append(padding)
-            } else if(transfer_128 % 4 == 1){
-              val padding = ArrayBuffer.fill(16 * 2)(0.toByte)
+              edgesArrayBuffer.append(edgePadding)
+              //edgeIndex Padding
+              for(i <- 0 until 3*4){ //for each 128b edge packet, there are 4Bytes needed for index
+                edgeIndexBuffer.append(0.toByte)
+              }
+            } else if(transfer_128 % 4 == 2){
+              val edgePadding = ArrayBuffer.fill(16 * 2)(0.toByte)
+              val indexPadding = ArrayBuffer.fill(2)(0.toByte)
               transfer_128 = transfer_128 + 2
-              edgesArrayBuffer.append(padding)
-            } else if (transfer_128 % 4 == 2) {
-              val padding = ArrayBuffer.fill(16 * 1)(0.toByte)
+              edgesArrayBuffer.append(edgePadding)
+              //edgeIndex Padding
+              for(i <- 0 until 2*4){
+                edgeIndexBuffer.append(0.toByte)
+              }
+            } else if (transfer_128 % 4 == 3) {
+              val edgePadding = ArrayBuffer.fill(16 * 1)(0.toByte)
               transfer_128 = transfer_128 + 1
-              edgesArrayBuffer.append(padding)
+              edgesArrayBuffer.append(edgePadding)
+              //edgeIndex Padding
+              for(i <- 0 until 1*4){
+                edgeIndexBuffer.append(0.toByte)
+              }
             }
           }
-          transfer_128 = transfer_128 + 1
         } while (flag > 0) //  flag>0 means that there is no allZeros
       }
     }
@@ -155,23 +202,52 @@ class SboomTopTest extends AnyFunSuite {
           for (offset <- 0 until remainder) {
             if (blocks(goodIntervalBound + offset)(col).nonEmpty) {
               flag = flag + 1
+              edgeCnt = edgeCnt + 1
+
+              //generating edge indices
+              if(edgeCnt%2 == 1){
+                edgeIndexByte = (edgeIndexByte | (offset.toByte)<<4)
+              }
+              else{
+                edgeIndexByte = (edgeIndexByte | (offset.toByte))
+                edgeIndexBuffer.append(edgeIndexByte.toByte)
+                edgeIndexByte = 0
+              }
               val edge = blocks(goodIntervalBound)(col).dequeue()
               edgesArrayBuffer.append(edge)
             } else {
-              val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
-              //tempArray(offset) = edge
-              edgesArrayBuffer.append(edge)
+              //Do Nothing
+//              val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
+//              //tempArray(offset) = edge
+//              edgesArrayBuffer.append(edge)
             }
           }
           // if there is no enough blocks, we need to add the extra blocks and edges to be the multiples of number of PEs
-          for (offset <- remainder until PeConfig().peNumEachColumn) {
-            val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
-            edgesArrayBuffer.append(edge)
+//          for (offset <- remainder until PeConfig().peNumEachColumn) {
+//            val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
+//            edgesArrayBuffer.append(edge)
+//          }
+          if(edgeCnt>0 && edgeCnt%8 == 0){
+            transfer_128 = transfer_128 + 1
           }
-          transfer_128 = transfer_128 + 1
           println("transfer_128",transfer_128)
           if (flag == 0) {
             println("-------transfer_128----------",transfer_128)
+
+
+            var edgePaddingTo128Remainder = edgeCnt % 8
+            var edgeIndexPaddingByteNum = (8 - edgePaddingTo128Remainder)/2
+            //padding to make a 128b packet
+            for(i <- 0 until 8-edgePaddingTo128Remainder){
+              val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
+              edgesArrayBuffer.append(edge)
+            }
+            //edgeIndexPadding to make 32b index packet
+            for(i <- 0 until edgeIndexPaddingByteNum){
+              edgeIndexBuffer.append(0.toByte)
+            }
+            transfer_128 = transfer_128 + 1
+
             if (transfer_128 % 4 == 1) {
               val padding = ArrayBuffer.fill(16 * 3)(0.toByte)
               transfer_128 = transfer_128 + 3
@@ -187,7 +263,6 @@ class SboomTopTest extends AnyFunSuite {
             }
           }
         } while (flag > 0)
-
       }
     }
 
@@ -238,18 +313,29 @@ class SboomTopTest extends AnyFunSuite {
 
       dut.clockDomain.forkStimulus(100) //产生周期为10个单位的时钟
 
-      val axiMemSimConfig = AxiMemorySimConfig()
-      val axiMemSimModel = AxiMemorySim(compiled.dut.io.topAxiMemControlPort, compiled.dut.clockDomain, axiMemSimConfig)
-      axiMemSimModel.start()
-      axiMemSimModel.memory.writeArray(0, vexGen())
+      //axi4 port1 for vex&edges
+      val axiMemSimConfig1 = AxiMemorySimConfig()
+      val axiMemSimModel1 = AxiMemorySim(compiled.dut.io.topAxiMemControlPort, compiled.dut.clockDomain, axiMemSimConfig1)
+
+      // axi4 port2 for indices
+      val axiMemSimConfig2 = AxiMemorySimConfig()
+      val axiMemSimModel2 = AxiMemorySim(compiled.dut.io.topAxiEdgeIndexPort, compiled.dut.clockDomain, axiMemSimConfig2)
+
+      axiMemSimModel1.start()
+      axiMemSimModel2.start()
+
+      axiMemSimModel1.memory.writeArray(0, vexGen())
       val (edgeIndex, edge) = edgeGen()
-      axiMemSimModel.memory.writeArray(0x400000,edgeIndex)
-      axiMemSimModel.memory.writeArray(0x800000, edge)
+    axiMemSimModel1.memory.writeArray(0x400000,edgeIndex)
+      axiMemSimModel2.memory.writeArray(0x400000,edgeIndex)
+      axiMemSimModel1.memory.writeArray(0x800000, edge)
+
+
 
       dut.clockDomain.waitSampling(count = 8)
       dut.clockDomain.waitSampling(count = 100)
 
-      val dataRead = axiMemSimModel.memory.readArray(0, 10)
+      val dataRead = axiMemSimModel1.memory.readArray(0, 10)
       for (i <- 0 until 10) {
         println(dataRead(i))
       }

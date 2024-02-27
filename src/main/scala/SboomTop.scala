@@ -7,9 +7,11 @@ import dispatcher._
 case class SboomTop() extends Component{
 
   val axiConfig = Axi4Config(addressWidth = 32, dataWidth = 512, idWidth = 4)
+  val axiEdgeIndexPortConfig = Axi4Config(addressWidth = 32, dataWidth = 128, idWidth = 4)
 
   val io = new Bundle {
     val topAxiMemControlPort = master(Axi4(axiConfig))
+    val topAxiEdgeIndexPort = master(Axi4(axiEdgeIndexPortConfig))
   }
 
   noIoPrefix()
@@ -30,6 +32,7 @@ case class SboomTop() extends Component{
   val peTop = PE.PeTop(pe_top_config)
 
   io.topAxiMemControlPort << dispatcher.io.axiMemControlPort
+  io.topAxiEdgeIndexPort << dispatcher.io.axiEdgeIndexPort
 
   //******************************** control signals connection *********************//
   for(i<- 0 until PeConfig().peColumnNum){
