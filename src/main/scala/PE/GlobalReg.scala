@@ -44,13 +44,13 @@ case class GlobalReg(config: PeConfig) extends Component{
     io.in_stream.ready  := ready
     io.reg_full         := reg_full
 
-    when (wr_pointer === config.vertex_read_cnt_max) {
+    when (wr_pointer === config.vertex_read_cnt_max * config.vertex_write_slice) {
         ready := False
     } elsewhen (io.srst) {
         ready := True
     }
 
-    when(wr_pointer === config.vertex_read_cnt_max) {
+    when(wr_pointer === config.vertex_read_cnt_max * config.vertex_write_slice) {
         reg_full := True
     } otherwise {
         reg_full := False
@@ -58,10 +58,10 @@ case class GlobalReg(config: PeConfig) extends Component{
 
     when(io.in_stream.valid && io.in_stream.ready) {
         for (i <- 0 until config.vertex_write_slice) {
-            vertex_reg((wr_pointer * config.vertex_write_slice)(5 downto 0) + i) := io.in_stream.payload(config.data_width * (i + 1) - 1 downto config.data_width * i )
+            vertex_reg((wr_pointer)(5 downto 0) + i) := io.in_stream.payload(config.data_width * (i + 1) - 1 downto config.data_width * i )
             // TODO change this into right shift
         }
-        wr_pointer := wr_pointer + 1
+        wr_pointer := wr_pointer + config.vertex_write_slice
     } otherwise {
         wr_pointer := 0
     }
@@ -69,6 +69,4 @@ case class GlobalReg(config: PeConfig) extends Component{
     for (i <- 0 until config.thread_num) {
         io.rd_data (i) := vertex_reg(io.rd_addr(i))
     }
-
-
 }

@@ -25,9 +25,9 @@ case class DualModeReg(config: PeConfig) extends Component{
     // Module Declaration
     //-----------------------------------------------------
 
-    val vertex_reg = Vec(Reg(Bits(config.data_width bits)) init(0), config.matrix_size)
-    val wr_pointer = Reg(UInt(config.vertex_read_pointer_size bits)) init 0
-    val ready = Reg(Bool()) init True
+    val vertex_reg  = Vec(Reg(Bits(config.data_width bits)) init 0, config.matrix_size)
+    val wr_pointer  = Reg(UInt(config.vertex_read_pointer_size bits)) init 0
+    val ready       = Reg(Bool()) init True
 
     //-----------------------------------------------------
     // Module Wiring
