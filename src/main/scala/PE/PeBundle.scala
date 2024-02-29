@@ -18,7 +18,7 @@ case class PeBundle(config: PeConfig) extends Component {
     val io_fifo       =  new Bundle {
         val globalreg_done  = out Bool()
         val pe_fifo         = Vec(slave Stream (Bits(config.data_width bits)), config.thread_num)
-        val pe_tag          = Vec(slave Stream (Bits(config.tag_width bits)), config.thread_num)
+        val pe_tag          = Vec(slave Stream (Bits(config.tag_width - 1 bits)), config.thread_num)
     }
 
     val io_global_reg =new Bundle {

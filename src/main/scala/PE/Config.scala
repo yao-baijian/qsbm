@@ -12,7 +12,7 @@ object Config {
     val data_width:         Int = 16
     val addr_width:         Int = log2Up(matrix_size)
     val extend_addr_width:  Int = log2Up(matrix_size * thread_num)
-    val tag_width:          Int = 3
+    val tag_width:          Int = 4
     val tag_width_full:     Int = tag_width * thread_num
     val tag_extend_width:   Int = tag_width_full * 4
     val edge_width :        Int = 4
