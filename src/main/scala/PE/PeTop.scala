@@ -29,9 +29,9 @@ import scala.language.postfixOps
 case class PeTop(config:PeConfig) extends Component {
 
     val io = new Bundle {
-        val last_update         = in Vec(Bool(), config.core_num)
+        val last_update         = in Vec(Bool(), config.core_num) //big line ending
         val raw_edge_stream     = Vec(slave Stream (Bits(config.axi_extend_width bits)), config.core_num)
-        val tag_stream          = Vec(slave Stream (Bits(config.tag_extend_width bits)), config.core_num)
+        val tag_stream          = Vec(slave Stream (Bits(config.tag_extend_width bits)), config.core_num) //edge index port
         val vertex_stream       = Vec(slave Stream (Bits(config.axi_extend_width bits)), config.core_num)
         val pe_rdy_table        = out Vec(Bool(), config.core_num)
         val bundle_busy_table   = out Vec(Bool(), config.core_num)

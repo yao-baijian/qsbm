@@ -15,6 +15,7 @@ case class DispatcherConfig(){
 
   //AXI4
   val size = 512
+  val edgeIndexSize = 128
 
   //StreamFifo
   val fifoWidth = 512
