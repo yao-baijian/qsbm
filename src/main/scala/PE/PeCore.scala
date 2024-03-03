@@ -226,15 +226,15 @@ case class PeCore(config: PeConfig) extends Component {
 
     // TODO when remap to adder table, addr need to -1, redundunt logic, need to remove them
     intrahaz_poz_s0_f0(0)   := intrahaz_f0(0).asUInt.resize(3)
-    intrahaz_poz_s0_f0(1)   := intrahaz_poz_add_p1(0)
+    intrahaz_poz_s0_f0(1)   := intrahaz_poz_add_p1(0).resize(3)
     intrahaz_poz_s0_f0(2)   := intrahaz_poz_add_p1(0) +^ intrahaz_f0(2).asUInt
     intrahaz_poz_s0_f0(3)   := intrahaz_poz_add_p2(0)
-    intrahaz_poz_s0_f0(4)   := intrahaz_poz_add_p2(0) +^ intrahaz_f0(4).asUInt
-    intrahaz_poz_s0_f0(5)   := intrahaz_poz_add_p2(0) +^ intrahaz_poz_add_p1(2)
-    intrahaz_poz_s0_f0(6)   := intrahaz_poz_add_p2(0) +^ intrahaz_poz_add_p1(2) + intrahaz_f0(6).asUInt
+    intrahaz_poz_s0_f0(4)   := intrahaz_poz_add_p2(0) + intrahaz_f0(4).asUInt
+    intrahaz_poz_s0_f0(5)   := intrahaz_poz_add_p2(0) + intrahaz_poz_add_p1(2)
+    intrahaz_poz_s0_f0(6)   := intrahaz_poz_add_p2(0) + intrahaz_poz_add_p1(2) + intrahaz_f0(6).asUInt
     intrahaz_poz_s0_f0(7)   := 0
 
-    intrahaz_all_val        := intrahaz_poz_add_p2(0) +^ intrahaz_poz_add_p2(1)
+    intrahaz_all_val        := intrahaz_poz_add_p2(0) + intrahaz_poz_add_p2(1)
 
     //-----------------------------------------------------------
     // pipeline f1: find inter stage hazard WRITE AFTER READ
