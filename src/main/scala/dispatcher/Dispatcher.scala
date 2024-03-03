@@ -338,7 +338,7 @@ case class Dispatcher() extends Component {
           }
         }
       }   //end of whenIsActive
-    }//end of new state
+    } //end of new state
 
     //******************************* READ_VEX_DATA *********************************//
     val dispatchVexCnt = Reg(UInt(16 bits)) init 0
