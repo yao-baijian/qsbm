@@ -44,7 +44,7 @@ bin/
 
 
 simWorkspace/
-xSimWorkspace/
+xSimWorkspace/SboomTop/*
 tmp/
 null
 

@@ -79,7 +79,6 @@ case class GatherPeCore(config:PeConfig) extends Component {
                 goto(OPERATE)
             }
         )
-
         OPERATE
         .whenIsActive {
             when (update_ram_rd_addr_h1 === config.matrix_size - 1) {
@@ -95,7 +94,6 @@ case class GatherPeCore(config:PeConfig) extends Component {
 //-----------------------------------------------------------
 // pipeline h1: read updated value (J @ X_comp) and vertex ram (x_old)
 //-----------------------------------------------------------
-// TO DO
 
     when (gather_pe_busy & (update_ram_rd_addr_h1 =/= config.matrix_size - 1)) {
         when (h1_valid) {
@@ -110,8 +108,8 @@ case class GatherPeCore(config:PeConfig) extends Component {
         h1_valid := False
     }
 
-    io_update.rd_addr := update_ram_rd_addr_h1
-    io_vertex_ram.rd_addr := vertex_ram_rd_addr_h1
+    io_update.rd_addr       := update_ram_rd_addr_h1
+    io_vertex_ram.rd_addr   := vertex_ram_rd_addr_h1
 
 // -----------------------------------------------------------
 // pipeline h2: y_new = y_old + ((-1 + alpha) *x_old + beta* updated value) * dt
