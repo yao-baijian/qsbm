@@ -59,12 +59,11 @@ case class PeCore(config: PeConfig) extends Component {
     val intrahaz_val        = Vec(Vec(Bool(), config.thread_num), config.thread_num)
     val intrahaz_f0         = Vec(Bool(), config.thread_num)
     val intrahaz_poz_s0_f0  = Vec(UInt(3 bits), config.thread_num)
-    val intrahaz_poz_add_p1 = Vec(UInt(3 bits), 4)
+    val intrahaz_poz_add_p1 = Vec(UInt(2 bits), 4)
     val intrahaz_poz_add_p2 = Vec(UInt(3 bits), 2)
     val intrahaz_all_val    = UInt(3 bits)
 
     val f1_valid            = Vec(Reg(Bool()) init False, config.thread_num )
-    val real_addr_f1        = Vec(Reg(UInt(config.extend_addr_width bits)) init 0, config.thread_num)
     val real_addr_valid_f1  = Vec(Reg(Bool()) init False, config.thread_num)
     val edge_value_f1       = Vec(Reg(SInt(config.edge_width bits)) init 0, config.thread_num)
     val update_ram_addr_f1  = Vec(Reg(UInt(config.extend_addr_width bits)) init 0, config.thread_num)
@@ -186,9 +185,9 @@ case class PeCore(config: PeConfig) extends Component {
               when(io_state.switch_done) {
                   pe_busy := False
                   for (i <- 0 until config.thread_num) {
-                      fifo_rdy(i) := True
+                      fifo_rdy(i)   := True
                   }
-                  need_new_vertex  := True
+                  need_new_vertex   := True
                   goto(IDLE)
               }
           }
@@ -198,14 +197,16 @@ case class PeCore(config: PeConfig) extends Component {
     // Frontend
     //-----------------------------------------------------------
     // TODO add valid signal for address comparing
-    // pipeline the frontend logic
     //-----------------------------------------------------------
     // f0  find intra stage hazard
     //-----------------------------------------------------------
     // TODO POWER OVERHEAD HERE, NEED REDESIGN
 
-    for (i <- 0 until config.thread_num - 1) {
+    for (i <- 0 until config.thread_num) {
         real_addr(i) := (io_edge.tag_value(i) ## io_edge.edge_value(i)(9 downto 4)).asUInt
+    }
+
+    for (i <- 0 until config.thread_num - 1) {
         for (j <- i + 1 until config.thread_num) {
             intrahaz_vec(i)(j) := (real_addr(i) === real_addr(j) && f0_valid(i) && f0_valid(j)) ? True | False
         }
@@ -216,24 +217,24 @@ case class PeCore(config: PeConfig) extends Component {
     }
 
     for (i <- 0 until 4) {
-        intrahaz_poz_add_p1(i) := (B"2'00" ## intrahaz_f0(i * 2)).asUInt + (B"2'00" ## intrahaz_f0(i * 2 + 1)).asUInt
+        intrahaz_poz_add_p1(i) :=  intrahaz_f0(i * 2).asUInt +^ intrahaz_f0(i * 2 + 1).asUInt
     }
 
-    for (i <- 0 until 1) {
-        intrahaz_poz_add_p2(i) := intrahaz_poz_add_p1(i * 2) + intrahaz_poz_add_p1(i * 2 + 1)
+    for (i <- 0 until 2) {
+        intrahaz_poz_add_p2(i) := intrahaz_poz_add_p1(i * 2) +^ intrahaz_poz_add_p1(i * 2 + 1)
     }
 
     // TODO when remap to adder table, addr need to -1, redundunt logic, need to remove them
-    intrahaz_poz_s0_f0(0)   := (B"2'00" ## intrahaz_f0(0)).asUInt
+    intrahaz_poz_s0_f0(0)   := intrahaz_f0(0).asUInt.resize(3)
     intrahaz_poz_s0_f0(1)   := intrahaz_poz_add_p1(0)
-    intrahaz_poz_s0_f0(2)   := intrahaz_poz_add_p1(0) + intrahaz_f0(2).asUInt
+    intrahaz_poz_s0_f0(2)   := intrahaz_poz_add_p1(0) +^ intrahaz_f0(2).asUInt
     intrahaz_poz_s0_f0(3)   := intrahaz_poz_add_p2(0)
-    intrahaz_poz_s0_f0(4)   := intrahaz_poz_add_p2(0) + intrahaz_f0(4).asUInt
-    intrahaz_poz_s0_f0(5)   := intrahaz_poz_add_p2(0) + intrahaz_poz_add_p1(2)
-    intrahaz_poz_s0_f0(6)   := intrahaz_poz_add_p2(0) + intrahaz_poz_add_p1(2) + intrahaz_f0(6).asUInt
+    intrahaz_poz_s0_f0(4)   := intrahaz_poz_add_p2(0) +^ intrahaz_f0(4).asUInt
+    intrahaz_poz_s0_f0(5)   := intrahaz_poz_add_p2(0) +^ intrahaz_poz_add_p1(2)
+    intrahaz_poz_s0_f0(6)   := intrahaz_poz_add_p2(0) +^ intrahaz_poz_add_p1(2) + intrahaz_f0(6).asUInt
     intrahaz_poz_s0_f0(7)   := 0
 
-    intrahaz_all_val        := intrahaz_poz_add_p2(0) + intrahaz_poz_add_p2(1)
+    intrahaz_all_val        := intrahaz_poz_add_p2(0) +^ intrahaz_poz_add_p2(1)
 
     //-----------------------------------------------------------
     // pipeline f1: find inter stage hazard WRITE AFTER READ
@@ -242,7 +243,6 @@ case class PeCore(config: PeConfig) extends Component {
     for (i <- 0 until config.thread_num) {
         when(io_edge.edge_ready(i) && io_edge.edge_valid(i) && io_edge.edge_value(i) =/= 0) {
             f1_valid(i)             := True
-            real_addr_f1(i)         := real_addr(i)
             vertex_reg_addr_f1(i)   := io_edge.edge_value(i)(15 downto 10).asUInt
             update_ram_addr_f1(i)   := real_addr(i)
             edge_value_f1(i)        := io_edge.edge_value(i)(3 downto 0).asSInt
@@ -252,7 +252,6 @@ case class PeCore(config: PeConfig) extends Component {
             }
         } otherwise {
             f1_valid(i)             := False
-            real_addr_f1(i)         := real_addr(i)
             vertex_reg_addr_f1(i)   := 0
             update_ram_addr_f1(i)   := 0
             edge_value_f1(i)        := 0
@@ -275,7 +274,7 @@ case class PeCore(config: PeConfig) extends Component {
 
     for (i <- 0 until config.thread_num) {
         for (j <- 0 until config.thread_num) {
-            interhaz_f1 (i)(j) := ((real_addr_f1(i) === update_ram_addr_h1(j))&&
+            interhaz_f1 (i)(j) := ((update_ram_addr_f1(i) === update_ram_addr_h1(j))&&
               real_addr_valid_f1(i) && entry_valid_h1(j)) ? True | False
         }
         interhaz_val_f1(i)      := interhaz_f1 (i).orR
@@ -294,14 +293,13 @@ case class PeCore(config: PeConfig) extends Component {
     //-----------------------------------------------------------
     // pipeline h1: Multiplication
     //-----------------------------------------------------------
-    // TODO extend update ram addr to real_addr (9 bit)
     for (i <- 0 until config.thread_num) {
         when(f1_valid(i)) {
             h1_valid(i)             := True
             entry_valid_h1(i)       := real_addr_valid_f1(i)
             edge_value_h1(i)        := edge_value_f1(i)
             vertex_reg_data_h1(i)   := io_vertex.data(i).asSInt
-            update_ram_addr_h1(i)   := real_addr_f1(i)
+            update_ram_addr_h1(i)   := update_ram_addr_f1(i)
             interhaz_table_h1(i)    := interhaz_val_f1(i) ? (interhaz_val_f1 (i) ## interhaz_index(i)(2) ## interhaz_index(i)(1) ## interhaz_index(i)(0)) | 0
             intrahaz_table_h1(i)    := intrahaz_table_f1(i)
             for (j <- 0 until config.thread_num) {
@@ -321,7 +319,7 @@ case class PeCore(config: PeConfig) extends Component {
         }
     }
 
-    for (i <- 0 until 4) {
+    for (i <- 0 until config.extra_adder_num) {
         when(adder_en_h1(i)(3)) {
             adder_en_h1(i) := adder_en_f1(i)
         } otherwise {
@@ -365,7 +363,7 @@ case class PeCore(config: PeConfig) extends Component {
         }
     }
 
-    for (i <- 0 until 4) {
+    for (i <- 0 until config.extra_adder_num) {
         when(adder_en_h2(i)(3)) {
             adder_en_h2(i)          := adder_en_h1(i)
         } otherwise {
@@ -373,14 +371,15 @@ case class PeCore(config: PeConfig) extends Component {
         }
     }
 
-    //  TODO differentiate normal haz from extra haz
     for (i <- 0 until config.thread_num) {
-        normal_haz_data_h2(i) := (interhaz_table_h2(i)(3) ? update_data_h3(interhaz_table_h2(i)(2 downto 0).asUInt) | updata_data_old_h2(i))(config.data_width - 1 downto 0)
+        normal_haz_data_h2(i) := (interhaz_table_h2(i)(3) && !interhaz_table_h2(i)(3)) ? update_data_h3(interhaz_table_h2(i)(2 downto 0).asUInt) | updata_data_old_h2(i)
+        // TODO change
         normal_update_data_h2(i) := (entry_valid_h2(i) && !intrahaz_table_h2(i)(3)) ? (normal_haz_data_h2(i) + multiply_data_h2(i))(config.data_width - 1 downto 0) | 0
+        // TODO change
     }
 
     for (i <- 0 until config.extra_adder_num) {
-        extra_haz_data_h2(i) := (interhaz_table_h2(i)(3) ? update_data_h3(interhaz_table_h2(i)(2 downto 0).asUInt) | updata_data_old_h2(i))(config.data_width - 1 downto 0)
+        extra_haz_data_h2(i) := (interhaz_table_h2(i)(3) && !interhaz_table_h2(i)(3))? update_data_h3(interhaz_table_h2(i)(2 downto 0).asUInt) | updata_data_old_h2(i)
     }
 
     // TODO Pass intar hazard date into extra adder matrix

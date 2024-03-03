@@ -37,6 +37,7 @@ case class PeTop(config:PeConfig) extends Component {
         val bundle_busy_table   = out Vec(Bool(), config.core_num)
         val vertex_stream_top   = slave Stream (Bits(config.axi_extend_width bits))
         val writeback_stream    = Vec(master Stream (Bits(config.data_width bits)), config.thread_num)
+        val srst                = in Bool()
         val bundle_sel          = in Vec(Bool(), config.core_num)
     }
 
@@ -47,7 +48,7 @@ case class PeTop(config:PeConfig) extends Component {
     val switch_done             = Reg(Bool())                       init False
     val switch                  = Reg(Bool())                       init True
     val vertex_reg_en           = Reg(Bits(config.thread_num bits)) init 1
-    val vertex_reg_cnt          = Reg(UInt(3 bits))          init 0
+    val vertex_reg_cnt          = Reg(UInt(6 bits))          init 0
     val bundle_busy             = Bool()
     val bundle_busy_table       = Vec(Bool(), config.core_num)
     val last_update             = Reg(Bool())                       init False
@@ -169,20 +170,40 @@ case class PeTop(config:PeConfig) extends Component {
         rdy_list_B(i) := vertex_reg_en(i) & vertex_reg_group_B(i).io.in_stream.ready
     }
 
-    io.vertex_stream_top.ready := Mux(switch, rdy_list_A(vertex_reg_cnt),  rdy_list_B(vertex_reg_cnt))
+    val vertex_reg_sel        = Reg(UInt(3 bits)) init 0
+    io.vertex_stream_top.ready := Mux(switch, rdy_list_A(vertex_reg_sel),  rdy_list_B(vertex_reg_sel))
 
     //-----------------------------------------------------
     // Other Logic
     //-----------------------------------------------------
 
-    // Todo : need found invalid here
-    when(vertex_reg_en =/= 0 && io.vertex_stream_top.valid && io.vertex_stream_top.payload === 0 ) {
-        vertex_reg_cnt:= (vertex_reg_cnt + 1)(2 downto 0)
-        vertex_reg_en := vertex_reg_en |<< 1
-    } elsewhen (switch_done) {
-        vertex_reg_cnt := 0
-        vertex_reg_en := 0x00000001
+//    TODO this only support size 64 * 32 = 2048
+    val vertex_reg_upperbound = Reg(UInt(6 bits)) init 7
+    val vertex_reg_lowerbound = Reg(UInt(6 bits)) init 0
+
+
+    when (switch_done) {
+        vertex_reg_upperbound := vertex_reg_upperbound + 8
+        vertex_reg_lowerbound := vertex_reg_lowerbound + 8
+    } elsewhen (io.srst) {
+        vertex_reg_upperbound := 7
+        vertex_reg_lowerbound := 0
     }
+
+    when(io.vertex_stream_top.valid && io.vertex_stream_top.payload === 0) {
+        vertex_reg_cnt  := vertex_reg_cnt + 1
+    } elsewhen (switch_done || io.srst) {
+        vertex_reg_cnt  := 0
+    }
+
+    when (vertex_reg_cnt === vertex_reg_lowerbound) {
+        vertex_reg_en   := 0x00000001
+        vertex_reg_sel  := 0
+    } elsewhen (io.vertex_stream_top.valid && io.vertex_stream_top.payload === 0 && vertex_reg_en =/= 0) {
+        vertex_reg_en   := vertex_reg_en |<< 1
+        vertex_reg_sel  := vertex_reg_sel + 1
+    }
+
 
     // Todo this part is not capable of parameterize
     for (i <- 0 until config.thread_num * config.matrix_size) {
@@ -215,7 +236,7 @@ case class PeTop(config:PeConfig) extends Component {
     //-----------------------------------------------------
 
     when(writeback_busy && writeback_pointer =/= config.matrix_size - 1) {
-        writeback_pointer   := writeback_pointer+1
+        writeback_pointer   := writeback_pointer + 1
         writeback_valid     := True
         for  (i <- 0 until config.thread_num) {
             writeback_payload(i) := Mux(switch, vertex_reg_group_B(i).io_gather_pe.rd_data, vertex_reg_group_A(i).io_gather_pe.rd_data)
