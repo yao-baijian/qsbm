@@ -425,13 +425,13 @@ case class Dispatcher() extends Component {
         whenIsActive{
           //axiEdgeIndexPort for Edge Index
           io.axiEdgeIndexPort.ar.valid := True
-          io.axiEdgeIndexPort.ar.payload.len := U"8'b0001_1111" //burst length = 31 + 1
-          io.axiEdgeIndexPort.ar.payload.addr := U"32'h00400000" + (32 * 16) * edgeAddrCnt
+          io.axiEdgeIndexPort.ar.payload.len := U"8'b0000_1111" //burst length = 15 + 1
+          io.axiEdgeIndexPort.ar.payload.addr := U"32'h00400000" + (16 * 16) * edgeAddrCnt
 
           // axiMemControlPort for Edge Data
           io.axiMemControlPort.ar.valid := True
-          io.axiMemControlPort.ar.payload.len := U"8'b0001_1111" //burst length = 31 + 1
-          io.axiMemControlPort.ar.payload.addr := U"32'h00800000" + (32 * 64) * edgeAddrCnt
+          io.axiMemControlPort.ar.payload.len := U"8'b0000_1111" //burst length = 15 + 1
+          io.axiMemControlPort.ar.payload.addr := U"32'h00800000" + (16 * 64) * edgeAddrCnt
           //io.axiMemControlPort.ar.payload.len := U"8'b0000_0111" // (7+1) transfer in a burst
 
           when(io.axiMemControlPort.ar.fire && io.axiMemControlPort.r.valid && io.axiEdgeIndexPort.r.valid){
