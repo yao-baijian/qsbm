@@ -270,7 +270,7 @@ case class PeTop(config:PeConfig) extends Component {
                   goto(OPERATE)
               }
           )
-
+//    TODO here logic seems
         OPERATE
           .whenIsActive {
               when (!last_update) {

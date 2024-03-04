@@ -54,13 +54,13 @@ case class PeCore(config: PeConfig) extends Component {
     // Frontend
     //-----------------------------------------------------------
     val f0_valid            = Vec(Bool(), config.thread_num )
-    val real_addr           = Vec(UInt(config.extend_addr_width bits), config.thread_num)
-    val intrahaz_vec        = Vec(Vec(Bool(), config.thread_num), config.thread_num)
-    val intrahaz_val        = Vec(Vec(Bool(), config.thread_num), config.thread_num)
+    val real_addr_f0        = Vec(UInt(config.extend_addr_width bits), config.thread_num)
+    val intrahaz_vec_f0     = Vec(Vec(Bool(), config.thread_num), config.thread_num)
+    val intrahaz_val_f0     = Vec(Vec(Bool(), config.thread_num), config.thread_num)
     val intrahaz_f0         = Vec(Bool(), config.thread_num)
     val intrahaz_poz_s0_f0  = Vec(UInt(3 bits), config.thread_num)
-    val intrahaz_poz_add_p1 = Vec(UInt(2 bits), 4)
-    val intrahaz_poz_add_p2 = Vec(UInt(3 bits), 2)
+    val intrahaz_poz_add_p1_f0 = Vec(UInt(2 bits), 4)
+    val intrahaz_poz_add_p2_f0 = Vec(UInt(3 bits), 2)
     val intrahaz_all_val    = UInt(3 bits)
 
     val f1_valid            = Vec(Reg(Bool()) init False, config.thread_num )
@@ -203,38 +203,58 @@ case class PeCore(config: PeConfig) extends Component {
     // TODO POWER OVERHEAD HERE, NEED REDESIGN
 
     for (i <- 0 until config.thread_num) {
-        real_addr(i) := (io_edge.tag_value(i) ## io_edge.edge_value(i)(9 downto 4)).asUInt
+        real_addr_f0(i) := (io_edge.tag_value(i) ## io_edge.edge_value(i)(9 downto 4)).asUInt
+        f0_valid(i)     := io_edge.edge_ready(i) && io_edge.edge_valid(i) && io_edge.edge_value(i) =/= 0
     }
 
     for (i <- 0 until config.thread_num - 1) {
-        for (j <- i + 1 until config.thread_num) {
-            intrahaz_vec(i)(j) := (real_addr(i) === real_addr(j) && f0_valid(i) && f0_valid(j)) ? True | False
+        for (j <- 0 until config.thread_num) {
+            if (i <= j) {
+                intrahaz_vec_f0 (i)(j) := False
+            } else {
+                intrahaz_vec_f0 (i)(j) := ((real_addr_f0(i) === real_addr_f0(j)) && f0_valid(i) && f0_valid(j)) ? True | False
+            }
         }
-        for (k <- 0 until i) {
-            intrahaz_val(i)(k) := intrahaz_vec(k)(i)
+        for (k <- 0 until config.thread_num) {
+            if (k < i) {
+                intrahaz_val_f0(i)(k) := intrahaz_vec_f0(k)(i)
+            } else {
+                intrahaz_val_f0(i)(k) := False
+            }
         }
-        intrahaz_f0(i) := intrahaz_vec(i).orR && !intrahaz_val(i).orR
+        intrahaz_f0(i) := intrahaz_vec_f0(i).orR && !intrahaz_val_f0(i).orR
+    }
+    intrahaz_f0(config.thread_num - 1) := False
+
+    for (i <- 0 until config.thread_num) {
+        intrahaz_vec_f0(config.thread_num - 1)(i) := False
+        if (i < config.thread_num - 1) {
+            intrahaz_val_f0(config.thread_num - 1)(i) := intrahaz_vec_f0(i)(config.thread_num - 1)
+        } else {
+            intrahaz_val_f0(config.thread_num - 1)(i) := False
+        }
     }
 
+    // TODO entry valid not fixing yet
     for (i <- 0 until 4) {
-        intrahaz_poz_add_p1(i) :=  intrahaz_f0(i * 2).asUInt +^ intrahaz_f0(i * 2 + 1).asUInt
+        intrahaz_poz_add_p1_f0(i) :=  intrahaz_f0(i * 2).asUInt +^ intrahaz_f0(i * 2 + 1).asUInt
     }
 
     for (i <- 0 until 2) {
-        intrahaz_poz_add_p2(i) := intrahaz_poz_add_p1(i * 2) +^ intrahaz_poz_add_p1(i * 2 + 1)
+        intrahaz_poz_add_p2_f0(i) := intrahaz_poz_add_p1_f0(i * 2) +^ intrahaz_poz_add_p1_f0(i * 2 + 1)
     }
 
     // TODO when remap to adder table, addr need to -1, redundunt logic, need to remove them
     intrahaz_poz_s0_f0(0)   := intrahaz_f0(0).asUInt.resize(3)
-    intrahaz_poz_s0_f0(1)   := intrahaz_poz_add_p1(0).resize(3)
-    intrahaz_poz_s0_f0(2)   := intrahaz_poz_add_p1(0) +^ intrahaz_f0(2).asUInt
-    intrahaz_poz_s0_f0(3)   := intrahaz_poz_add_p2(0)
-    intrahaz_poz_s0_f0(4)   := intrahaz_poz_add_p2(0) + intrahaz_f0(4).asUInt
-    intrahaz_poz_s0_f0(5)   := intrahaz_poz_add_p2(0) + intrahaz_poz_add_p1(2)
-    intrahaz_poz_s0_f0(6)   := intrahaz_poz_add_p2(0) + intrahaz_poz_add_p1(2) + intrahaz_f0(6).asUInt
+    intrahaz_poz_s0_f0(1)   := intrahaz_poz_add_p1_f0(0).resize(3)
+    intrahaz_poz_s0_f0(2)   := intrahaz_poz_add_p1_f0(0) +^ intrahaz_f0(2).asUInt
+    intrahaz_poz_s0_f0(3)   := intrahaz_poz_add_p2_f0(0)
+    intrahaz_poz_s0_f0(4)   := intrahaz_poz_add_p2_f0(0) + intrahaz_f0(4).asUInt
+    intrahaz_poz_s0_f0(5)   := intrahaz_poz_add_p2_f0(0) + intrahaz_poz_add_p1_f0(2)
+    intrahaz_poz_s0_f0(6)   := intrahaz_poz_add_p2_f0(0) + intrahaz_poz_add_p1_f0(2) + intrahaz_f0(6).asUInt
     intrahaz_poz_s0_f0(7)   := 0
 
-    intrahaz_all_val        := intrahaz_poz_add_p2(0) + intrahaz_poz_add_p2(1)
+    intrahaz_all_val        := intrahaz_poz_add_p2_f0(0) + intrahaz_poz_add_p2_f0(1)
 
     //-----------------------------------------------------------
     // pipeline f1: find inter stage hazard WRITE AFTER READ
@@ -244,11 +264,11 @@ case class PeCore(config: PeConfig) extends Component {
         when(io_edge.edge_ready(i) && io_edge.edge_valid(i) && io_edge.edge_value(i) =/= 0) {
             f1_valid(i)             := True
             vertex_reg_addr_f1(i)   := io_edge.edge_value(i)(15 downto 10).asUInt
-            update_ram_addr_f1(i)   := real_addr(i)
+            update_ram_addr_f1(i)   := real_addr_f0(i)
             edge_value_f1(i)        := io_edge.edge_value(i)(3 downto 0).asSInt
             intrahaz_table_f1(i)    := intrahaz_f0(i).asBits ## intrahaz_poz_s0_f0(i)
             for (j <- 0 until config.thread_num) {
-                intrahaz_adder_table_f1(i)(j) := intrahaz_f0(i) ? intrahaz_vec(i)(j) | False
+                intrahaz_adder_table_f1(i)(j) := intrahaz_f0(i) ? intrahaz_vec_f0(i)(j) | False
             }
         } otherwise {
             f1_valid(i)             := False
