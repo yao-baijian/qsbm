@@ -64,7 +64,7 @@ case class PeCore(config: PeConfig) extends Component {
     val intrahaz_all_val    = UInt(3 bits)
 
     val f1_valid            = Vec(Reg(Bool()) init False, config.thread_num )
-    val real_addr_valid_f1  = Vec(Reg(Bool()) init False, config.thread_num)
+    val entry_valid_f1  = Vec(Reg(Bool()) init False, config.thread_num)
     val edge_value_f1       = Vec(Reg(SInt(config.edge_width bits)) init 0, config.thread_num)
     val update_ram_addr_f1  = Vec(Reg(UInt(config.extend_addr_width bits)) init 0, config.thread_num)
     val vertex_reg_addr_f1  = Vec(Reg(UInt(config.addr_width bits)) init 0, config.thread_num)
@@ -267,6 +267,7 @@ case class PeCore(config: PeConfig) extends Component {
             update_ram_addr_f1(i)   := real_addr_f0(i)
             edge_value_f1(i)        := io_edge.edge_value(i)(3 downto 0).asSInt
             intrahaz_table_f1(i)    := intrahaz_f0(i).asBits ## intrahaz_poz_s0_f0(i)
+            entry_valid_f1(i)       := !intrahaz_val_f0(i).orR
             for (j <- 0 until config.thread_num) {
                 intrahaz_adder_table_f1(i)(j) := intrahaz_f0(i) ? intrahaz_vec_f0(i)(j) | False
             }
@@ -276,6 +277,7 @@ case class PeCore(config: PeConfig) extends Component {
             update_ram_addr_f1(i)   := 0
             edge_value_f1(i)        := 0
             intrahaz_table_f1(i)    := 0
+            entry_valid_f1(i)       := False
             for (j <- 0 until config.thread_num) {
                 intrahaz_adder_table_f1(i)(j) := False
             }
@@ -295,7 +297,7 @@ case class PeCore(config: PeConfig) extends Component {
     for (i <- 0 until config.thread_num) {
         for (j <- 0 until config.thread_num) {
             interhaz_f1 (i)(j) := ((update_ram_addr_f1(i) === update_ram_addr_h1(j))&&
-              real_addr_valid_f1(i) && entry_valid_h1(j)) ? True | False
+              entry_valid_f1(i) && entry_valid_h1(j)) ? True | False
         }
         interhaz_val_f1(i)      := interhaz_f1 (i).orR
         io_vertex.addr(i)       := vertex_reg_addr_f1(i)
@@ -316,7 +318,7 @@ case class PeCore(config: PeConfig) extends Component {
     for (i <- 0 until config.thread_num) {
         when(f1_valid(i)) {
             h1_valid(i)             := True
-            entry_valid_h1(i)       := real_addr_valid_f1(i)
+            entry_valid_h1(i)       := entry_valid_f1(i)
             edge_value_h1(i)        := edge_value_f1(i)
             vertex_reg_data_h1(i)   := io_vertex.data(i).asSInt
             update_ram_addr_h1(i)   := update_ram_addr_f1(i)
