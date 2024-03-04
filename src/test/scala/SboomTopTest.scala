@@ -115,27 +115,28 @@ class SboomTopTest extends AnyFunSuite {
       for (col <- 0 until arrayWidth) { //arrayWidth is the number of 64 * 64 blocks
         do {
           // 128bits conccatenation
-          edgeIndexByte = 0
+//          edgeIndexByte = 0
           flag = 0
           for (offset <- 0 until PeConfig().peNumEachColumn) {
             if (blocks(base + offset)(col).nonEmpty) {
               flag = flag + 1
               edgeCnt = edgeCnt + 1
+              if(edgeCnt >0 && edgeCnt%8 == 0){
+                transfer_128 = transfer_128 + 1
+              }
 
               //generating edge indices
               if(edgeCnt%2 == 1){
-                edgeIndexByte = (edgeIndexByte | (offset.toByte)<<4)
+                edgeIndexByte = (edgeIndexByte | ((offset+1).toByte)<<4)
               }
               else{
-                edgeIndexByte = (edgeIndexByte | (offset.toByte))
+                edgeIndexByte = (edgeIndexByte | ((offset+1).toByte))
                 edgeIndexBuffer.append(edgeIndexByte.toByte)
                 edgeIndexByte = 0
               }
 
               //put the edges into the buffer
               val edge = blocks(base + offset)(col).dequeue()
-              //              println("edge size", edge.length)
-              //               tempArray(offset) = edge
               edgesArrayBuffer.append(edge)
             } else {
               // Do nothing
@@ -143,23 +144,20 @@ class SboomTopTest extends AnyFunSuite {
               //               tempArray(offset) = edge
 //              edgesArrayBuffer.append(edge)
             }
-
-            if(edgeCnt > 0 && edgeCnt%8 == 0){ //128b = 8 edges * 16b
-              transfer_128 = transfer_128 + 1
-            }
           } // 128bits conccatenation and paddings
+        } while (flag > 0) //  flag>0 means that there is no allZeros
 
-//          edgeIndexBuffer.append(edgeIndexByte)
+        if(flag == 0){
+          println("transfer_128 and edgeCnt",transfer_128,edgeCnt)
 
-          if(flag == 0){
-            println("transfer_128",transfer_128)
-
-
-            var edgePaddingTo128Remainder = edgeCnt % 8
-            var edgeIndexPaddingByteNum = (8 - edgePaddingTo128Remainder)/2
+          var edgePaddingTo128Remainder = edgeCnt % 8
+          var edgeIndexPaddingByteNum = (8 - edgePaddingTo128Remainder)/2
+          println("edgePaddingTo128Remainder",edgePaddingTo128Remainder)
+          if(edgePaddingTo128Remainder != 0){
             //padding to make a 128b packet
             for(i <- 0 until 8-edgePaddingTo128Remainder){
               val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
+              edgeCnt = edgeCnt + 1
               edgesArrayBuffer.append(edge)
             }
             //edgeIndexPadding to make 32b index packet
@@ -167,38 +165,51 @@ class SboomTopTest extends AnyFunSuite {
               edgeIndexBuffer.append(0.toByte)
             }
             transfer_128 = transfer_128 + 1
-
-            //judge the number of 128b transfers
-            if(transfer_128 % 4 == 1){
-              val edgePadding =  ArrayBuffer.fill(16 * 3)(0.toByte)
-              transfer_128 = transfer_128 + 3
-              edgesArrayBuffer.append(edgePadding)
-              //edgeIndex Padding
-              for(i <- 0 until 3*4){ //for each 128b edge packet, there are 4Bytes needed for index
-                edgeIndexBuffer.append(0.toByte)
-              }
-            } else if(transfer_128 % 4 == 2){
-              val edgePadding = ArrayBuffer.fill(16 * 2)(0.toByte)
-              val indexPadding = ArrayBuffer.fill(2)(0.toByte)
-              transfer_128 = transfer_128 + 2
-              edgesArrayBuffer.append(edgePadding)
-              //edgeIndex Padding
-              for(i <- 0 until 2*4){
-                edgeIndexBuffer.append(0.toByte)
-              }
-            } else if (transfer_128 % 4 == 3) {
-              val edgePadding = ArrayBuffer.fill(16 * 1)(0.toByte)
-              transfer_128 = transfer_128 + 1
-              edgesArrayBuffer.append(edgePadding)
-              //edgeIndex Padding
-              for(i <- 0 until 1*4){
-                edgeIndexBuffer.append(0.toByte)
-              }
-            }
           }
-        } while (flag > 0) //  flag>0 means that there is no allZeros
+          //seperator added with 128b all zeros
+          for(i <- 0 until 8){
+            val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
+            edgeCnt = edgeCnt + 1
+            edgesArrayBuffer.append(edge)
+          }
+          //edgeIndexPadding to make 32b index packet
+          for(i <- 0 until 4){
+            edgeIndexBuffer.append(0.toByte)
+          }
+          transfer_128 = transfer_128 + 1
+          println("debug transfer_128",transfer_128)
+        }
+
+          //judge the number of 128b transfers
+        if(transfer_128 % 4 == 1){
+          val edgePadding =  ArrayBuffer.fill(16 * 3)(0.toByte)
+          transfer_128 = transfer_128 + 3
+          edgesArrayBuffer.append(edgePadding)
+          //edgeIndex Padding
+          for(i <- 0 until 3*4){ //for each 128b edge packet, there are 4Bytes needed for index
+            edgeIndexBuffer.append(0.toByte)
+          }
+        } else if(transfer_128 % 4 == 2){
+          val edgePadding = ArrayBuffer.fill(16 * 2)(0.toByte)
+          val indexPadding = ArrayBuffer.fill(2)(0.toByte)
+          transfer_128 = transfer_128 + 2
+          edgesArrayBuffer.append(edgePadding)
+          //edgeIndex Padding
+          for(i <- 0 until 2*4){
+            edgeIndexBuffer.append(0.toByte)
+          }
+        } else if (transfer_128 % 4 == 3) {
+          val edgePadding = ArrayBuffer.fill(16 * 1)(0.toByte)
+          transfer_128 = transfer_128 + 1
+          edgesArrayBuffer.append(edgePadding)
+          //edgeIndex Padding
+          for(i <- 0 until 1*4){
+            edgeIndexBuffer.append(0.toByte)
+          }
+        }
       }
     }
+
 
     //To deal with remaining blocks
     if (remainder > 0) {
@@ -209,13 +220,16 @@ class SboomTopTest extends AnyFunSuite {
             if (blocks(goodIntervalBound + offset)(col).nonEmpty) {
               flag = flag + 1
               edgeCnt = edgeCnt + 1
+              if(edgeCnt>0 && edgeCnt%8 == 0){
+                transfer_128 = transfer_128 + 1
+              }
 
               //generating edge indices
               if(edgeCnt%2 == 1){
-                edgeIndexByte = (edgeIndexByte | (offset.toByte)<<4)
+                edgeIndexByte = (edgeIndexByte | ((offset+1).toByte)<<4)
               }
               else{
-                edgeIndexByte = (edgeIndexByte | (offset.toByte))
+                edgeIndexByte = (edgeIndexByte | ((offset+1).toByte))
                 edgeIndexBuffer.append(edgeIndexByte.toByte)
                 edgeIndexByte = 0
               }
@@ -233,16 +247,14 @@ class SboomTopTest extends AnyFunSuite {
 //            val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
 //            edgesArrayBuffer.append(edge)
 //          }
-          if(edgeCnt>0 && edgeCnt%8 == 0){
-            transfer_128 = transfer_128 + 1
-          }
-          println("transfer_128",transfer_128)
-          if (flag == 0) {
-            println("-------transfer_128----------",transfer_128)
+        } while (flag > 0)
 
+        if (flag == 0) {
+          println("-------transfer_128----------",transfer_128)
+          var edgePaddingTo128Remainder = edgeCnt % 8
+          var edgeIndexPaddingByteNum = (8 - edgePaddingTo128Remainder)/2
 
-            var edgePaddingTo128Remainder = edgeCnt % 8
-            var edgeIndexPaddingByteNum = (8 - edgePaddingTo128Remainder)/2
+          if(edgePaddingTo128Remainder != 0){
             //padding to make a 128b packet
             for(i <- 0 until 8-edgePaddingTo128Remainder){
               val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
@@ -253,22 +265,33 @@ class SboomTopTest extends AnyFunSuite {
               edgeIndexBuffer.append(0.toByte)
             }
             transfer_128 = transfer_128 + 1
-
-            if (transfer_128 % 4 == 1) {
-              val padding = ArrayBuffer.fill(16 * 3)(0.toByte)
-              transfer_128 = transfer_128 + 3
-              edgesArrayBuffer.append(padding)
-            } else if (transfer_128 % 4 == 2) {
-              val padding = ArrayBuffer.fill(16 * 2)(0.toByte)
-              transfer_128 = transfer_128 + 2
-              edgesArrayBuffer.append(padding)
-            } else if (transfer_128 % 4 == 3) {
-              val padding = ArrayBuffer.fill(16 * 1)(0.toByte)
-              transfer_128 = transfer_128 + 1
-              edgesArrayBuffer.append(padding)
-            }
           }
-        } while (flag > 0)
+          // add extra seperator with 128bit all zeros
+          for(i <- 0 until 8){
+            val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
+            edgeCnt = edgeCnt + 1
+            edgesArrayBuffer.append(edge)
+          }
+          //edgeIndexPadding to make 32b index packet
+          for(i <- 0 until 4){
+            edgeIndexBuffer.append(0.toByte)
+          }
+          transfer_128 = transfer_128 + 1
+
+          if (transfer_128 % 4 == 1) {
+            val padding = ArrayBuffer.fill(16 * 3)(0.toByte)
+            transfer_128 = transfer_128 + 3
+            edgesArrayBuffer.append(padding)
+          } else if (transfer_128 % 4 == 2) {
+            val padding = ArrayBuffer.fill(16 * 2)(0.toByte)
+            transfer_128 = transfer_128 + 2
+            edgesArrayBuffer.append(padding)
+          } else if (transfer_128 % 4 == 3) {
+            val padding = ArrayBuffer.fill(16 * 1)(0.toByte)
+            transfer_128 = transfer_128 + 1
+            edgesArrayBuffer.append(padding)
+          }
+        }
       }
     }
 

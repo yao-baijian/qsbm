@@ -164,6 +164,16 @@ case class Dispatcher() extends Component {
     io.dispatchToVexRegFilePorts(i).valid := vexEdgeOutStreams(0).valid &&  vexPeColumnSelect === i
   }
 
+  //******************************** VEX DISPATCH *********************************************//
+//  val vexCacheFifo = StreamFifo(
+//    dataType = AxiEdgeIndexPort(DispatcherConfig().edgeIndexSize),
+//    depth = 4096
+//    //    pushClock = clockA,
+//    //    popClock = clockB
+//  )
+//  vexCacheFifo.io.push.payload.data := io.axiEdgeIndexPort.r.payload.data
+//  vexCacheFifo.io.push.valid := False
+
   //******************************** EDGE INDEX DISPATCH *********************************************//
   val edgeIndexCacheFifo = StreamFifo(
     dataType = AxiEdgeIndexPort(DispatcherConfig().edgeIndexSize),
@@ -281,6 +291,23 @@ case class Dispatcher() extends Component {
 //  }
 
 
+  val dispatchPeColumnSelector = new Area{
+
+    when(io.bigPeBusyFlagVec(0) === False) {
+      vexPeColumnSelect := 0
+      edgePeColumnSelect := 0
+    }.elsewhen(io.bigPeBusyFlagVec(1) === False){
+      vexPeColumnSelect := 1
+      edgePeColumnSelect := 1
+    }.elsewhen(io.bigPeBusyFlagVec(2) === False){
+      vexPeColumnSelect := 2
+      edgePeColumnSelect := 2
+    }.elsewhen(io.bigPeBusyFlagVec(3) === False){
+      vexPeColumnSelect := 3
+      edgePeColumnSelect := 3
+    }
+  }
+
 
   //********************************  FSM Control  *******************************************************//
   val axi4MemCtrlFsm = new StateMachine {
@@ -321,32 +348,36 @@ case class Dispatcher() extends Component {
         //startUp := False
         io.axiMemControlPort.ar.payload.len := U"8'b0000_0001" // (1+1) transfer in a burst
         io.axiMemControlPort.ar.payload.addr := U"32'h0000_0000"
-
-        when(io.bigPeBusyFlagVec(0) === False) {
-          vexPeColumnSelect := 0
-          io.axiMemControlPort.ar.valid := True
-          when(io.axiMemControlPort.ar.ready){
-            goto(READ_VEX_DATA)
-          }
-        }.elsewhen(io.bigPeBusyFlagVec(1) === False){
-          vexPeColumnSelect := 1
-          io.axiMemControlPort.ar.valid := True
-          when(io.axiMemControlPort.ar.ready) {
-            goto(READ_VEX_DATA)
-          }
-        }.elsewhen(io.bigPeBusyFlagVec(2) === False){
-          vexPeColumnSelect := 2
-          io.axiMemControlPort.ar.valid := True
-          when(io.axiMemControlPort.ar.ready) {
-            goto(READ_VEX_DATA)
-          }
-        }.elsewhen(io.bigPeBusyFlagVec(3) === False){
-          vexPeColumnSelect := 3
-          io.axiMemControlPort.ar.valid := True
-          when(io.axiMemControlPort.ar.ready) {
-            goto(READ_VEX_DATA)
-          }
+        io.axiMemControlPort.ar.valid := True
+        when(io.axiMemControlPort.ar.ready){
+          goto(READ_VEX_DATA)
         }
+
+//        when(io.bigPeBusyFlagVec(0) === False) {
+//          vexPeColumnSelect := 0
+//          io.axiMemControlPort.ar.valid := True
+//          when(io.axiMemControlPort.ar.ready){
+//            goto(READ_VEX_DATA)
+//          }
+//        }.elsewhen(io.bigPeBusyFlagVec(1) === False){
+//          vexPeColumnSelect := 1
+//          io.axiMemControlPort.ar.valid := True
+//          when(io.axiMemControlPort.ar.ready) {
+//            goto(READ_VEX_DATA)
+//          }
+//        }.elsewhen(io.bigPeBusyFlagVec(2) === False){
+//          vexPeColumnSelect := 2
+//          io.axiMemControlPort.ar.valid := True
+//          when(io.axiMemControlPort.ar.ready) {
+//            goto(READ_VEX_DATA)
+//          }
+//        }.elsewhen(io.bigPeBusyFlagVec(3) === False){
+//          vexPeColumnSelect := 3
+//          io.axiMemControlPort.ar.valid := True
+//          when(io.axiMemControlPort.ar.ready) {
+//            goto(READ_VEX_DATA)
+//          }
+//        }
       }   //end of whenIsActive
     } //end of new state
 
@@ -446,7 +477,6 @@ case class Dispatcher() extends Component {
           seperatorOutDly := False
           vexEdgeSelect := 1
           edgePeColumnSelect := vexPeColumnSelect  //当确定vexPeColumn的时候，同时确定了edgePeColumn
-
         }
 
         whenIsActive{
