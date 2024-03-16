@@ -49,6 +49,8 @@ case class PeCore(config: PeConfig) extends Component {
         val rd_data     = Vec(in  Bits (config.data_width bits),config.thread_num)
     }
 
+
+
     //-----------------------------------------------------------
     // Value Declaration
     // Frontend
@@ -109,8 +111,7 @@ case class PeCore(config: PeConfig) extends Component {
     val adder_s1_h2         = Vec(Vec(SInt(config.data_width bits), config.thread_num), config.extra_adder_num)
 
     val h3_valid            = Vec(Reg(Bool()) init False, config.thread_num)
-    val update_data_h3      = Vec(SInt(config.data_width bits), config.thread_num)
-    val ram_data_h3         = Vec(Reg(SInt(config.data_width bits)) init 0, config.thread_num)
+    val update_data_h3      = Vec(Reg(SInt(config.data_width bits)), config.thread_num)
     val update_ram_addr_h3  = Vec(Reg(UInt(config.extend_addr_width bits)) init 0, config.thread_num)
 
     //-----------------------------------------------------------
@@ -203,13 +204,13 @@ case class PeCore(config: PeConfig) extends Component {
     // TODO POWER OVERHEAD HERE, NEED REDESIGN
 
     for (i <- 0 until config.thread_num) {
-        real_addr_f0(i) := (io_edge.tag_value(i) ## io_edge.edge_value(i)(9 downto 4)).asUInt
+        real_addr_f0(i) := ((io_edge.tag_value(i).asUInt - 1 ) ## io_edge.edge_value(i)(9 downto 4)).asUInt
         f0_valid(i)     := io_edge.edge_ready(i) && io_edge.edge_valid(i) && io_edge.edge_value(i) =/= 0
     }
 
     for (i <- 0 until config.thread_num - 1) {
         for (j <- 0 until config.thread_num) {
-            if (i <= j) {
+            if (j <= i) {
                 intrahaz_vec_f0 (i)(j) := False
             } else {
                 intrahaz_vec_f0 (i)(j) := ((real_addr_f0(i) === real_addr_f0(j)) && f0_valid(i) && f0_valid(j)) ? True | False
@@ -261,7 +262,7 @@ case class PeCore(config: PeConfig) extends Component {
     //-----------------------------------------------------------
 
     for (i <- 0 until config.thread_num) {
-        when(io_edge.edge_ready(i) && io_edge.edge_valid(i) && io_edge.edge_value(i) =/= 0) {
+        when(f0_valid(i)) {
             f1_valid(i)             := True
             vertex_reg_addr_f1(i)   := io_edge.edge_value(i)(15 downto 10).asUInt
             update_ram_addr_f1(i)   := real_addr_f0(i)
@@ -269,7 +270,12 @@ case class PeCore(config: PeConfig) extends Component {
             intrahaz_table_f1(i)    := intrahaz_f0(i).asBits ## intrahaz_poz_s0_f0(i)
             entry_valid_f1(i)       := !intrahaz_val_f0(i).orR
             for (j <- 0 until config.thread_num) {
-                intrahaz_adder_table_f1(i)(j) := intrahaz_f0(i) ? intrahaz_vec_f0(i)(j) | False
+                if (i === j) {
+                    intrahaz_adder_table_f1(i)(j) := intrahaz_f0(i) ? True | False
+                } else {
+                    intrahaz_adder_table_f1(i)(j) := intrahaz_f0(i) ? intrahaz_vec_f0(i)(j) | False
+                }
+
             }
         } otherwise {
             f1_valid(i)             := False
@@ -285,12 +291,22 @@ case class PeCore(config: PeConfig) extends Component {
     }
 
     for (i <- 0 until 4) {
-        for (j <- 0 until 8) {
-            when(intrahaz_f0(i) && intrahaz_poz_s0_f0(j) === i) {
-                adder_en_f1(i) := True ## intrahaz_poz_s0_f0(j)
-            } otherwise {
-                adder_en_f1(i) := 0
-            }
+        when(intrahaz_f0(0) && intrahaz_poz_s0_f0(0) === i + 1) {
+            adder_en_f1(i) := True ## intrahaz_poz_s0_f0(0)
+        } elsewhen (intrahaz_f0(1) && intrahaz_poz_s0_f0(1) === i + 1) {
+            adder_en_f1(i) := True ## intrahaz_poz_s0_f0(1)
+        } elsewhen (intrahaz_f0(2) && intrahaz_poz_s0_f0(2) === i + 1) {
+            adder_en_f1(i) := True ## intrahaz_poz_s0_f0(2)
+        } elsewhen (intrahaz_f0(3) && intrahaz_poz_s0_f0(3) === i + 1) {
+            adder_en_f1(i) := True ## intrahaz_poz_s0_f0(3)
+        } elsewhen (intrahaz_f0(4) && intrahaz_poz_s0_f0(4) === i + 1) {
+            adder_en_f1(i) := True ## intrahaz_poz_s0_f0(4)
+        } elsewhen (intrahaz_f0(5) && intrahaz_poz_s0_f0(5) === i + 1) {
+            adder_en_f1(i) := True ## intrahaz_poz_s0_f0(5)
+        } elsewhen (intrahaz_f0(6) && intrahaz_poz_s0_f0(6) === i + 1) {
+            adder_en_f1(i) := True ## intrahaz_poz_s0_f0(6)
+        } otherwise {
+            adder_en_f1(i) := 0
         }
     }
 
@@ -306,9 +322,9 @@ case class PeCore(config: PeConfig) extends Component {
 //     TODO is all zero case be excluded
     for (i <- 0 until config.thread_num) {
         interhaz_index(i)(2) := ~interhaz_f1(i)(3 downto 0).orR
-        interhaz_temp1(i) := interhaz_index(i)(2) ? interhaz_f1(i)(7 downto 4) | interhaz_f1(i)(3 downto 0);
+        interhaz_temp1(i) := interhaz_index(i)(2) ? interhaz_f1(i)(7 downto 4) | interhaz_f1(i)(3 downto 0)
         interhaz_index(i)(1) := ~interhaz_temp1(i).orR
-        interhaz_temp2(i) := interhaz_index(i)(1) ? interhaz_temp1(i)(3 downto 2) | interhaz_temp1(i)(1 downto 0);
+        interhaz_temp2(i) := interhaz_index(i)(1) ? interhaz_temp1(i)(3 downto 2) | interhaz_temp1(i)(1 downto 0)
         interhaz_index(i)(0) := ~interhaz_temp2(i)(0)
     }
 
@@ -342,7 +358,7 @@ case class PeCore(config: PeConfig) extends Component {
     }
 
     for (i <- 0 until config.extra_adder_num) {
-        when(adder_en_h1(i)(3)) {
+        when(adder_en_f1(i)(3)) {
             adder_en_h1(i) := adder_en_f1(i)
         } otherwise {
             adder_en_h1(i) := 0
@@ -378,15 +394,15 @@ case class PeCore(config: PeConfig) extends Component {
             intrahaz_table_h2(i)    := 0
             updata_data_old_h2(i)   := 0
             update_ram_addr_h2(i)   := 0
-            for (k <- 0 until config.thread_num) {
-                intrahaz_adder_table_h2(i)(k) := False
+            for (j <- 0 until config.thread_num) {
+                intrahaz_adder_table_h2(i)(j) := False
             }
 
         }
     }
 
     for (i <- 0 until config.extra_adder_num) {
-        when(adder_en_h2(i)(3)) {
+        when(adder_en_h1(i)(3)) {
             adder_en_h2(i)          := adder_en_h1(i)
         } otherwise {
             adder_en_h2(i)          := 0
@@ -419,6 +435,15 @@ case class PeCore(config: PeConfig) extends Component {
         extra_update_data_h2(i) := adder_en_h2(i)(3) ? adder_s1_h2(i).reduceBalancedTree(_ + _) | 0
     }
 
+    // TODO revise here
+    for (i <- 0 until config.thread_num) {
+        if (i < 4) {
+            updata_data_h2(i) := extra_update_data_h2(i) + normal_update_data_h2(i)
+        } else {
+            updata_data_h2(i) := normal_update_data_h2(i)
+        }
+    }
+
     //-----------------------------------------------------------
     // pipeline h3 write back
     //-----------------------------------------------------------
@@ -426,17 +451,17 @@ case class PeCore(config: PeConfig) extends Component {
         when(h2_valid(i)) {
             h3_valid(i)             := True
             update_ram_addr_h3(i)   := update_ram_addr_h2(i)
-            ram_data_h3(i)          := updata_data_h2(i)
+            update_data_h3(i)       := updata_data_h2(i)
         } otherwise {
             h3_valid(i)             := False
             update_ram_addr_h3(i)   := 0
-            ram_data_h3(i)          := 0
+            update_data_h3(i)       := 0
         }
     }
 
     for (i <- 0 until config.thread_num) {
         io_update.wr_valid(i)       := h3_valid(i)
         io_update.wr_addr(i)        := update_ram_addr_h3(i)
-        io_update.wr_data(i)        := ram_data_h3(i).asBits
+        io_update.wr_data(i)        := update_data_h3(i).asBits
     }
 }

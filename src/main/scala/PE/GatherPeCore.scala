@@ -57,7 +57,6 @@ case class GatherPeCore(config:PeConfig) extends Component {
 
     val h5_valid            = Reg(Bool())                               init False
     val vertex_ram_wr_data_h5 =  Reg(Bits (config.data_width bits))     init 0
-    val vertex_ram_wr_val_h5 = Reg(Bool())                              init False
     val vertex_ram_wr_addr_h5 = Reg(UInt (config.addr_width bits))      init 0
 
     val gather_pe_done      = Reg(Bool())                               init True
@@ -84,7 +83,7 @@ case class GatherPeCore(config:PeConfig) extends Component {
             when (update_ram_rd_addr_h1 === config.matrix_size - 1) {
                 gather_pe_busy := False
             }
-            when(!h4_valid) {
+            when(!gather_pe_busy && !h5_valid) {
                 gather_pe_done := True
                 goto(IDLE)
             }
@@ -173,17 +172,15 @@ case class GatherPeCore(config:PeConfig) extends Component {
     when (h4_valid) {
         vertex_ram_wr_data_h5   := x_new_cliped_h4 ## y_new_cliped_h4
         vertex_ram_wr_addr_h5   := io_vertex_ram.wr_addr + 1
-        vertex_ram_wr_val_h5    := True
         h5_valid                := True
     } otherwise {
         vertex_ram_wr_data_h5   := 0
         vertex_ram_wr_addr_h5   := 0
-        vertex_ram_wr_val_h5    := False
-        h4_valid                := False
+        h5_valid                := False
     }
 
     io_vertex_ram.wr_data := vertex_ram_wr_data_h5
     io_vertex_ram.wr_addr := vertex_ram_wr_addr_h5
-    io_vertex_ram.wr_val  := vertex_ram_wr_val_h5
+    io_vertex_ram.wr_val  := h5_valid
 }
 

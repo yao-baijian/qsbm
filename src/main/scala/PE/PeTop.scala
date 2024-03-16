@@ -101,31 +101,51 @@ case class PeTop(config:PeConfig) extends Component {
     //-----------------------------------------------------
     for (i <- 0 until config.core_num) {
         pe_bundle_array(i).io_global_reg.vertex_stream << io.vertex_stream(i)
-        pe_bundle_array(i).io_state.last_update     <> io.last_update(i)
+        pe_bundle_array(i).io_state.last_update <> io.last_update(i)
         bundle_busy_table(i) := pe_bundle_array(i).io_state.bundle_busy
-        high_to_low_converter.io.in_edge_stream(i)  <> io.raw_edge_stream(i)
-        high_to_low_converter.io.in_tag_stream(i)   <> io.tag_stream(i)
+        high_to_low_converter.io.in_edge_stream(i) <> io.raw_edge_stream(i)
+        high_to_low_converter.io.in_tag_stream(i) <> io.tag_stream(i)
 
         for (j <- 0 until config.thread_num) {
             pe_rdy_table_all(i)(j) := pe_bundle_array(i).io_fifo.pe_fifo(j).ready
-            all_zero_table (i)(j) := (high_to_low_converter.io.out_edge_stream(i)(j).payload === 0) & high_to_low_converter.io.out_edge_stream(i)(j).valid
+            all_zero_table(i)(j) := (high_to_low_converter.io.out_edge_stream(i)(j).payload === 0) & high_to_low_converter.io.out_edge_stream(i)(j).valid
         }
 
-        io.pe_rdy_table(i) :=  pe_rdy_table_all(i).orR
+        io.pe_rdy_table(i) := pe_rdy_table_all(i).orR
         pe_bundle_array(i).io_state.switch_done <> switch_done
-        all_zero(i) := all_zero_table (i).andR
+        all_zero(i) := all_zero_table(i).andR
         pe_bundle_array(i).io_state.all_zero := all_zero(i)
 
         for (j <- 0 until config.thread_num) {
-            pe_bundle_array(i).io_fifo.pe_fifo(j)       <> high_to_low_converter.io.out_edge_stream(i)(j)
-            pe_bundle_array(i).io_fifo.pe_tag(j)        <> high_to_low_converter.io.out_tag_stream(i)(j)
-            pe_bundle_array(i).io_update_reg.rd_data(j) <> pe_core_update_reg(i)(pe_bundle_array(i).io_update_reg.rd_addr(j))
-            when(update_reg_srst(i)) {
-                for (k <- 0 until config.matrix_size ) {
+            pe_bundle_array(i).io_fifo.pe_fifo(j) <> high_to_low_converter.io.out_edge_stream(i)(j)
+            pe_bundle_array(i).io_fifo.pe_tag(j) <> high_to_low_converter.io.out_tag_stream(i)(j)
+            for (k <- 0 until config.matrix_size) {
+                when(update_reg_srst(i)) {
                     pe_core_update_reg(i)(j * config.matrix_size + k) := 0
+                } elsewhen (pe_bundle_array(i).io.wr_valid(0) && pe_bundle_array(i).io.wr_addr(0) === j * config.matrix_size + k) {
+                    pe_core_update_reg(i)(j * config.matrix_size + k) := pe_bundle_array(i).io.wr_data(0)
+                } elsewhen (pe_bundle_array(i).io.wr_valid(1) && pe_bundle_array(i).io.wr_addr(1) === j * config.matrix_size + k) {
+                    pe_core_update_reg(i)(j * config.matrix_size + k) := pe_bundle_array(i).io.wr_data(1)
+                } elsewhen (pe_bundle_array(i).io.wr_valid(2) && pe_bundle_array(i).io.wr_addr(2) === j * config.matrix_size + k) {
+                    pe_core_update_reg(i)(j * config.matrix_size + k) := pe_bundle_array(i).io.wr_data(2)
+                } elsewhen (pe_bundle_array(i).io.wr_valid(3) && pe_bundle_array(i).io.wr_addr(3) === j * config.matrix_size + k) {
+                    pe_core_update_reg(i)(j * config.matrix_size + k) := pe_bundle_array(i).io.wr_data(3)
+                } elsewhen (pe_bundle_array(i).io.wr_valid(4) && pe_bundle_array(i).io.wr_addr(4) === j * config.matrix_size + k) {
+                    pe_core_update_reg(i)(j * config.matrix_size + k) := pe_bundle_array(i).io.wr_data(4)
+                } elsewhen (pe_bundle_array(i).io.wr_valid(5) && pe_bundle_array(i).io.wr_addr(5) === j * config.matrix_size + k) {
+                    pe_core_update_reg(i)(j * config.matrix_size + k) := pe_bundle_array(i).io.wr_data(5)
+                } elsewhen (pe_bundle_array(i).io.wr_valid(6) && pe_bundle_array(i).io.wr_addr(6) === j * config.matrix_size + k) {
+                    pe_core_update_reg(i)(j * config.matrix_size + k) := pe_bundle_array(i).io.wr_data(0)
+                } elsewhen (pe_bundle_array(i).io.wr_valid(7) && pe_bundle_array(i).io.wr_addr(7) === j * config.matrix_size + k) {
+                    pe_core_update_reg(i)(j * config.matrix_size + k) := pe_bundle_array(i).io.wr_data(7)
+                } otherwise {
+                    pe_core_update_reg(i)(j * config.matrix_size + k) := pe_core_update_reg(i)(j * config.matrix_size + k)
                 }
-            } elsewhen (pe_bundle_array(i).io_update_reg.wr_valid(j)) {
-                pe_core_update_reg(i)(pe_bundle_array(i).io_update_reg.wr_addr(j)) := pe_bundle_array(i).io_update_reg.wr_data(j)
+                when (pe_bundle_array(i).io.rd_addr(j) === j * config.matrix_size + k) {
+                    pe_bundle_array(i).io.rd_data(j) := pe_core_update_reg(i)(j * config.matrix_size + k)
+                } otherwise {
+                    pe_bundle_array(i).io.rd_data(j) := 0
+                }
             }
         }
     }

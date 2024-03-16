@@ -31,42 +31,47 @@ case class GlobalReg(config: PeConfig) extends Component{
     //-----------------------------------------------------
     // Module Declaration
     //-----------------------------------------------------
-
-    val vertex_reg  = Vec(Reg(Bits(config.data_width bits)) init(0), config.matrix_size)
-    val wr_pointer  = Reg(UInt(config.vertex_read_pointer_size bits)) init 0
+    val vertex_mem  = Mem(Bits(config.axi_extend_width bits), wordCount = 2)
+    val wr_pointer  = Reg(UInt(1 bits)) init 0
     val ready       = Reg(Bool()) init True
     val reg_full    = Reg(Bool()) init False
+
 
     //-----------------------------------------------------
     // Module Wiring
     //-----------------------------------------------------
 
+    vertex_mem.write(
+        enable = io.in_stream.valid && io.in_stream.ready,
+        address = wr_pointer,
+        data = io.in_stream.payload
+    )
+
+    for (i <- 0 until config.thread_num) {
+        io.rd_data(i) := vertex_mem.readAsync(io.rd_addr(i)(5).asUInt).subdivideIn(config.data_width bits)(io.rd_addr(i)(4 downto 0))
+    }
+
+
     io.in_stream.ready  := ready
     io.reg_full         := reg_full
 
-    when (wr_pointer === config.vertex_read_cnt_max * config.vertex_write_slice) {
+    when (wr_pointer === 1) {
         ready := False
     } elsewhen (io.srst) {
         ready := True
     }
 
-    when(wr_pointer === config.vertex_read_cnt_max * config.vertex_write_slice) {
+    when(wr_pointer === 1) {
         reg_full := True
     } otherwise {
         reg_full := False
     }
 
     when(io.in_stream.valid && io.in_stream.ready) {
-        for (i <- 0 until config.vertex_write_slice) {
-            vertex_reg((wr_pointer)(5 downto 0) + i) := io.in_stream.payload(config.data_width * (i + 1) - 1 downto config.data_width * i )
-            // TODO change this into right shift
-        }
-        wr_pointer := wr_pointer + config.vertex_write_slice
+        wr_pointer := wr_pointer + 1
     } otherwise {
         wr_pointer := 0
     }
 
-    for (i <- 0 until config.thread_num) {
-        io.rd_data (i) := vertex_reg(io.rd_addr(i))
-    }
+
 }

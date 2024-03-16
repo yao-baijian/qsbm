@@ -26,7 +26,7 @@ case class PeBundle(config: PeConfig) extends Component {
         val reg_full        = out Bool()
     }
 
-    val io_update_reg = new Bundle {
+    val io = new Bundle {
         val wr_valid = Vec(out Bool(), config.thread_num)
         val wr_addr = Vec(out UInt (config.extend_addr_width bits), config.thread_num)
         val wr_data = Vec(out Bits (config.data_width bits), config.thread_num)
@@ -57,11 +57,11 @@ case class PeBundle(config: PeConfig) extends Component {
         pe_core.io_vertex.addr(i)       <> global_reg.io.rd_addr(i)
         pe_core.io_vertex.data(i)       <> global_reg.io.rd_data(i)
 
-        pe_core.io_update.wr_valid(i)   <>  io_update_reg.wr_valid(i)
-        pe_core.io_update.wr_addr(i)    <>  io_update_reg.wr_addr(i)
-        pe_core.io_update.wr_data(i)    <>  io_update_reg.wr_data(i)
-        pe_core.io_update.rd_addr(i)    <>  io_update_reg.rd_addr(i)
-        pe_core.io_update.rd_data(i)    <>  io_update_reg.rd_data(i)
+        io.wr_valid(i)   := pe_core.io_update.wr_valid(i)
+        io.wr_addr(i)    := pe_core.io_update.wr_addr(i)
+        io.wr_data(i)    := pe_core.io_update.wr_data(i)
+        io.rd_addr(i)    := pe_core.io_update.rd_addr(i)
+        pe_core.io_update.rd_data(i) := io.rd_data(i)
 
         io_fifo.pe_fifo(i).ready        <> pe_core.io_edge.edge_ready(i)
         io_fifo.pe_tag(i).ready         <> pe_core.io_edge.edge_ready(i)
