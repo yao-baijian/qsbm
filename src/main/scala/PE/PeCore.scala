@@ -22,23 +22,15 @@ case class PeCore(config: PeConfig) extends Component {
 
     val io_state = new Bundle {
         val last_update     = in Bool()
-        val globalreg_done  = in Bool()
         val switch_done     = in Bool()
         val all_zero        = in Bool()
         val pe_busy         = out Bool()
         val need_new_vertex = out Bool()
     }
-  
-    val io_edge = new Bundle {
-        val edge_value  = Vec(in Bits(config.data_width bits), config.thread_num)
-        val tag_value   = Vec(in Bits(config.tag_width - 1 bits), config.thread_num)
-        val edge_valid  = Vec(in Bool(), config.thread_num)
-        val edge_ready  = Vec(out Bool(), config.thread_num)
-    }
 
-    val io_vertex = new Bundle {
-        val addr        = Vec(out UInt (config.addr_width bits),config.thread_num)
-        val data        = Vec(in Bits  (config.data_width bits),config.thread_num)
+    val io_global_reg = new Bundle {
+        val vertex_stream = slave Stream (Bits(config.axi_extend_width bits))
+        val reg_full = out Bool()
     }
 
     val io_update = new Bundle {
@@ -49,7 +41,21 @@ case class PeCore(config: PeConfig) extends Component {
         val rd_data     = Vec(in  Bits (config.data_width bits),config.thread_num)
     }
 
+    val io_fifo = new Bundle {
+        val globalreg_done = out Bool()
+        val pe_fifo = Vec(slave Stream (Bits(config.data_width bits)), config.thread_num)
+        val pe_tag  = Vec(slave Stream (Bits(config.tag_width - 1 bits)), config.thread_num)
+    }
 
+    val pe_config = PeConfig()
+    val last_update_r = Reg(Bool()) init False
+    val global_reg = GlobalReg(pe_config)
+
+    val vertex_addr = Vec(UInt(config.addr_width bits), config.thread_num)
+    val vertex_data = Vec(Bits(config.data_width bits), config.thread_num)
+    val edge_value  = Vec(Bits (config.data_width bits), config.thread_num)
+    val tag_value   = Vec(Bits (config.tag_width - 1 bits), config.thread_num)
+    val edge_valid  = Vec(Bool(), config.thread_num)
 
     //-----------------------------------------------------------
     // Value Declaration
@@ -128,8 +134,20 @@ case class PeCore(config: PeConfig) extends Component {
 
     io_state.pe_busy            := pe_busy
     io_state.need_new_vertex    := need_new_vertex
+    global_reg.io.in_stream     <> io_global_reg.vertex_stream
+    global_reg.io.srst          <> need_new_vertex
+    io_fifo.globalreg_done      <> global_reg.io.reg_full
+    io_global_reg.reg_full      <> global_reg.io.reg_full
+    io_state.last_update        <> last_update_r
+
     for (i <- 0 until config.thread_num) {
-        io_edge.edge_ready(i)       := fifo_rdy(i)
+        global_reg.io.rd_addr(i) := vertex_addr(i)
+        vertex_data(i) := global_reg.io.rd_data(i)
+        io_fifo.pe_fifo(i).ready := fifo_rdy(i)
+        io_fifo.pe_tag(i).ready := fifo_rdy(i)
+        edge_valid(i) := io_fifo.pe_fifo(i).valid
+        edge_value(i) := io_fifo.pe_fifo(i).payload
+        tag_value(i) := io_fifo.pe_tag(i).payload
     }
 
     //-----------------------------------------------------------
@@ -144,7 +162,7 @@ case class PeCore(config: PeConfig) extends Component {
 
         IDLE
           .whenIsActive {
-              when (io_state.globalreg_done) {
+              when (global_reg.io.reg_full) {
                   need_new_vertex  := False
               }
               when (io_state.last_update) {
@@ -152,7 +170,7 @@ case class PeCore(config: PeConfig) extends Component {
                       fifo_rdy(i) := False
                   }
                   goto(PAUSE)
-              } elsewhen (!need_new_vertex && io_edge.edge_valid.orR === True) {
+              } elsewhen (!need_new_vertex && edge_valid.orR === True) {
                   pe_busy := True
                   for (i <- 0 until config.thread_num) {
                       fifo_rdy(i) := True
@@ -194,6 +212,12 @@ case class PeCore(config: PeConfig) extends Component {
           }
     }
 
+    when(io_state.last_update) {
+        last_update_r := True
+    } elsewhen (io_state.switch_done) {
+        last_update_r := False
+    }
+
     //-----------------------------------------------------------
     // Frontend
     //-----------------------------------------------------------
@@ -204,8 +228,8 @@ case class PeCore(config: PeConfig) extends Component {
     // TODO POWER OVERHEAD HERE, NEED REDESIGN
 
     for (i <- 0 until config.thread_num) {
-        real_addr_f0(i) := ((io_edge.tag_value(i).asUInt - 1 ) ## io_edge.edge_value(i)(9 downto 4)).asUInt
-        f0_valid(i)     := io_edge.edge_ready(i) && io_edge.edge_valid(i) && io_edge.edge_value(i) =/= 0
+        real_addr_f0(i) := ((tag_value(i).asUInt - 1 ) ## edge_value(i)(9 downto 4)).asUInt
+        f0_valid(i)     := fifo_rdy(i) && edge_valid(i) && edge_value(i) =/= 0
     }
 
     for (i <- 0 until config.thread_num - 1) {
@@ -264,9 +288,9 @@ case class PeCore(config: PeConfig) extends Component {
     for (i <- 0 until config.thread_num) {
         when(f0_valid(i)) {
             f1_valid(i)             := True
-            vertex_reg_addr_f1(i)   := io_edge.edge_value(i)(15 downto 10).asUInt
+            vertex_reg_addr_f1(i)   := edge_value(i)(15 downto 10).asUInt
             update_ram_addr_f1(i)   := real_addr_f0(i)
-            edge_value_f1(i)        := io_edge.edge_value(i)(3 downto 0).asSInt
+            edge_value_f1(i)        := edge_value(i)(3 downto 0).asSInt
             intrahaz_table_f1(i)    := intrahaz_f0(i).asBits ## intrahaz_poz_s0_f0(i)
             entry_valid_f1(i)       := !intrahaz_val_f0(i).orR
             for (j <- 0 until config.thread_num) {
@@ -315,8 +339,8 @@ case class PeCore(config: PeConfig) extends Component {
             interhaz_f1 (i)(j) := ((update_ram_addr_f1(i) === update_ram_addr_h1(j))&&
               entry_valid_f1(i) && entry_valid_h1(j)) ? True | False
         }
-        interhaz_val_f1(i)      := interhaz_f1 (i).orR
-        io_vertex.addr(i)       := vertex_reg_addr_f1(i)
+        interhaz_val_f1(i)  := interhaz_f1 (i).orR
+        vertex_addr(i)      := vertex_reg_addr_f1(i)
     }
 
 //     TODO is all zero case be excluded
@@ -336,7 +360,7 @@ case class PeCore(config: PeConfig) extends Component {
             h1_valid(i)             := True
             entry_valid_h1(i)       := entry_valid_f1(i)
             edge_value_h1(i)        := edge_value_f1(i)
-            vertex_reg_data_h1(i)   := io_vertex.data(i).asSInt
+            vertex_reg_data_h1(i)   := vertex_data(i).asSInt
             update_ram_addr_h1(i)   := update_ram_addr_f1(i)
             interhaz_table_h1(i)    := interhaz_val_f1(i) ? (interhaz_val_f1 (i) ## interhaz_index(i)(2) ## interhaz_index(i)(1) ## interhaz_index(i)(0)) | 0
             intrahaz_table_h1(i)    := intrahaz_table_f1(i)
