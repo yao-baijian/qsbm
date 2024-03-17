@@ -69,28 +69,31 @@ case class PeTop(config:PeConfig) extends Component {
     // Module Declaration & Instantiation
     //-----------------------------------------------------
     val high_to_low_converter       = HighToLowConvert(Config)
-    val pecore_array             = new Array[PeCore](config.core_num)
+    val pecore_array                = new Array[PeCore](config.core_num)
     val gather_pe_group             = new Array[GatherPeCore](config.thread_num)
     val vertex_reg_group_A          = new Array[DualModeReg](config.thread_num)
     val vertex_reg_group_B          = new Array[DualModeReg](config.thread_num)
-
+    val update_mem                  = new Array[Mem[Bits]](config.thread_num)
     val pe_core_update_reg          = Vec(Vec(Reg(Bits(config.data_width bits)),config.matrix_size * config.thread_num), config.core_num)
-    val update_reg_group            = Vec(Reg(Bits(config.data_width bits)),config.matrix_size * config.thread_num)
-    val pe_bundle_wire              = Vec(Vec(SInt(config.data_width bits),config.core_num), config.matrix_size * config.thread_num)
+//    val update_reg_group            = Vec(Reg(Bits(config.data_width bits)),config.matrix_size * config.thread_num)
+    val pe_bundle_wire              = Vec(Vec(SInt(config.data_width bits),config.core_num), config.thread_num)
+    val pe_update_value             = Vec(SInt(config.data_width bits), config.thread_num)
 
     // Fix update reg and vertex reg size
     for (i <- 0 until config.core_num) {
         pecore_array(i) = PeCore(Config)
         pecore_array(i).setName("pe_bundle_" + i.toString)
+
         for (j <- 0 until config.thread_num) {
             pe_core_update_reg(i).foreach(_ init 0)
         }
-        update_reg_group.foreach(_ init 0)
+//        update_reg_group.foreach(_ init 0)
     }
 
     for (i <- 0 until config.thread_num) {
         gather_pe_group(i) = GatherPeCore(Config)
         gather_pe_group(i).setName("gather_pe_" + i.toString)
+        update_mem(i) = Mem(Bits(config.data_width bits), wordCount = config.matrix_size)
         vertex_reg_group_A(i) = DualModeReg(Config)
         vertex_reg_group_A(i).setName("vertex_regA_" + i.toString)
         vertex_reg_group_B(i) = DualModeReg(Config)
@@ -138,8 +141,6 @@ case class PeTop(config:PeConfig) extends Component {
                     pe_core_update_reg(i)(j * config.matrix_size + k) := pecore_array(i).io_update.wr_data(0)
                 } elsewhen (pecore_array(i).io_update.wr_valid(7) && pecore_array(i).io_update.wr_addr(7) === j * config.matrix_size + k) {
                     pe_core_update_reg(i)(j * config.matrix_size + k) := pecore_array(i).io_update.wr_data(7)
-                } otherwise {
-                    pe_core_update_reg(i)(j * config.matrix_size + k) := pe_core_update_reg(i)(j * config.matrix_size + k)
                 }
                 when (pecore_array(i).io_update.rd_addr(j) === j * config.matrix_size + k) {
                     pecore_array(i).io_update.rd_data(j) := pe_core_update_reg(i)(j * config.matrix_size + k)
@@ -223,21 +224,26 @@ case class PeTop(config:PeConfig) extends Component {
         vertex_reg_sel  := vertex_reg_sel + 1
     }
 
-    for (i <- 0 until config.thread_num * config.matrix_size) {
+    val write_ptr = Reg(UInt(9 bits)) init 0
+    val write_valid = Reg(Bool()) init False
+
+    for (i <- 0 until config.thread_num) {
         for (j <- 0 until 4) {
-            pe_bundle_wire(i)(j) := pe_core_update_reg(j)(i).asSInt
+            pe_bundle_wire(i)(j) := pe_core_update_reg(j)((write_ptr + i*64)(8 downto 0)).asSInt
         }
-        when(need_update) {
-            update_reg_group (i) := pe_bundle_wire(i).reduceBalancedTree(_ + _).asBits
-        }
+        pe_update_value(i) := pe_bundle_wire(i).reduceBalancedTree(_ + _)
     }
 
-    val addr_mapper = Vec(UInt(9 bits), config.thread_num)
     for (i <- 0 until config.thread_num) {
-        addr_mapper(i) := i*64
+        update_mem(i).write(
+            enable = write_valid,
+            address = write_ptr(5 downto 0),
+            data = pe_update_value(i).asBits
+        )
     }
+
     for (i <- 0 until config.thread_num) {
-        gather_pe_group(i).io_update.rd_data := update_reg_group(addr_mapper(i) + gather_pe_group(i).io_update.rd_addr)
+        gather_pe_group(i).io_update.rd_data := update_mem(i).readAsync(gather_pe_group(i).io_update.rd_addr)
     }
 
     io.bundle_busy_table <> bundle_busy_table
@@ -291,6 +297,8 @@ case class PeTop(config:PeConfig) extends Component {
               }
               when(last_update & !bundle_busy & !writeback_busy) {
                   need_update := True
+                  write_ptr   := 0
+                  write_valid := True
                   goto(UPDATE_SUM_AND_SWITCH)
               }
           }
@@ -299,12 +307,15 @@ case class PeTop(config:PeConfig) extends Component {
               when(last_update) {
                   last_update := False
               }
-              when(need_update) {
+              when(need_update && write_ptr =/= 63) {
+                  write_ptr     := write_ptr + 1
+              } elsewhen (need_update && write_ptr === 63) {
                   for (i <- 0 until config.core_num) {
                       update_reg_srst(i) := True
                   }
+                  write_valid := False
                   need_update := False
-                  switch      := !switch
+                  switch := !switch
                   switch_done := True
               } otherwise {
                   for (i <- 0 until config.core_num) {
