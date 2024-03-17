@@ -36,7 +36,6 @@ case class GlobalReg(config: PeConfig) extends Component{
     val ready       = Reg(Bool()) init True
     val reg_full    = Reg(Bool()) init False
 
-
     //-----------------------------------------------------
     // Module Wiring
     //-----------------------------------------------------

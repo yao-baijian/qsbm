@@ -160,17 +160,17 @@ case class PeTop(config:PeConfig) extends Component {
         vertex_reg_group_B(i).io.in_stream.valid := Mux(!switch, Mux(vertex_reg_en(i) === True, io.vertex_stream_top.valid, False), False)
         vertex_reg_group_B(i).io.in_stream.payload := Mux(!switch, Mux(vertex_reg_en(i) === True, io.vertex_stream_top.payload, B(0)), B(0))
 
-        vertex_reg_group_A(i).io_gather_pe.wr_valid := Mux(!switch , gather_pe_group(i).io_vertex_ram.wr_val , False )
-        vertex_reg_group_A(i).io_gather_pe.wr_addr := Mux(!switch , gather_pe_group(i).io_vertex_ram.wr_addr , U(0) )
-        vertex_reg_group_A(i).io_gather_pe.wr_data := Mux(!switch , gather_pe_group(i).io_vertex_ram.wr_data , B(0) )
-        vertex_reg_group_A(i).io_gather_pe.rd_addr := Mux(!switch, Mux(writeback_busy, writeback_pointer ,gather_pe_group(i).io_vertex_ram.rd_addr), U(0))
+        vertex_reg_group_A(i).io.wr_valid := Mux(!switch , gather_pe_group(i).io_vertex_ram.wr_val , False )
+        vertex_reg_group_A(i).io.wr_addr := Mux(!switch , gather_pe_group(i).io_vertex_ram.wr_addr , U(0) )
+        vertex_reg_group_A(i).io.wr_data := Mux(!switch , gather_pe_group(i).io_vertex_ram.wr_data , B(0) )
+        vertex_reg_group_A(i).io.rd_addr := Mux(!switch, Mux(writeback_busy, writeback_pointer ,gather_pe_group(i).io_vertex_ram.rd_addr), U(0))
 
-        vertex_reg_group_B(i).io_gather_pe.wr_valid := Mux(switch, gather_pe_group(i).io_vertex_ram.wr_val, False)
-        vertex_reg_group_B(i).io_gather_pe.wr_addr := Mux(switch, gather_pe_group(i).io_vertex_ram.wr_addr, U(0))
-        vertex_reg_group_B(i).io_gather_pe.wr_data := Mux(switch, gather_pe_group(i).io_vertex_ram.wr_data, B(0))
-        vertex_reg_group_B(i).io_gather_pe.rd_addr := Mux(switch, Mux(writeback_busy, writeback_pointer ,gather_pe_group(i).io_vertex_ram.rd_addr), U(0))
+        vertex_reg_group_B(i).io.wr_valid := Mux(switch, gather_pe_group(i).io_vertex_ram.wr_val, False)
+        vertex_reg_group_B(i).io.wr_addr := Mux(switch, gather_pe_group(i).io_vertex_ram.wr_addr, U(0))
+        vertex_reg_group_B(i).io.wr_data := Mux(switch, gather_pe_group(i).io_vertex_ram.wr_data, B(0))
+        vertex_reg_group_B(i).io.rd_addr := Mux(switch, Mux(writeback_busy, writeback_pointer ,gather_pe_group(i).io_vertex_ram.rd_addr), U(0))
 
-        gather_pe_group(i).io_vertex_ram.rd_data   := Mux(!switch, Mux(writeback_busy, B(0) ,vertex_reg_group_A(i).io_gather_pe.rd_data), Mux(writeback_busy, B(0) ,vertex_reg_group_B(i).io_gather_pe.rd_data))
+        gather_pe_group(i).io_vertex_ram.rd_data   := Mux(!switch, Mux(writeback_busy, B(0) ,vertex_reg_group_A(i).io.rd_data), Mux(writeback_busy, B(0) ,vertex_reg_group_B(i).io.rd_data))
 
         vertex_reg_group_A(i).io.srst   := Mux(!switch, switch_done, False)
         vertex_reg_group_B(i).io.srst   := Mux(switch, switch_done, False)
@@ -201,7 +201,6 @@ case class PeTop(config:PeConfig) extends Component {
     val vertex_reg_upperbound = Reg(UInt(6 bits)) init 7
     val vertex_reg_lowerbound = Reg(UInt(6 bits)) init 0
 
-
     when (switch_done) {
         vertex_reg_upperbound := vertex_reg_upperbound + 8
         vertex_reg_lowerbound := vertex_reg_lowerbound + 8
@@ -224,11 +223,11 @@ case class PeTop(config:PeConfig) extends Component {
         vertex_reg_sel  := vertex_reg_sel + 1
     }
 
-    when(need_update) {
-        for (i <- 0 until config.thread_num * config.matrix_size) {
-            for (j <- 0 until 4) {
-                pe_bundle_wire(i)(j) := pe_core_update_reg(j)(i).asSInt
-            }
+    for (i <- 0 until config.thread_num * config.matrix_size) {
+        for (j <- 0 until 4) {
+            pe_bundle_wire(i)(j) := pe_core_update_reg(j)(i).asSInt
+        }
+        when(need_update) {
             update_reg_group (i) := pe_bundle_wire(i).reduceBalancedTree(_ + _).asBits
         }
     }
@@ -253,7 +252,7 @@ case class PeTop(config:PeConfig) extends Component {
         writeback_pointer   := writeback_pointer + 1
         writeback_valid     := True
         for  (i <- 0 until config.thread_num) {
-            writeback_payload(i) := Mux(switch, vertex_reg_group_B(i).io_gather_pe.rd_data, vertex_reg_group_A(i).io_gather_pe.rd_data)
+            writeback_payload(i) := Mux(switch, vertex_reg_group_B(i).io.rd_data, vertex_reg_group_A(i).io.rd_data)
         }
     } otherwise{
         writeback_pointer   := 0
