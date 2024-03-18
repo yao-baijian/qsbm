@@ -74,7 +74,11 @@ case class PeTop(config:PeConfig) extends Component {
     val vertex_reg_group_A          = new Array[DualModeReg](config.thread_num)
     val vertex_reg_group_B          = new Array[DualModeReg](config.thread_num)
     val update_mem                  = new Array[Mem[Bits]](config.thread_num)
-    val pe_core_update_reg          = Vec(Vec(Reg(Bits(config.data_width bits)),config.matrix_size * config.thread_num), config.core_num)
+    val pe_core_update_reg          = Vec(Vec(Vec(Reg(Bits(config.data_width bits)),config.matrix_size) ,config.thread_num), config.core_num)
+
+//    val pe_write_val_buf            = Vec(Vec(Vec(Reg(Bool()) init False,config.thread_num) ,config.thread_num), config.core_num)
+//    val pe_write_data_buf           = Vec(Vec(Vec(Reg(Bits(config.data_width bits)) init 0, config.thread_num) ,config.thread_num), config.core_num)
+
 //    val update_reg_group            = Vec(Reg(Bits(config.data_width bits)),config.matrix_size * config.thread_num)
     val pe_bundle_wire              = Vec(Vec(SInt(config.data_width bits),config.core_num), config.thread_num)
     val pe_update_value             = Vec(SInt(config.data_width bits), config.thread_num)
@@ -124,26 +128,26 @@ case class PeTop(config:PeConfig) extends Component {
             pecore_array(i).io_fifo.pe_tag(j) <> high_to_low_converter.io.out_tag_stream(i)(j)
             for (k <- 0 until config.matrix_size) {
                 when(update_reg_srst(i)) {
-                    pe_core_update_reg(i)(j * config.matrix_size + k) := 0
+                    pe_core_update_reg(i)(j)(k) := 0
                 } elsewhen (pecore_array(i).io_update.wr_valid(0) && pecore_array(i).io_update.wr_addr(0) === j * config.matrix_size + k) {
-                    pe_core_update_reg(i)(j * config.matrix_size + k) := pecore_array(i).io_update.wr_data(0)
+                    pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(0)
                 } elsewhen (pecore_array(i).io_update.wr_valid(1) && pecore_array(i).io_update.wr_addr(1) === j * config.matrix_size + k) {
-                    pe_core_update_reg(i)(j * config.matrix_size + k) := pecore_array(i).io_update.wr_data(1)
+                    pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(1)
                 } elsewhen (pecore_array(i).io_update.wr_valid(2) && pecore_array(i).io_update.wr_addr(2) === j * config.matrix_size + k) {
-                    pe_core_update_reg(i)(j * config.matrix_size + k) := pecore_array(i).io_update.wr_data(2)
+                    pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(2)
                 } elsewhen (pecore_array(i).io_update.wr_valid(3) && pecore_array(i).io_update.wr_addr(3) === j * config.matrix_size + k) {
-                    pe_core_update_reg(i)(j * config.matrix_size + k) := pecore_array(i).io_update.wr_data(3)
+                    pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(3)
                 } elsewhen (pecore_array(i).io_update.wr_valid(4) && pecore_array(i).io_update.wr_addr(4) === j * config.matrix_size + k) {
-                    pe_core_update_reg(i)(j * config.matrix_size + k) := pecore_array(i).io_update.wr_data(4)
+                    pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(4)
                 } elsewhen (pecore_array(i).io_update.wr_valid(5) && pecore_array(i).io_update.wr_addr(5) === j * config.matrix_size + k) {
-                    pe_core_update_reg(i)(j * config.matrix_size + k) := pecore_array(i).io_update.wr_data(5)
+                    pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(5)
                 } elsewhen (pecore_array(i).io_update.wr_valid(6) && pecore_array(i).io_update.wr_addr(6) === j * config.matrix_size + k) {
-                    pe_core_update_reg(i)(j * config.matrix_size + k) := pecore_array(i).io_update.wr_data(0)
+                    pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(6)
                 } elsewhen (pecore_array(i).io_update.wr_valid(7) && pecore_array(i).io_update.wr_addr(7) === j * config.matrix_size + k) {
-                    pe_core_update_reg(i)(j * config.matrix_size + k) := pecore_array(i).io_update.wr_data(7)
+                    pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(7)
                 }
                 when (pecore_array(i).io_update.rd_addr(j) === j * config.matrix_size + k) {
-                    pecore_array(i).io_update.rd_data(j) := pe_core_update_reg(i)(j * config.matrix_size + k)
+                    pecore_array(i).io_update.rd_data(j) := pe_core_update_reg(i)(j)(k)
                 } otherwise {
                     pecore_array(i).io_update.rd_data(j) := 0
                 }
@@ -224,12 +228,12 @@ case class PeTop(config:PeConfig) extends Component {
         vertex_reg_sel  := vertex_reg_sel + 1
     }
 
-    val write_ptr = Reg(UInt(9 bits)) init 0
+    val write_ptr = Reg(UInt(6 bits)) init 0
     val write_valid = Reg(Bool()) init False
 
     for (i <- 0 until config.thread_num) {
         for (j <- 0 until 4) {
-            pe_bundle_wire(i)(j) := pe_core_update_reg(j)((write_ptr + i*64)(8 downto 0)).asSInt
+            pe_bundle_wire(i)(j) := pe_core_update_reg(j)(i)(write_ptr).asSInt
         }
         pe_update_value(i) := pe_bundle_wire(i).reduceBalancedTree(_ + _)
     }
@@ -237,7 +241,7 @@ case class PeTop(config:PeConfig) extends Component {
     for (i <- 0 until config.thread_num) {
         update_mem(i).write(
             enable = write_valid,
-            address = write_ptr(5 downto 0),
+            address = write_ptr,
             data = pe_update_value(i).asBits
         )
     }
