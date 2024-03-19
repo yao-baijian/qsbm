@@ -11,19 +11,16 @@ case class DualModeReg(config: PeConfig) extends Component{
     val io = new Bundle{
         val srst        = in Bool()
         val in_stream   = slave Stream(Bits(config.axi_extend_width bits))
-        val wr_valid = in Bool()
-        val wr_addr = in UInt (config.addr_width bits)
-        val wr_data = in Bits (config.data_width bits)
-        val rd_addr = in UInt (config.addr_width bits)
-        val rd_data = out Bits (config.data_width bits)
+        val rd_addr     = in UInt (1 bits)
+        val rd_data     = out Bits (config.axi_extend_width bits)
     }
 
     //-----------------------------------------------------
     // Module Declaration
     //-----------------------------------------------------
 
-    val vertex_reg  = Vec(Reg(Bits(config.data_width bits)) init 0, config.matrix_size)
-    val wr_pointer  = Reg(UInt(config.vertex_read_pointer_size bits)) init 0
+    val vertex_mem  = Mem(Bits(config.axi_extend_width bits), 2)
+    val wr_pointer  = Reg(UInt(1 bits)) init 0
     val ready       = Reg(Bool()) init True
 
     //-----------------------------------------------------
@@ -32,23 +29,23 @@ case class DualModeReg(config: PeConfig) extends Component{
 
     io.in_stream.ready := ready
 
-    when(wr_pointer === config.vertex_read_cnt_max) {
+    when(wr_pointer === 1) {
         ready := False
     } elsewhen (io.srst) {
         ready := True
     }
 
     when(io.in_stream.valid && io.in_stream.ready) {
-        for (i <- 0 until config.vertex_write_slice) {
-            vertex_reg((wr_pointer * config.vertex_write_slice) (5 downto 0) + i) := io.in_stream.payload(config.data_width * (i + 1) - 1 downto config.data_width * i)
-        }
         wr_pointer := wr_pointer + 1
     } otherwise {
         wr_pointer := 0
     }
 
-    when (io.wr_valid) {
-        vertex_reg(io.wr_addr) := io.wr_data
-    }
-    io.rd_data := vertex_reg(io.rd_addr)
+    vertex_mem.write(
+        enable = io.in_stream.valid && io.in_stream.ready,
+        address = wr_pointer,
+        data = io.in_stream.payload
+    )
+
+    io.rd_data := vertex_mem.readAsync(io.rd_addr)
 }
