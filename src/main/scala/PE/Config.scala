@@ -37,6 +37,8 @@ object Config {
     val xy_width:           Int = 8
     val haz_table_width:    Int = 4
 
+    val spmm_prec:          Int = 31
+
     def test(): Unit = {
         println(addr_width)
         println(vertex_read_cnt_max)
@@ -78,7 +80,8 @@ case class PeConfig(axi_width:          Int = Config.axi_width,
                     quant_precision_8:  Int = Config.quant_precision_8,
                     quant_precision_32: Int = Config.quant_precision_32,
                     xy_width:           Int = Config.xy_width,
-                    haz_table_width:    Int = Config.haz_table_width)
+                    haz_table_width:    Int = Config.haz_table_width,
+                    spmm_prec:          Int = Config.spmm_prec)
 
 
 

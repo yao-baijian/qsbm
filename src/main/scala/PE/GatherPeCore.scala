@@ -8,22 +8,14 @@ import scala.language.postfixOps
 
 case class GatherPeCore(config:PeConfig) extends Component {
   
-    val io_state = new Bundle {
-        val switch_done     = in Bool()
+    val io = new Bundle {
+        val swap_done     = in Bool()
         val gather_pe_done  = out Bool()
-        val gather_pe_busy  = out Bool()
         val writeback_valid = out Bool()
         val writeback_payload = out Bits(config.axi_extend_width bits)
-    }
-    //  TODO address width is not fit with gather pe
-    val io_update = new Bundle {
-        val rd_addr     = out UInt (4 bits)
-        val rd_data     = in Vec(Bits (31 bits), 32)
-    }
-
-    val io_vertex = new Bundle {
-        val rd_addr     = out UInt (4 bits)
-        val rd_data     = in  Bits (config.axi_extend_width bits)
+        val rd_addr = out UInt (4 bits)
+        val spmm_rd_data = in Vec(Bits(31 bits), 32)
+        val vertex_rd_data     = in  Bits (config.axi_extend_width bits)
     }
 
     val alpha               =  S(config.alpha, 4 bits)
@@ -33,17 +25,16 @@ case class GatherPeCore(config:PeConfig) extends Component {
     val negetive_boundary   =  S(config.negetive_boundary, 4 bits)
 
     val h1_valid            = Reg(Bool()) init False
-    val update_ram_rd_addr_h1 = Reg(UInt (4 bits))      init 0
-    val vertex_ram_rd_addr_h1 = Reg(UInt (4 bits))      init 0
+    val spmm_vertex_rd_addr_h1 = Reg(UInt (4 bits))      init 0
 
     val h2_valid            = Reg(Bool()) init False
     val spmm_h2             = Vec(Reg(SInt(31 bits)) init 0, 32)
     val y_old_h2            = Vec(Reg(SInt(config.xy_width bits)) init 0, 32)
     val x_old_h2            = Vec(Reg(SInt(config.xy_width bits)) init 0, 32)
-    val y_new_h2            = Vec(SInt(32 bits), 32)
+    val y_new_h2            = Vec(SInt(44 bits), 32)
 
     val h3_valid            = Reg(Bool()) init False
-    val y_new_h3            = Vec(Reg(SInt(config.quant_precision_32 bits)) init 0, 32)
+    val y_new_h3            = Vec(Reg(SInt(44 bits)) init 0, 32)
     val x_old_h3            = Vec(Reg(SInt(config.xy_width bits)) init 0, 32)
     val x_new_h3            = Vec(SInt(config.quant_precision_32 bits), 32)
     val x_new_cliped_h3     = Vec(SInt(config.xy_width bits), 32)
@@ -55,8 +46,7 @@ case class GatherPeCore(config:PeConfig) extends Component {
     val gather_pe_done      = Reg(Bool())                               init True
     val gather_pe_busy      = Reg(Bool())                               init False
 
-    io_state.gather_pe_done := gather_pe_done
-    io_state.gather_pe_busy := gather_pe_busy
+    io.gather_pe_done := gather_pe_done
 
     val gather_pe_fsm = new StateMachine {
 
@@ -65,7 +55,7 @@ case class GatherPeCore(config:PeConfig) extends Component {
 
         IDLE
           .whenIsActive {
-              when(io_state.switch_done) {
+              when(io.swap_done) {
                   gather_pe_done := False
                   gather_pe_busy := True
                   h1_valid       := True
@@ -74,7 +64,7 @@ case class GatherPeCore(config:PeConfig) extends Component {
           }
         OPERATE
           .whenIsActive {
-            when (update_ram_rd_addr_h1 === 15) {
+            when (spmm_vertex_rd_addr_h1 === 15) {
                 gather_pe_busy := False
                 h1_valid       := False
             }
@@ -90,15 +80,12 @@ case class GatherPeCore(config:PeConfig) extends Component {
 //-----------------------------------------------------------
 
     when (h1_valid) {
-        update_ram_rd_addr_h1 := update_ram_rd_addr_h1 + 1
-        vertex_ram_rd_addr_h1 := vertex_ram_rd_addr_h1 + 1
+        spmm_vertex_rd_addr_h1 := spmm_vertex_rd_addr_h1 + 1
     } otherwise {
-        update_ram_rd_addr_h1 := 0
-        vertex_ram_rd_addr_h1 := 0
+        spmm_vertex_rd_addr_h1 := 0
     }
 
-    io_update.rd_addr       := update_ram_rd_addr_h1
-    io_vertex.rd_addr       := vertex_ram_rd_addr_h1
+    io.rd_addr       := spmm_vertex_rd_addr_h1
 
 // -----------------------------------------------------------
 // pipeline h2: y_new = y_old + ((-1 + alpha) *x_old + beta* updated value) * dt
@@ -106,9 +93,9 @@ case class GatherPeCore(config:PeConfig) extends Component {
 
     when (h1_valid) {
         for (i <- 0 until 32) {
-            spmm_h2(i)  := io_update.rd_data(i).asSInt
-            x_old_h2(i) := io_vertex.rd_data((i+1)*16-1 downto (i+1)*16-8).asSInt
-            y_old_h2(i) := io_vertex.rd_data((i+1)*16-9 downto i*16).asSInt
+            spmm_h2(i)  := io.spmm_rd_data(i).asSInt
+            x_old_h2(i) := io.vertex_rd_data((i+1)*16-1 downto (i+1)*16-8).asSInt
+            y_old_h2(i) := io.vertex_rd_data((i+1)*16-9 downto i*16).asSInt
         }
         h2_valid := True
     } otherwise {
@@ -120,7 +107,7 @@ case class GatherPeCore(config:PeConfig) extends Component {
         h2_valid := False
     }
     for (i <- 0 until 32) {
-        y_new_h2(i) := (((-32 + alpha) * x_old_h2 (i)+ beta * spmm_h2(i))* xi_dt + y_old_h2(i))(31 downto 0)
+        y_new_h2(i) := (((-32 + alpha) * x_old_h2 (i) + beta * spmm_h2(i))* xi_dt + y_old_h2(i))
     }
 
     // -----------------------------------------------------------
@@ -161,8 +148,8 @@ case class GatherPeCore(config:PeConfig) extends Component {
         vertex_wb_data_h4       := 0
     }
 
-    io_state.writeback_payload  := vertex_wb_data_h4
-    io_state.writeback_valid    := h4_valid
+    io.writeback_payload  := vertex_wb_data_h4
+    io.writeback_valid    := h4_valid
 
 }
 
