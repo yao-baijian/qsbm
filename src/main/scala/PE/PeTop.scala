@@ -48,8 +48,7 @@ case class PeTop(config:PeConfig) extends Component {
 
     val swap_done               = Reg(Bool())                       init False
     val swap                    = Reg(Bool())                       init True
-    val vertex_reg_en           = Reg(Bits(config.thread_num bits)) init 1
-    val vertex_reg_cnt          = Reg(UInt(6 bits))          init 0
+
     val bundle_busy             = Bool()
     val bundle_busy_table       = Vec(Bool(), config.core_num)
     val last_update             = Reg(Bool())                       init False
@@ -67,8 +66,8 @@ case class PeTop(config:PeConfig) extends Component {
     val high_to_low_converter       = HighToLowConvert(Config)
     val gather_pe_core              = GatherPeCore(Config)
     val pecore_array                = new Array[PeCore](config.core_num)
-    val vertex_reg_group_A          = new Array[DualModeReg](config.thread_num)
-    val vertex_reg_group_B          = new Array[DualModeReg](config.thread_num)
+    val vertex_reg_A                = DualModeReg(Config)
+    val vertex_reg_B                = DualModeReg(Config)
     val update_mem                  = new Array[Mem[Bits]](config.thread_num)
     val pe_core_update_reg          = Vec(Vec(Vec(Reg(Bits(config.spmm_prec bits)) init 0, config.matrix_size), config.thread_num), config.core_num)
     val pe_bundle_wire              = Vec(Vec(SInt(config.spmm_prec bits),config.core_num), config.thread_num)
@@ -81,17 +80,11 @@ case class PeTop(config:PeConfig) extends Component {
     }
 
     for (i <- 0 until config.thread_num) {
-        update_mem(i) = Mem(Bits(31 bits), wordCount = config.matrix_size)
-        vertex_reg_group_A(i) = DualModeReg(Config)
-        vertex_reg_group_A(i).setName("vertex_regA_" + i.toString)
-        vertex_reg_group_B(i) = DualModeReg(Config)
-        vertex_reg_group_B(i).setName("vertex_regB_" + i.toString)
+        update_mem(i) = Mem(Bits(config.spmm_prec bits), wordCount = config.matrix_size)
     }
     //-----------------------------------------------------
     // Module Wiring
     //-----------------------------------------------------
-
-//    val pe_core_write_vec = Vec(Vec(Vec(UInt(8 bits), 64), 8 ), 4)
 
     for (i <- 0 until config.core_num) {
         pecore_array(i).io_global_reg.vertex_stream << io.vertex_stream(i)
@@ -113,28 +106,6 @@ case class PeTop(config:PeConfig) extends Component {
         for (j <- 0 until config.thread_num) {
             pecore_array(i).io_fifo.pe_fifo(j) <> high_to_low_converter.io.out_edge_stream(i)(j)
             pecore_array(i).io_fifo.pe_tag(j) <> high_to_low_converter.io.out_tag_stream(i)(j)
-//            pecore_array(i).io_update.rd_data(j) := pe_core_update_reg(i)(pecore_array(i).io_update.rd_addr(j)(8 downto 6))(pecore_array(i).io_update.rd_addr(j)(5 downto 0))
-//            pe_core_update_reg(i)(pecore_array(i).io_update.wr_addr(j)) := pecore_array(i).io_update.wr_data(j)
-            // TODO reg reset signal
-//            for (k <- 0 until config.matrix_size) {
-//                for (l <- 0 until config.thread_num) {
-//                    when (update_reg_srst(i)) {
-//                        pe_core_write_vec(i)(j)(k)(l) := True
-//                    } otherwise {
-//                        pe_core_write_vec(i)(j)(k)(l) := (pecore_array(i).io_update.wr_addr(l) === j * config.matrix_size + k) && pecore_array(i).io_update.wr_valid(i)
-//                    }
-//                }
-
-//            switch(pecore_array(i).io_update.wr_addr(0)) (
-//                for (index_h <- 0 to 7) {
-//                    for (index_l  <- 0 to 64)
-//                    is (index_h ## index_l) {
-//                        pe_core_update_reg(i)()() :=
-//                    }
-//                }
-//            )
-
-
             for (k <- 0 until config.matrix_size) {
                 when(update_reg_srst(i)) {
                     pe_core_update_reg(i)(j)(k) := 0
@@ -165,64 +136,23 @@ case class PeTop(config:PeConfig) extends Component {
         }
     }
     gather_pe_core.io.swap_done := swap_done
-    for (i <- 0 until config.thread_num) {
-        vertex_reg_group_A(i).io.in_stream.valid    := Mux(swap, Mux(vertex_reg_en(i) === True, io.vertex_stream_top.valid,  False) , False)
-        vertex_reg_group_A(i).io.in_stream.payload  := Mux(swap, Mux(vertex_reg_en(i)=== True, io.vertex_stream_top.payload, B(0)), B(0))
-        vertex_reg_group_B(i).io.in_stream.valid    := Mux(!swap, Mux(vertex_reg_en(i) === True, io.vertex_stream_top.valid, False), False)
-        vertex_reg_group_B(i).io.in_stream.payload  := Mux(!swap, Mux(vertex_reg_en(i) === True, io.vertex_stream_top.payload, B(0)), B(0))
-        vertex_reg_group_A(i).io.srst               := Mux(!swap, swap_done, False)
-        vertex_reg_group_B(i).io.srst               := Mux(swap, swap_done, False)
-        vertex_reg_group_A(i).io.rd_addr            := gather_pe_core.io.rd_addr(0).asUInt
-        vertex_reg_group_B(i).io.rd_addr            := gather_pe_core.io.rd_addr(0).asUInt
-
-        when (!swap && gather_pe_core.io.rd_addr(3 downto 1) === i ) {
-            gather_pe_core.io.vertex_rd_data := vertex_reg_group_A(i).io.rd_data
-        } elsewhen(swap && gather_pe_core.io.rd_addr(3 downto 1) === i ) {
-            gather_pe_core.io.vertex_rd_data := vertex_reg_group_B(i).io.rd_data
-        } otherwise {
-            gather_pe_core.io.vertex_rd_data := 0
-        }
-    }
-
+    vertex_reg_A.io.in_stream.valid    := Mux(swap, io.vertex_stream_top.valid , False)
+    vertex_reg_A.io.in_stream.payload  := Mux(swap, io.vertex_stream_top.payload,  B(0))
+    vertex_reg_B.io.in_stream.valid    := Mux(!swap, io.vertex_stream_top.valid, False)
+    vertex_reg_B.io.in_stream.payload  := Mux(!swap, io.vertex_stream_top.payload, B(0))
+    vertex_reg_A.io.srst                := Mux(!swap, swap_done, False)
+    vertex_reg_B.io.srst                := Mux(swap, swap_done, False)
+    vertex_reg_A.io.rd_addr             := gather_pe_core.io.rd_addr
+    vertex_reg_B.io.rd_addr             := gather_pe_core.io.rd_addr
+    vertex_reg_A.io.swap_done           := swap_done
+    vertex_reg_B.io.swap_done           := swap_done
+    gather_pe_core.io.vertex_rd_data    := Mux(!swap, vertex_reg_A.io.rd_data, vertex_reg_B.io.rd_data)
+    io.vertex_stream_top.ready := Mux(swap, vertex_reg_A.io.in_stream.ready,  vertex_reg_B.io.in_stream.ready)
     gather_pe_busy := !gather_pe_core.io.gather_pe_done
-
-    val rdy_list_B = Bits(config.thread_num bits)
-    val rdy_list_A = Bits(config.thread_num bits)
-
-    for (i <- 0 until config.thread_num) {
-        rdy_list_A(i) := vertex_reg_en(i) & vertex_reg_group_A(i).io.in_stream.ready
-        rdy_list_B(i) := vertex_reg_en(i) & vertex_reg_group_B(i).io.in_stream.ready
-    }
-
-    val vertex_reg_sel        = Reg(UInt(3 bits)) init 0
-    io.vertex_stream_top.ready := Mux(swap, rdy_list_A(vertex_reg_sel),  rdy_list_B(vertex_reg_sel))
 
     //-----------------------------------------------------
     // Other Logic
     //-----------------------------------------------------
-
-//    TODO this only support size 64 * 32 = 2048
-    val vertex_reg_lowerbound = Reg(UInt(6 bits)) init 0
-
-    when (swap_done) {
-        vertex_reg_lowerbound := vertex_reg_lowerbound + 8
-    } elsewhen (io.srst) {
-        vertex_reg_lowerbound := 0
-    }
-
-    when(io.vertex_stream_top.valid && io.vertex_stream_top.payload === 0) {
-        vertex_reg_cnt  := vertex_reg_cnt + 1
-    } elsewhen (swap_done || io.srst) {
-        vertex_reg_cnt  := 0
-    }
-
-    when (vertex_reg_cnt === vertex_reg_lowerbound) {
-        vertex_reg_en   := 0x00000001
-        vertex_reg_sel  := 0
-    } elsewhen (io.vertex_stream_top.valid && io.vertex_stream_top.payload === 0 && vertex_reg_en =/= 0) {
-        vertex_reg_en   := vertex_reg_en |<< 1
-        vertex_reg_sel  := vertex_reg_sel + 1
-    }
 
     val write_ptr = Reg(UInt(6 bits)) init 0
     val write_valid = Reg(Bool()) init False
@@ -255,7 +185,6 @@ case class PeTop(config:PeConfig) extends Component {
 
     io.writeback_payload    := gather_pe_core.io.writeback_payload
     io.writeback_valid      := gather_pe_core.io.writeback_valid
-
     io.bundle_busy_table <> bundle_busy_table
     bundle_busy := bundle_busy_table.orR
 

@@ -9,13 +9,13 @@ import scala.language.postfixOps
 case class GatherPeCore(config:PeConfig) extends Component {
   
     val io = new Bundle {
-        val swap_done     = in Bool()
-        val gather_pe_done  = out Bool()
-        val writeback_valid = out Bool()
-        val writeback_payload = out Bits(config.axi_extend_width bits)
-        val rd_addr = out UInt (4 bits)
-        val spmm_rd_data = in Vec(Bits(31 bits), 32)
-        val vertex_rd_data     = in  Bits (config.axi_extend_width bits)
+        val swap_done           = in Bool()
+        val gather_pe_done      = out Bool()
+        val writeback_valid     = out Bool()
+        val writeback_payload   = out Bits(config.axi_extend_width bits)
+        val rd_addr             = out UInt (4 bits)
+        val spmm_rd_data        = in Vec(Bits(31 bits), 32)
+        val vertex_rd_data      = in  Bits (config.axi_extend_width bits)
     }
 
     val alpha               =  S(config.alpha, 4 bits)
