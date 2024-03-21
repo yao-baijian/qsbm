@@ -46,8 +46,8 @@ case class PeTop(config:PeConfig) extends Component {
     // Val declaration
     //-----------------------------------------------------
 
-    val switch_done             = Reg(Bool())                       init False
-    val switch                  = Reg(Bool())                       init True
+    val swap_done             = Reg(Bool())                       init False
+    val swap                  = Reg(Bool())                       init True
     val vertex_reg_en           = Reg(Bits(config.thread_num bits)) init 1
     val vertex_reg_cnt          = Reg(UInt(6 bits))          init 0
     val bundle_busy             = Bool()
@@ -90,6 +90,9 @@ case class PeTop(config:PeConfig) extends Component {
     //-----------------------------------------------------
     // Module Wiring
     //-----------------------------------------------------
+
+    val pe_core_write_vec = Vec(Vec(Vec(UInt(8 bits), 64), 8 ), 4)
+
     for (i <- 0 until config.core_num) {
         pecore_array(i).io_global_reg.vertex_stream << io.vertex_stream(i)
         pecore_array(i).io_state.last_update <> io.last_update(i)
@@ -103,55 +106,71 @@ case class PeTop(config:PeConfig) extends Component {
         }
 
         io.pe_rdy_table(i) := pe_rdy_table_all(i).orR
-        pecore_array(i).io_state.switch_done <> switch_done
+        pecore_array(i).io_state.switch_done <> swap_done
         all_zero(i) := all_zero_table(i).andR
         pecore_array(i).io_state.all_zero := all_zero(i)
 
         for (j <- 0 until config.thread_num) {
             pecore_array(i).io_fifo.pe_fifo(j) <> high_to_low_converter.io.out_edge_stream(i)(j)
             pecore_array(i).io_fifo.pe_tag(j) <> high_to_low_converter.io.out_tag_stream(i)(j)
+            pecore_array(i).io_update.rd_data(j) := pe_core_update_reg(i).read(pecore_array(i).io_update.rd_addr(j)(8 downto 6))(pecore_array(i).io_update.rd_addr(j)(5 downto 0))
+
             for (k <- 0 until config.matrix_size) {
-                when(update_reg_srst(i)) {
-                    pe_core_update_reg(i)(j)(k) := 0
-                } elsewhen (pecore_array(i).io_update.wr_valid(0) && pecore_array(i).io_update.wr_addr(0) === j * config.matrix_size + k) {
-                    pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(0)
-                } elsewhen (pecore_array(i).io_update.wr_valid(1) && pecore_array(i).io_update.wr_addr(1) === j * config.matrix_size + k) {
-                    pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(1)
-                } elsewhen (pecore_array(i).io_update.wr_valid(2) && pecore_array(i).io_update.wr_addr(2) === j * config.matrix_size + k) {
-                    pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(2)
-                } elsewhen (pecore_array(i).io_update.wr_valid(3) && pecore_array(i).io_update.wr_addr(3) === j * config.matrix_size + k) {
-                    pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(3)
-                } elsewhen (pecore_array(i).io_update.wr_valid(4) && pecore_array(i).io_update.wr_addr(4) === j * config.matrix_size + k) {
-                    pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(4)
-                } elsewhen (pecore_array(i).io_update.wr_valid(5) && pecore_array(i).io_update.wr_addr(5) === j * config.matrix_size + k) {
-                    pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(5)
-                } elsewhen (pecore_array(i).io_update.wr_valid(6) && pecore_array(i).io_update.wr_addr(6) === j * config.matrix_size + k) {
-                    pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(6)
-                } elsewhen (pecore_array(i).io_update.wr_valid(7) && pecore_array(i).io_update.wr_addr(7) === j * config.matrix_size + k) {
-                    pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(7)
+                for (l <- 0 until config.thread_num) {
+                    when (update_reg_srst(i)) {
+                        pe_core_write_vec(i)(j)(k)(l) := True
+                    } otherwise {
+                        pe_core_write_vec(i)(j)(k)(l) := (pecore_array(i).io_update.wr_addr(l) === j * config.matrix_size + k) && pecore_array(i).io_update.wr_valid(i)
+                    }
                 }
-                when (pecore_array(i).io_update.rd_addr(j) === j * config.matrix_size + k) {
-                    pecore_array(i).io_update.rd_data(j) := pe_core_update_reg(i)(j)(k)
-                } otherwise {
-                    pecore_array(i).io_update.rd_data(j) := 0
+
+                switch(pe_core_write_vec(i)(j)(k)) {
+                    is(1) (
+                        pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(0).asBits
+                    )
+                    is(2)(
+                        pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(1).asBits
+                    )
+                    is(4)(
+                        pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(2).asBits
+                    )
+                    is(8)(
+                        pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(3).asBits
+                    )
+                    is(16)(
+                        pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(4).asBits
+                    )
+                    is(32)(
+                        pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(5).asBits
+                    )
+                    is(64)(
+                        pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(6).asBits
+                    )
+                    is(128)(
+                        pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(7).asBits
+                    )
+                    is(255)(
+                        pe_core_update_reg(i)(j)(k) := 0
+                    )
+                    default(pe_core_update_reg(i)(j)(k) := pe_core_update_reg(i)(j)(k))
                 }
             }
         }
     }
-    gather_pe_core.io_state.switch_done := switch_done
+    gather_pe_core.io_state.switch_done := swap_done
     for (i <- 0 until config.thread_num) {
-        vertex_reg_group_A(i).io.in_stream.valid    := Mux(switch, Mux(vertex_reg_en(i) === True, io.vertex_stream_top.valid,  False) , False)
-        vertex_reg_group_A(i).io.in_stream.payload  := Mux(switch, Mux(vertex_reg_en(i)=== True, io.vertex_stream_top.payload, B(0)), B(0))
-        vertex_reg_group_B(i).io.in_stream.valid    := Mux(!switch, Mux(vertex_reg_en(i) === True, io.vertex_stream_top.valid, False), False)
-        vertex_reg_group_B(i).io.in_stream.payload  := Mux(!switch, Mux(vertex_reg_en(i) === True, io.vertex_stream_top.payload, B(0)), B(0))
-        vertex_reg_group_A(i).io.srst               := Mux(!switch, switch_done, False)
-        vertex_reg_group_B(i).io.srst               := Mux(switch, switch_done, False)
+        vertex_reg_group_A(i).io.in_stream.valid    := Mux(swap, Mux(vertex_reg_en(i) === True, io.vertex_stream_top.valid,  False) , False)
+        vertex_reg_group_A(i).io.in_stream.payload  := Mux(swap, Mux(vertex_reg_en(i)=== True, io.vertex_stream_top.payload, B(0)), B(0))
+        vertex_reg_group_B(i).io.in_stream.valid    := Mux(!swap, Mux(vertex_reg_en(i) === True, io.vertex_stream_top.valid, False), False)
+        vertex_reg_group_B(i).io.in_stream.payload  := Mux(!swap, Mux(vertex_reg_en(i) === True, io.vertex_stream_top.payload, B(0)), B(0))
+        vertex_reg_group_A(i).io.srst               := Mux(!swap, swap_done, False)
+        vertex_reg_group_B(i).io.srst               := Mux(swap, swap_done, False)
         vertex_reg_group_A(i).io.rd_addr            := gather_pe_core.io_vertex.rd_addr(0).asUInt
         vertex_reg_group_B(i).io.rd_addr            := gather_pe_core.io_vertex.rd_addr(0).asUInt
 
-        when (!switch && gather_pe_core.io_vertex.rd_addr(3 downto 1) === i ) {
+        when (!swap && gather_pe_core.io_vertex.rd_addr(3 downto 1) === i ) {
             gather_pe_core.io_vertex.rd_data := vertex_reg_group_A(i).io.rd_data
-        } elsewhen(switch && gather_pe_core.io_vertex.rd_addr(3 downto 1) === i ) {
+        } elsewhen(swap && gather_pe_core.io_vertex.rd_addr(3 downto 1) === i ) {
             gather_pe_core.io_vertex.rd_data := vertex_reg_group_B(i).io.rd_data
         } otherwise {
             gather_pe_core.io_vertex.rd_data := 0
@@ -169,7 +188,7 @@ case class PeTop(config:PeConfig) extends Component {
     }
 
     val vertex_reg_sel        = Reg(UInt(3 bits)) init 0
-    io.vertex_stream_top.ready := Mux(switch, rdy_list_A(vertex_reg_sel),  rdy_list_B(vertex_reg_sel))
+    io.vertex_stream_top.ready := Mux(swap, rdy_list_A(vertex_reg_sel),  rdy_list_B(vertex_reg_sel))
 
     //-----------------------------------------------------
     // Other Logic
@@ -179,7 +198,7 @@ case class PeTop(config:PeConfig) extends Component {
     val vertex_reg_upperbound = Reg(UInt(6 bits)) init 7
     val vertex_reg_lowerbound = Reg(UInt(6 bits)) init 0
 
-    when (switch_done) {
+    when (swap_done) {
         vertex_reg_upperbound := vertex_reg_upperbound + 8
         vertex_reg_lowerbound := vertex_reg_lowerbound + 8
     } elsewhen (io.srst) {
@@ -189,7 +208,7 @@ case class PeTop(config:PeConfig) extends Component {
 
     when(io.vertex_stream_top.valid && io.vertex_stream_top.payload === 0) {
         vertex_reg_cnt  := vertex_reg_cnt + 1
-    } elsewhen (switch_done || io.srst) {
+    } elsewhen (swap_done || io.srst) {
         vertex_reg_cnt  := 0
     }
 
@@ -278,13 +297,13 @@ case class PeTop(config:PeConfig) extends Component {
                   }
                   write_valid := False
                   need_update := False
-                  switch := !switch
-                  switch_done := True
+                  swap := !swap
+                  swap_done := True
               } otherwise {
                   for (i <- 0 until config.core_num) {
                       update_reg_srst(i) := False
                   }
-                  switch_done := False
+                  swap_done := False
                   when (bundle_busy) {
                       goto(OPERATE)
                   } otherwise {

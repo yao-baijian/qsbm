@@ -107,8 +107,8 @@ case class GatherPeCore(config:PeConfig) extends Component {
     when (h1_valid) {
         for (i <- 0 until 32) {
             spmm_h2(i)  := io_update.rd_data(i).asSInt
-            x_old_h2(i) := io_vertex.rd_data(15 downto 8).asSInt
-            y_old_h2(i) := io_vertex.rd_data(7 downto 0).asSInt
+            x_old_h2(i) := io_vertex.rd_data((i+1)*16-1 downto (i+1)*16-8).asSInt
+            y_old_h2(i) := io_vertex.rd_data((i+1)*16-9 downto i*16).asSInt
         }
         h2_valid := True
     } otherwise {
