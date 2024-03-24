@@ -343,11 +343,11 @@ class SboomTopTest extends AnyFunSuite {
       dut.clockDomain.forkStimulus(100) //产生周期为10个单位的时钟
 
       //axi4 port1 for vex&edges
-      val axiMemSimConfig1 = AxiMemorySimConfig()
+      val axiMemSimConfig1 = AxiMemorySimConfig(maxOutstandingReads = 1,maxOutstandingWrites = 1)
       val axiMemSimModel1 = AxiMemorySim(compiled.dut.io.topAxiMemControlPort, compiled.dut.clockDomain, axiMemSimConfig1)
 
       // axi4 port2 for indices
-      val axiMemSimConfig2 = AxiMemorySimConfig()
+      val axiMemSimConfig2 = AxiMemorySimConfig(maxOutstandingReads = 1,maxOutstandingWrites = 1)
       val axiMemSimModel2 = AxiMemorySim(compiled.dut.io.topAxiEdgeIndexPort, compiled.dut.clockDomain, axiMemSimConfig2)
 
       axiMemSimModel1.start()
