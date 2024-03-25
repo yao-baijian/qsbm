@@ -29,13 +29,13 @@ class SboomTopTest extends AnyFunSuite {
   val simConfig = SpinalSimConfig(_spinalConfig = MySpinalConfig)
   //val xSimConfig = simConfig.copy(_workspacePath = "xSimWorkspace".withXSim.withXSimSourcesPaths(xciSource)Paths,ArrayBuffer(""))
 
-  val compiled= simConfig
-    .withWave
-    .withXilinxDevice("xczu7ev-ffvc1156-2-e")
-    .withXSim
-    .compile(SboomTop())
+//  val compiled= simConfig
+//    .withWave
+//    .withXilinxDevice("xczu7ev-ffvc1156-2-e")
+//    .withXSim
+//    .compile(SboomTop())
 
-//  val compiled= simConfig.withWave.compile(SboomTop())
+  val compiled= simConfig.withWave.compile(SboomTop())
 //  val compiled= xSimConfig.withWave.compile(SboomTop())
 //  val axiMemSimConfig = AxiMemorySimConfig()
 //  val axiMemSimModel = AxiMemorySim(compiled.dut.io.topAxiMemControlPort, compiled.dut.clockDomain, axiMemSimConfig)
@@ -72,7 +72,7 @@ class SboomTopTest extends AnyFunSuite {
     val firFields = firstLine.split(' ')
     val width = scala.math.ceil(parseUnsignedLong(firFields(0)).toDouble / 64).toInt
     val arrayWidth = width
-    println("arrayWidth = ",arrayWidth)
+//    println("arrayWidth = ",arrayWidth)
     //put a queue inside each block
     val blocks = Array.ofDim[mutable.Queue[ArrayBuffer[Byte]]](arrayWidth, arrayWidth)
     for (row <- 0 until arrayWidth) {
@@ -112,6 +112,8 @@ class SboomTopTest extends AnyFunSuite {
 
     // To deal with all lines within good interval and all column blocks
     var blockEmpty = 0
+    var bigLineBlockCnt = 0
+
     for (base <- 0 until (goodIntervalBound) by PeConfig().peNumEachColumn) {
       for (col <- 0 until arrayWidth) { //arrayWidth is the number of 64 * 64 blocks
         do {
@@ -149,12 +151,13 @@ class SboomTopTest extends AnyFunSuite {
         } while (flag > 0) //  flag>0 means that there is no allZeros
 
         if(flag == 0){
-          println("transfer_128 and edgeCnt",transfer_128,edgeCnt)
+//        println("transfer_128 and edgeCnt",transfer_128,edgeCnt)
+          bigLineBlockCnt = bigLineBlockCnt + 1
           blockEmpty = blockEmpty + 1
           if(blockEmpty == 1){
             var edgePaddingTo128Remainder = edgeCnt % 8
             var edgeIndexPaddingByteNum = (8 - edgePaddingTo128Remainder)/2
-            println("edgePaddingTo128Remainder",edgePaddingTo128Remainder)
+//            println("edgePaddingTo128Remainder",edgePaddingTo128Remainder)
             if(edgePaddingTo128Remainder != 0){
               //padding to make a 128b packet
               for(i <- 0 until 8-edgePaddingTo128Remainder){
@@ -169,7 +172,7 @@ class SboomTopTest extends AnyFunSuite {
               transfer_128 = transfer_128 + 1
             }
 
-            //seperator added with 128b all zeros
+            //forced to add seperator with 128b all zeros
             for(i <- 0 until 8){
               val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
               edgeCnt = edgeCnt + 1
@@ -180,10 +183,11 @@ class SboomTopTest extends AnyFunSuite {
               edgeIndexBuffer.append(0.toByte)
             }
             transfer_128 = transfer_128 + 1
-            println("debug transfer_128",transfer_128)
+//            println("debug transfer_128",transfer_128)
 
-            //judge the number of 128b transfers
+            //judge the number of 128b transfers after the force-added 128'b0 seperator
             if(transfer_128 % 4 == 1){
+
               val edgePadding =  ArrayBuffer.fill(16 * 3)(0.toByte)
               transfer_128 = transfer_128 + 3
               edgesArrayBuffer.append(edgePadding)
@@ -209,7 +213,13 @@ class SboomTopTest extends AnyFunSuite {
                 edgeIndexBuffer.append(0.toByte)
               }
             }
+          }
 
+// bigLine End flag with additional 512'b0(equivalent to add another 512'b0 seperator after the first seperator)
+          if(bigLineBlockCnt%32 == 0){
+            val edgePadding =  ArrayBuffer.fill(16 * 4)(0.toByte)
+            transfer_128 = transfer_128 + 4
+            edgesArrayBuffer.append(edgePadding)
           }
         }
       }
@@ -301,6 +311,15 @@ class SboomTopTest extends AnyFunSuite {
             }
 
           }
+
+          // bigLine End flag with additional 512'b0(equivalent to add another 512'b0 seperator after the first seperator)
+          if(bigLineBlockCnt%32 == 0){
+            val edgePadding =  ArrayBuffer.fill(16 * 4)(0.toByte)
+            transfer_128 = transfer_128 + 4
+            edgesArrayBuffer.append(edgePadding)
+          }
+
+
         }
       }
     }

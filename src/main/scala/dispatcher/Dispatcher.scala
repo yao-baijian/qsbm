@@ -339,7 +339,7 @@ case class Dispatcher() extends Component {
 //        io.axiMemControlPort.ar.payload.len := U"8'b0000_0001" // (1+1) transfer in a burst
 //        io.axiMemControlPort.ar.payload.addr := U"32'h0000_0000" + vexAddrCnt * 128
 //        vexPeColumnSelect := peColumnSelectInOrderCnt
-//        when((vexAddrCnt+1) % DispatcherConfig().vexBigLineThreshold === 0){
+//        when((vexAddrCnt+1) % DispatcherConfig().bigLineBlockCntThreshold === 0){
 //          endLineFlag := True
 //        }
 //
@@ -398,7 +398,7 @@ case class Dispatcher() extends Component {
         when(io.axiMemControlPort.r.fire) {
           axiReadVertexCnt := axiReadVertexCnt + 1
           dispatchVexCnt := dispatchVexCnt + 1
-          when(dispatchVexCnt === DispatcherConfig().vexBigLineThreshold - 1){
+          when(dispatchVexCnt === DispatcherConfig().bigLineBlockCntThreshold - 1){
             dispatchVexCnt := 0
           }
           when(axiReadVertexCnt === 2 - 1 && io.axiMemControlPort.r.last === True) {
@@ -451,7 +451,7 @@ case class Dispatcher() extends Component {
         peColumnSelectInOrderCnt := peColumnSelectInOrderCnt + 1
 
         vexAddrCnt := vexAddrCnt + 1
-        when((vexAddrCnt+1) % DispatcherConfig().vexBigLineThreshold === 0){
+        when((vexAddrCnt+1) % DispatcherConfig().bigLineBlockCntThreshold === 0){
           endLineFlag := False
         }
         goto(READ_VEX_ADDR)
