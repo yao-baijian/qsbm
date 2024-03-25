@@ -195,12 +195,16 @@ case class Dispatcher() extends Component {
 //  vexIndexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(6) === 0 &&
 //  vexIndexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(7) === 0
 
-  val seperatorIn = vexEdgeOutStreams(1).payload.data.subdivideIn(128 bits)(0) === 0 || //&&
-                    vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(1) === 0 || //&&
-                    vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(2) === 0 || //&&
-                    vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(3) === 0  //&&
+//  val seperatorIn = vexEdgeOutStreams(1).payload.data.subdivideIn(128 bits)(0) === 0 || //&&
+//                    vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(1) === 0 || //&&
+//                    vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(2) === 0 || //&&
+//                    vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(3) === 0  //&&
 
-  val seperatorInDly = RegNext(seperatorIn) init False
+
+  val seperatorIn = Bool()
+  seperatorIn := False
+
+  val seperatorInDly = Reg(Bool()) init False
   when(seperatorIn === True){
     seperatorInDly := True
   }
@@ -490,6 +494,10 @@ case class Dispatcher() extends Component {
         }
 
         whenIsActive{
+          seperatorIn := vexEdgeOutStreams(1).payload.data.subdivideIn(128 bits)(0) === 0 || //&&
+            vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(1) === 0 || //&&
+            vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(2) === 0 || //&&
+            vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(3) === 0  //&&
           //dispatch edge index
           vexEdgeOutStreams(1).ready := True
 
