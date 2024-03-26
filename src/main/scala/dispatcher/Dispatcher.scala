@@ -195,10 +195,10 @@ case class Dispatcher() extends Component {
 //  vexIndexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(6) === 0 &&
 //  vexIndexEdgeOutStreams(1).payload.data.subdivideIn(16 bits)(7) === 0
 
-//  val seperatorIn = vexEdgeOutStreams(1).payload.data.subdivideIn(128 bits)(0) === 0 || //&&
-//                    vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(1) === 0 || //&&
-//                    vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(2) === 0 || //&&
-//                    vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(3) === 0  //&&
+  val allZeroIn = vexEdgeOutStreams(1).payload.data.subdivideIn(128 bits)(0) === 0 &&
+                    vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(1) === 0 &&
+                    vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(2) === 0 &&
+                    vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(3) === 0
 
 
   val seperatorIn = Bool()
@@ -208,6 +208,8 @@ case class Dispatcher() extends Component {
   when(seperatorIn === True){
     seperatorInDly := True
   }
+
+
 
 
 //  val allZeroInFlagReg = Reg(Bool()) init False
@@ -449,6 +451,11 @@ case class Dispatcher() extends Component {
       arFireDly := True
     }
 
+    val bigLineDetectCnt = Reg(UInt(2 bits)) init 0
+    when(seperatorIn){
+      bigLineDetectCnt := bigLineDetectCnt + 0x01
+    }
+
     val READ_EDGE = new StateFsm(fsm = internalFsm()){
       whenCompleted{
         vexEdgeSelect := 0
@@ -501,8 +508,15 @@ case class Dispatcher() extends Component {
           //dispatch edge index
           vexEdgeOutStreams(1).ready := True
 
-          edgeIndexCacheFifo.io.push.valid := io.axiEdgeIndexPort.r.valid
-          edgeCacheFifo.io.push.valid := vexEdgeOutStreams(1).valid
+          when(bigLineDetectCnt === 2 && allZeroIn === True){
+            edgeIndexCacheFifo.io.push.valid := False
+            edgeCacheFifo.io.push.valid := False
+
+          }.otherwise{
+            edgeIndexCacheFifo.io.push.valid := io.axiEdgeIndexPort.r.valid
+            edgeCacheFifo.io.push.valid := vexEdgeOutStreams(1).valid
+          }
+
 
           //dispatch edge data
 //          io.axiMemControlPort.ar.payload.addr := U"32'h00800000" + (32*64) * edgeAddrCnt
