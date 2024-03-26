@@ -451,10 +451,13 @@ case class Dispatcher() extends Component {
       arFireDly := True
     }
 
-    val bigLineDetectCnt = Reg(UInt(2 bits)) init 0
-    when(seperatorIn){
-      bigLineDetectCnt := bigLineDetectCnt + 0x01
-    }
+    val bigLineDetectCnt = Reg(UInt(1 bits)) init 0
+//    when(seperatorIn){
+//      when(allZeroIn)
+//      bigLineDetectCnt := bigLineDetectCnt + 0x01
+//    }.otherwise{
+//      bigLineDetectCnt := 0
+//    }
 
     val READ_EDGE = new StateFsm(fsm = internalFsm()){
       whenCompleted{
@@ -508,10 +511,12 @@ case class Dispatcher() extends Component {
           //dispatch edge index
           vexEdgeOutStreams(1).ready := True
 
-          when(bigLineDetectCnt === 2 && allZeroIn === True){
+          when(seperatorIn === True){
+              bigLineDetectCnt := bigLineDetectCnt + 1
+          }
+          when(bigLineDetectCnt === 1 && allZeroIn === True){
             edgeIndexCacheFifo.io.push.valid := False
             edgeCacheFifo.io.push.valid := False
-
           }.otherwise{
             edgeIndexCacheFifo.io.push.valid := io.axiEdgeIndexPort.r.valid
             edgeCacheFifo.io.push.valid := vexEdgeOutStreams(1).valid
