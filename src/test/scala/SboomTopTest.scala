@@ -29,13 +29,13 @@ class SboomTopTest extends AnyFunSuite {
   val simConfig = SpinalSimConfig(_spinalConfig = MySpinalConfig)
   //val xSimConfig = simConfig.copy(_workspacePath = "xSimWorkspace".withXSim.withXSimSourcesPaths(xciSource)Paths,ArrayBuffer(""))
 
-  val compiled= simConfig
-    .withWave
-    .withXilinxDevice("xczu7ev-ffvc1156-2-e")
-    .withXSim
-    .compile(SboomTop())
+//  val compiled= simConfig
+//    .withWave
+//    .withXilinxDevice("xczu7ev-ffvc1156-2-e")
+//    .withXSim
+//    .compile(SboomTop())
 
-//  val compiled= simConfig.withWave.compile(SboomTop())
+  val compiled= simConfig.withWave.compile(SboomTop())
 //  val compiled= xSimConfig.withWave.compile(SboomTop())
 //  val axiMemSimConfig = AxiMemorySimConfig()
 //  val axiMemSimModel = AxiMemorySim(compiled.dut.io.topAxiMemControlPort, compiled.dut.clockDomain, axiMemSimConfig)
@@ -372,11 +372,11 @@ class SboomTopTest extends AnyFunSuite {
       dut.clockDomain.forkStimulus(100) //产生周期为10个单位的时钟
 
       //axi4 port1 for vex&edges
-      val axiMemSimConfig1 = AxiMemorySimConfig(maxOutstandingReads = 1,maxOutstandingWrites = 1)
+      val axiMemSimConfig1 = AxiMemorySimConfig(maxOutstandingReads = 2,maxOutstandingWrites = 8)
       val axiMemSimModel1 = AxiMemorySim(compiled.dut.io.topAxiMemControlPort, compiled.dut.clockDomain, axiMemSimConfig1)
 
       // axi4 port2 for indices
-      val axiMemSimConfig2 = AxiMemorySimConfig(maxOutstandingReads = 1,maxOutstandingWrites = 1)
+      val axiMemSimConfig2 = AxiMemorySimConfig(maxOutstandingReads = 2,maxOutstandingWrites = 8)
       val axiMemSimModel2 = AxiMemorySim(compiled.dut.io.topAxiEdgeIndexPort, compiled.dut.clockDomain, axiMemSimConfig2)
 
       axiMemSimModel1.start()
