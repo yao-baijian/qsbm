@@ -222,6 +222,7 @@ case class Dispatcher() extends Component {
   edgeCacheFifo.io.push.payload.data := vexEdgeOutStreams(1).payload.data
   edgeCacheFifo.io.push.valid := False
 
+
 //  val edgeCacheFifoOutRegDly1 = RegNextWhen(edgeCacheFifo.io.pop.payload.data, edgeCacheFifo.io.pop.valid)
 //  val edgeCacheFifoOutRegDly2 = RegNextWhen(edgeCacheFifoOutRegDly1,edgeCacheFifo.io.pop.valid)
 
@@ -275,10 +276,11 @@ case class Dispatcher() extends Component {
     io.dispatchToEdgePorts(i).payload.data := edgePeColumnOutStreams(i).payload.data
     when(seperatorOutDly){
       io.dispatchToEdgePorts(i).valid := False
+      edgePeColumnOutStreams(i).ready := False
     }.otherwise{
       io.dispatchToEdgePorts(i).valid := edgePeColumnOutStreams(i).valid
+      edgePeColumnOutStreams(i).ready := io.edgeFifoReadyVec(i)
     }
-    edgePeColumnOutStreams(i).ready := io.edgeFifoReadyVec(i)
   }
 
 //  for (i <- 0 until PeConfig().peColumnNum) { //i for ith column
