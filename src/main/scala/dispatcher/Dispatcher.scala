@@ -452,6 +452,7 @@ case class Dispatcher() extends Component {
     }
 
     val bigLineDetectCnt = Reg(UInt(1 bits)) init 0
+    val edgeTransferCnt = Reg(UInt(8 bits)) init 0
 //    when(seperatorIn){
 //      when(allZeroIn)
 //      bigLineDetectCnt := bigLineDetectCnt + 0x01
@@ -504,6 +505,7 @@ case class Dispatcher() extends Component {
         }
 
         whenIsActive{
+          edgeTransferCnt := edgeTransferCnt + 1
           seperatorIn := vexEdgeOutStreams(1).payload.data.subdivideIn(128 bits)(0) === 0 || //&&
             vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(1) === 0 || //&&
             vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(2) === 0 || //&&
@@ -514,7 +516,7 @@ case class Dispatcher() extends Component {
           when(seperatorIn === True){
               bigLineDetectCnt := bigLineDetectCnt + 1
           }
-          when(bigLineDetectCnt === 1 && allZeroIn === True){
+          when(bigLineDetectCnt === 1 && allZeroIn === True && edgeTransferCnt === 0){
             edgeIndexCacheFifo.io.push.valid := False
             edgeCacheFifo.io.push.valid := False
           }.otherwise{
@@ -544,6 +546,7 @@ case class Dispatcher() extends Component {
 //          seperatorOutDly := False
 //          allZeroInFlagReg := False
           arFireDly := False
+          edgeTransferCnt := 0
         }
       }
     }
