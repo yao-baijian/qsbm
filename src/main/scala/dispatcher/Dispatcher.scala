@@ -19,6 +19,10 @@ case class AxiEdgeIndexPort(dataWidth:Int) extends Bundle {
   // def isBlack : Bool = red === 0 && green === 0 && blue === 0
 }
 
+case class VexPeColumnNumFifoPort(dataWidth:Int) extends Bundle {
+  val data = UInt(DispatcherConfig().vexPeColumnNumFifoWidth bits)
+}
+
 case class StreamFifoPort(dataWidth:Int) extends Bundle{
   val data = Bits(DispatcherConfig().fifoWidth bits)
 }
@@ -131,7 +135,6 @@ case class Dispatcher() extends Component {
   //r channel
 //  io.axiMemControlPort.r.ready := False
 
-
   //*************************** AXI4 Read Data to Dispatch Stream Data *********************************//
   //vex or edge demux to different 2 stream channels
   val vexEdgeSelect = Reg(UInt(log2Up(2) bits)) init 0
@@ -139,40 +142,20 @@ case class Dispatcher() extends Component {
   vexEdgeOutStreams(0).ready := False
   vexEdgeOutStreams(1).ready := False
 
-//  val vexIndexEdgeSelect = Reg(UInt(log2Up(3) bits)) init 0
-//  val vexIndexEdgeOutStreams = StreamDemux(io.axiMemControlPort.r, vexIndexEdgeSelect, 3)
-//  vexIndexEdgeOutStreams(0).ready := True
-//  vexIndexEdgeOutStreams(1).ready := True
-//  vexIndexEdgeOutStreams(2).ready := True
+//******************************** VEX DISPATCH ********************************************************
 
-  //*************************** vexSwitchRegOutPorts Connection *********************************//
+  //vexSwitchRegOutPorts Connection
   val vexSwitchRegOutSelect = Reg(UInt(log2Up(2) bits)) init 0
   // only need one port, leaving the allocation function to PE section
   io.dispatchVexRegOut4Gather.payload.data := vexEdgeOutStreams(0).payload.data
   io.dispatchVexRegOut4Gather.valid := vexEdgeOutStreams(0).valid
 
-//  io.vexSwitchRegOutPorts(0).payload.data := vexIndexEdgeOutStreams(0).payload.data
-//  io.vexSwitchRegOutPorts(0).valid := vexIndexEdgeOutStreams(0).fire && vexSwitchRegOutSelect === 0
-//
-//  io.vexSwitchRegOutPorts(1).payload.data := vexIndexEdgeOutStreams(0).payload.data
-//  io.vexSwitchRegOutPorts(1).valid := vexIndexEdgeOutStreams(0).fire && vexSwitchRegOutSelect === 1
-
-  //***********************  dispatchToVexRegFilePorts Connection *******************//
+  //dispatchToVexRegFilePorts Connection
   val vexPeColumnSelect = Reg(UInt(log2Up(4) bits)) init 0
   for(i <- 0 until PeConfig().peColumnNum){
     io.dispatchToVexRegFilePorts(i).payload.data := vexEdgeOutStreams(0).payload.data
     io.dispatchToVexRegFilePorts(i).valid := vexEdgeOutStreams(0).valid &&  vexPeColumnSelect === i
   }
-
-  //******************************** VEX DISPATCH *********************************************//
-//  val vexCacheFifo = StreamFifo(
-//    dataType = AxiEdgeIndexPort(DispatcherConfig().edgeIndexSize),
-//    depth = 4096
-//    //    pushClock = clockA,
-//    //    popClock = clockB
-//  )
-//  vexCacheFifo.io.push.payload.data := io.axiEdgeIndexPort.r.payload.data
-//  vexCacheFifo.io.push.valid := False
 
   //******************************** EDGE INDEX DISPATCH *********************************************//
   val edgeIndexCacheFifo = StreamFifo(
@@ -202,15 +185,16 @@ case class Dispatcher() extends Component {
 
 
   val seperatorIn = Bool()
-  seperatorIn := False
+
+  seperatorIn := vexEdgeOutStreams(1).payload.data.subdivideIn(128 bits)(0) === 0 || //&&
+                 vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(1) === 0 || //&&
+                 vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(2) === 0 || //&&
+                 vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(3) === 0  //&&
 
   val seperatorInDly = Reg(Bool()) init False
   when(seperatorIn === True){
     seperatorInDly := True
   }
-
-
-
 
 //  val allZeroInFlagReg = Reg(Bool()) init False
   val edgeCacheFifo = StreamFifo(
@@ -232,24 +216,24 @@ case class Dispatcher() extends Component {
 //    onesNum := CountOne(edgeIndexFifo.io.pop.payload.data.asBits)
 //  }
 
-
 //  val allZeroOutFlag = edgeCacheFifo.io.pop.payload.data === 0
 //  edgeCacheFifo.io.pop.valid := True
 //  val dipatchOutSeperator = Bool()
-  val seperatorOut = (edgeCacheFifo.io.pop.payload.data.subdivideIn(PeConfig().peColumnWid bits)(0) === 0 ||
-                     edgeCacheFifo.io.pop.payload.data.subdivideIn(PeConfig().peColumnWid bits)(1) === 0 ||
-                     edgeCacheFifo.io.pop.payload.data.subdivideIn(PeConfig().peColumnWid bits)(2) === 0 ||
-                     edgeCacheFifo.io.pop.payload.data.subdivideIn(PeConfig().peColumnWid bits)(3) === 0 ) &&
-                     edgeCacheFifo.io.pop.valid
 
+  val seperatorOut = (edgeCacheFifo.io.pop.payload.data.subdivideIn(PeConfig().peColumnWid bits)(0) === 0 ||
+                      edgeCacheFifo.io.pop.payload.data.subdivideIn(PeConfig().peColumnWid bits)(1) === 0 ||
+                      edgeCacheFifo.io.pop.payload.data.subdivideIn(PeConfig().peColumnWid bits)(2) === 0 ||
+                      edgeCacheFifo.io.pop.payload.data.subdivideIn(PeConfig().peColumnWid bits)(3) === 0 ) &&
+                      edgeCacheFifo.io.pop.valid
 
   val seperatorOutDly = Reg(Bool()) init False
   when(seperatorOut === True) {
     seperatorOutDly := True
   }
-  when(edgeCacheFifo.io.pop.valid === False){
-    seperatorOutDly := False
-  }
+
+//  when(edgeCacheFifo.io.pop.valid === False){
+//    seperatorOutDly := False
+//  }
 
   //edge data dispatch to 4 pe column stream,stream0 for vex, stream1 for edges
   val edgePeColumnSelect = Reg(UInt(log2Up(4) bits)) init 0
@@ -262,73 +246,44 @@ case class Dispatcher() extends Component {
   val edgeIndexPeColumnOutStreams = StreamDemux(edgeIndexCacheFifo.io.pop, edgePeColumnSelect, 4)
   for (i <- 0 until PeConfig().peColumnNum) { //i for ith column
     io.dispatchToedgeIndexPorts(i).payload.data := edgeIndexPeColumnOutStreams(i).payload.data
-    when(seperatorOutDly){
-      io.dispatchToedgeIndexPorts(i).valid := False
-    }.otherwise{
-      io.dispatchToedgeIndexPorts(i).valid := edgeIndexPeColumnOutStreams(i).valid
-    }
+//    when(seperatorOutDly){
+//      io.dispatchToedgeIndexPorts(i).valid := False
+//    }.otherwise{
+//      io.dispatchToedgeIndexPorts(i).valid := edgeIndexPeColumnOutStreams(i).valid
+//    }
     edgeIndexPeColumnOutStreams(i).ready := io.edgeFifoReadyVec(i)
   }
 
   //edgeColumnOutStreams
-  val edgePeColumnOutStreams = StreamDemux(edgeCacheFifo.io.pop, edgePeColumnSelect, 4)
+  val edgePeColumnOutStreams = StreamDemux(edgeCacheFifo.io.pop, edgePeColumnSelect, PeConfig().peColumnNum)
   for (i <- 0 until PeConfig().peColumnNum) { //i for ith column
     io.dispatchToEdgePorts(i).payload.data := edgePeColumnOutStreams(i).payload.data
+    edgePeColumnOutStreams(i).ready := io.edgeFifoReadyVec(i)
+    io.dispatchToEdgePorts(i).valid := edgePeColumnOutStreams(i).valid
+
     when(seperatorOutDly){
-      io.dispatchToEdgePorts(i).valid := False
       edgePeColumnOutStreams(i).ready := False
     }.otherwise{
-      io.dispatchToEdgePorts(i).valid := edgePeColumnOutStreams(i).valid
       edgePeColumnOutStreams(i).ready := io.edgeFifoReadyVec(i)
     }
   }
 
-//  for (i <- 0 until PeConfig().peColumnNum) { //i for ith column
-//    io.dispatchToEdgePorts(i).payload.data := edgePeColumnOutStreams(i).payload.data
-//    when(seperatorOutDly){
-//      io.dispatchToEdgePorts(i).valid := False
-//    }.otherwise{
-//      io.dispatchToEdgePorts(i).valid := edgePeColumnOutStreams(i).valid
-//    }
-//    edgePeColumnOutStreams(i).ready := io.edgeFifoReadyVec(i)
-//
-//    //    for (j <- 0 until PeConfig().peNumEachColumn) { //j for the offset of the ith column
-//////      edgePeColumnOutStreams(i).ready :=
-////      io.dispatchToEdgeFifoPorts(i)(j).payload.data := edgePeColumnOutStreams(i).payload.data.subdivideIn(16 bits)(j)
-////      when(edgePeColumnOutStreams(i).payload.data.subdivideIn(16 bits)(j) === 0 && (~allZeroInFlag) ){
-////        io.dispatchToEdgeFifoPorts(i)(j).valid := False //make sure that zeros will not be sent to the edgefifos within PEs
-////      }.otherwise{
-////        io.dispatchToEdgeFifoPorts(i)(j).valid := edgePeColumnOutStreams(i).valid
-////      }
-////    }
-//  }
-
-
-//  val dispatchPeColumnSelector = new Area{
-//
-//    when(io.bigPeBusyFlagVec(0) === False) {
-//      vexPeColumnSelect := 0
-//      edgePeColumnSelect := 0
-//    }.elsewhen(io.bigPeBusyFlagVec(1) === False){
-//      vexPeColumnSelect := 1
-//      edgePeColumnSelect := 1
-//    }.elsewhen(io.bigPeBusyFlagVec(2) === False){
-//      vexPeColumnSelect := 2
-//      edgePeColumnSelect := 2
-//    }.elsewhen(io.bigPeBusyFlagVec(3) === False){
-//      vexPeColumnSelect := 3
-//      edgePeColumnSelect := 3
-//    }
-//  }
-
+  val vexPeColumnNumFifo = StreamFifo(
+    dataType = VexPeColumnNumFifoPort(DispatcherConfig().vexPeColumnNumFifoWidth),
+    depth = 16
+  )
+  vexPeColumnNumFifo.io.push.valid := False
+  vexPeColumnNumFifo.io.pop.ready := True
+  vexPeColumnNumFifo.io.push.payload.data := vexPeColumnSelect
 
   //********************************  FSM Control  *******************************************************//
+
   val axi4MemCtrlFsm = new StateMachine {
     //FSM Internal Variables
     val axiReadVertexCnt = Reg(UInt(8 bits)) init 0
     val edgeAddrCnt = Reg(UInt(16 bits)) init 0
     //endlineflag Control
-    val vexAddrCnt = Reg(UInt(16 bits)) init 0
+
     val endLineFlag = Reg(Bool()) init False
     val peColumnSelectInOrderCnt = Reg(UInt(2 bits)) init 0
 
@@ -336,6 +291,9 @@ case class Dispatcher() extends Component {
     val READ_IDLE = new State with EntryPoint {
       whenIsActive{
         goto(READ_VEX_ADDR)
+      }
+      onExit{
+        vexPeColumnNumFifo.io.push.valid := True
       }
     }
 
@@ -354,22 +312,30 @@ case class Dispatcher() extends Component {
           }
         }
       }   //end of whenIsActive
+
+      onExit{
+
+      }
     } //end of new state
-
-
 
     //******************************* READ_VEX_DATA_SEND_EDGE_ADDR *********************************//
     val dispatchVexCnt = Reg(UInt(16 bits)) init 0
 
     val READ_VEX_DATA_SEND_EDGE_ADDR: State = new State {
 
+      onEntry{
+        vexEdgeSelect := 0
+      }
+
       whenIsActive {
+
+        io.axiMemControlPort.r.ready := True
         vexEdgeOutStreams(0).ready := True
-        //        io.axiMemControlPort.r.ready := True
-        //        vexEdgeOutStreams(0).ready := True
+        io.dispatchToVexRegFilePorts(vexPeColumnSelect).valid := True
+
         when(io.axiMemControlPort.r.fire) {
           axiReadVertexCnt := axiReadVertexCnt + 1
-          when(axiReadVertexCnt === 2 - 1 && io.axiMemControlPort.r.last === True) {
+          when(io.axiMemControlPort.r.last === True) {
             axiReadVertexCnt := 0
             goto(READ_EDGE_DATA_SEND_VEX_ADDR)
           }
@@ -385,142 +351,106 @@ case class Dispatcher() extends Component {
         io.axiMemControlPort.ar.valid := True
         io.axiMemControlPort.ar.payload.len := U"8'b0000_0111" //burst length = 7 + 1
         io.axiMemControlPort.ar.payload.addr := U"32'h00800000" + (8 * 64) * edgeAddrCnt
+        when(io.axiMemControlPort.ar.fire){
+          edgeAddrCnt := edgeAddrCnt + 1
+        }
       }
 
       onExit {
-        seperatorInDly := False
+        edgePeColumnSelect := vexPeColumnNumFifo.io.pop.payload.data
+        seperatorOutDly := False
       }
     }
-
-
 
     //******************************* READ_EDGE_DATA_SEND_VEX_ADDR *********************************//
     val peZeroCntVec = Vec(Reg(UInt(16 bits)) init 0, PeConfig().peNumEachColumn)
     val arFireDly = Reg(Bool()) init False
+
     when(io.axiMemControlPort.ar.fire){
       arFireDly := True
     }
 
     val bigLineDetectCnt = Reg(UInt(1 bits)) init 0
     val edgeTransferCnt = Reg(UInt(8 bits)) init 0
+    val vexAddrCnt = Reg(UInt(16 bits)) init 0
 
     val READ_EDGE_DATA_SEND_VEX_ADDR: State = new State {
 
+      onEntry{
+        vexEdgeSelect := 1
+        seperatorInDly := False
+      }
+
       whenIsActive {
         io.axiMemControlPort.r.ready := True
+        edgeCacheFifo.io.push.valid := vexEdgeOutStreams(1).valid
 
-        //send vex addr
-        io.axiMemControlPort.ar.payload.len := U"8'b0000_0001" // (1+1) transfer in a burst
-        io.axiMemControlPort.ar.payload.addr := U"32'h0000_0000"
-        io.axiMemControlPort.ar.valid := True
+        //dispatch edge data
+        //io.axiMemControlPort.ar.payload.addr := U"32'h00800000" + (32*64) * edgeAddrCnt
+        when((seperatorInDly||seperatorIn) && io.axiMemControlPort.r.last){
+          //send vex addr
+          io.axiMemControlPort.ar.payload.len := U"8'b0000_0001" // (1+1) transfer in a burst
+          io.axiMemControlPort.ar.payload.addr := U"32'h0000_0000"
+          io.axiMemControlPort.ar.valid := True
+          when(io.bigPeBusyFlagVec(0) === False) {
+            vexPeColumnSelect := 0
+            io.axiMemControlPort.ar.valid := True
+            vexPeColumnNumFifo.io.push.valid := True
+          }.elsewhen(io.bigPeBusyFlagVec(1) === False){
+            vexPeColumnSelect := 1
+            io.axiMemControlPort.ar.valid := True
+            vexPeColumnNumFifo.io.push.valid := True
+          }.elsewhen(io.bigPeBusyFlagVec(2) === False){
+            vexPeColumnSelect := 2
+            io.axiMemControlPort.ar.valid := True
+            vexPeColumnNumFifo.io.push.valid := True
+          }.elsewhen(io.bigPeBusyFlagVec(3) === False){
+            vexPeColumnSelect := 3
+            io.axiMemControlPort.ar.valid := True
+            vexPeColumnNumFifo.io.push.valid := True
+          }
+          when(io.axiMemControlPort.ar.fire){
+            vexAddrCnt := vexAddrCnt + 1
+          }
+          goto(READ_VEX_DATA_SEND_EDGE_ADDR)
+        }.elsewhen((seperatorInDly||seperatorIn) =/= True && io.axiMemControlPort.r.last){
+          //send edge addr
+          io.axiMemControlPort.ar.payload.len := U"8'b0000_0111" // (7+1) transfer in a burst
+          io.axiMemControlPort.ar.payload.addr := U"32'h00800000" + (8 * 64) * edgeAddrCnt
+          io.axiMemControlPort.ar.valid := True
+          when(io.axiMemControlPort.ar.fire){
+            edgeAddrCnt := edgeAddrCnt + 1
+          }
+          goto(READ_EDGE_DATA_SEND_VEX_ADDR)
+        }
 
-        when(vexAddrCnt === 100) {
+        when(vexAddrCnt === 128) {
           goto(End)
         }.elsewhen(io.axiMemControlPort.r.last) {
-          goto(READ_VEX_DATA_SEND_EDGE_ADDR)
+
         }
+      } //end of whenIsActive
+
+      onExit{
+//        seperatorInDly := False
+
+        when(seperatorIn || seperatorInDly){
+
+        }
+
       }
-    }
+
+    }// end of state
 
     val End:State = new State {
 
       whenIsActive{
       }
-
-
     }
 
-
-//      whenCompleted{
-//        vexEdgeSelect := 0
-//        peColumnSelectInOrderCnt := peColumnSelectInOrderCnt + 1
-//
-//        vexAddrCnt := vexAddrCnt + 1
-//        when((vexAddrCnt+1) % DispatcherConfig().bigLineBlockCntThreshold === 0){
-//          endLineFlag := False
-//        }
-//        goto(READ_VEX_ADDR)
-//
-//      }
-//    }
-
-//    def internalFsm() = new StateMachine {
-//
-//      val READ_EDGE_ADDR: State = new State with EntryPoint{
-//
-//        whenIsActive{
-//          //axiEdgeIndexPort for Edge Index
-//          io.axiEdgeIndexPort.ar.valid := True
-//          io.axiEdgeIndexPort.ar.payload.len := U"8'b0000_1111" //burst length = 7 + 1
-//          io.axiEdgeIndexPort.ar.payload.addr := U"32'h00400000" + (16 * 16) * edgeAddrCnt
-//
-//          // axiMemControlPort for Edge Data
-//          io.axiMemControlPort.ar.valid := True
-//          io.axiMemControlPort.ar.payload.len := U"8'b0000_0111" //burst length = 7 + 1
-//          io.axiMemControlPort.ar.payload.addr := U"32'h00800000" + (8 * 64) * edgeAddrCnt
-//          //io.axiMemControlPort.ar.payload.len := U"8'b0000_0111" // (7+1) transfer in a burst
-//
-//          when((io.axiMemControlPort.ar.fire ||arFireDly) && io.axiMemControlPort.r.valid /*&& io.axiEdgeIndexPort.r.valid*/){
-//
-//            goto(DISPATCH_EDGE_DATA)
-//          }
-//        }
-//      }
-//
-//      val DISPATCH_EDGE_DATA = new State{
-//        onEntry{
-//          seperatorOutDly := False
-//          vexEdgeSelect := 1
-//          edgePeColumnSelect := vexPeColumnSelect  //当确定vexPeColumn的时候，同时确定了edgePeColumn
-//        }
-//
-//        whenIsActive{
-//          edgeTransferCnt := edgeTransferCnt + 1
-//          seperatorIn := vexEdgeOutStreams(1).payload.data.subdivideIn(128 bits)(0) === 0 || //&&
-//            vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(1) === 0 || //&&
-//            vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(2) === 0 || //&&
-//            vexEdgeOutStreams(1).payload.data.subdivideIn(PeConfig().peColumnWid bits)(3) === 0  //&&
-//          //dispatch edge index
-//          vexEdgeOutStreams(1).ready := True
-//
-//          when(seperatorIn === True){
-//              bigLineDetectCnt := bigLineDetectCnt + 1
-//          }
-//          when(bigLineDetectCnt === 1 && allZeroIn === True && edgeTransferCnt === 0){
-//            edgeIndexCacheFifo.io.push.valid := False
-//            edgeCacheFifo.io.push.valid := False
-//          }.otherwise{
-//            edgeIndexCacheFifo.io.push.valid := io.axiEdgeIndexPort.r.valid
-//            edgeCacheFifo.io.push.valid := vexEdgeOutStreams(1).valid
-//          }
-//
-//
-//          //dispatch edge data
-////          io.axiMemControlPort.ar.payload.addr := U"32'h00800000" + (32*64) * edgeAddrCnt
-//          when((seperatorInDly||seperatorIn) && io.axiMemControlPort.r.last){
-//            edgeAddrCnt := edgeAddrCnt + 1
-//            exit()
-//          }.elsewhen((seperatorInDly||seperatorIn) =/= True && io.axiMemControlPort.r.last){
-//            edgeAddrCnt := edgeAddrCnt + 1
-//            goto(READ_EDGE_ADDR)
-//          }
-////          when(/*(allZeroInFlag || allZeroInFlagReg) && */ io.axiMemControlPort.r.last){
-////            edgeAddrCnt := edgeAddrCnt + 1
-////            exit()
-////          }.elsewhen ( io.axiMemControlPort.r.last){
-////            edgeAddrCnt := edgeAddrCnt + 1
-////            goto(READ_EDGE_ADDR)
-////          }
-//        }
-//        onExit{
-////          seperatorOutDly := False
-////          allZeroInFlagReg := False
-//          arFireDly := False
-//          edgeTransferCnt := 0
-//        }
-//      }
-//    }
   } //end of FSM
+
+
 
   //************************** ScheduleBoard for Read and Write ***************************//
   case class ScheduleBoardPort() extends Bundle {

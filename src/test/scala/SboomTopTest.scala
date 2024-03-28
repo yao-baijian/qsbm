@@ -29,13 +29,10 @@ class SboomTopTest extends AnyFunSuite {
   val simConfig = SpinalSimConfig(_spinalConfig = MySpinalConfig)
   //val xSimConfig = simConfig.copy(_workspacePath = "xSimWorkspace".withXSim.withXSimSourcesPaths(xciSource)Paths,ArrayBuffer(""))
 
-//  val compiled= simConfig
-//    .withWave
-//    .withXilinxDevice("xczu7ev-ffvc1156-2-e")
-//    .withXSim
-//    .compile(SboomTop())
+  val compiled= simConfig.withWave.withXilinxDevice("xczu7ev-ffvc1156-2-e").withXSim.compile(SboomTop())
+//  val compiled= simConfig.withWave.compile(SboomTop())
 
-  val compiled= simConfig.withWave.compile(SboomTop())
+
 //  val compiled= xSimConfig.withWave.compile(SboomTop())
 //  val axiMemSimConfig = AxiMemorySimConfig()
 //  val axiMemSimModel = AxiMemorySim(compiled.dut.io.topAxiMemControlPort, compiled.dut.clockDomain, axiMemSimConfig)

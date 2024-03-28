@@ -23,6 +23,8 @@ case class DispatcherConfig(){
   val edgeByteLen = 2
   val bigLineBlockCntThreshold = math.ceil(matrixSize.toFloat/blockSize).toInt
 
+  val vexPeColumnNumFifoWidth = 2
+
 }
 
 case class PeConfig(){
