@@ -259,7 +259,7 @@ case class Dispatcher() extends Component {
   for (i <- 0 until PeConfig().peColumnNum) { //i for ith column
     io.dispatchToEdgePorts(i).payload.data := edgePeColumnOutStreams(i).payload.data
     edgePeColumnOutStreams(i).ready := io.edgeFifoReadyVec(i)
-    io.dispatchToEdgePorts(i).valid := edgePeColumnOutStreams(i).valid
+    io.dispatchToEdgePorts(i).valid := edgePeColumnOutStreams(i).valid && edgeCacheFifo.io.pop.ready
 
     when(seperatorOutDly){
       edgePeColumnOutStreams(i).ready := False
@@ -357,7 +357,7 @@ case class Dispatcher() extends Component {
       }
 
       onExit {
-        edgePeColumnSelect := vexPeColumnNumFifo.io.pop.payload.data
+        edgePeColumnSelect := vexPeColumnSelect
         seperatorOutDly := False
       }
     }
@@ -379,6 +379,7 @@ case class Dispatcher() extends Component {
       onEntry{
         vexEdgeSelect := 1
         seperatorInDly := False
+
       }
 
       whenIsActive {
@@ -395,7 +396,7 @@ case class Dispatcher() extends Component {
           when(io.bigPeBusyFlagVec(0) === False) {
             vexPeColumnSelect := 0
             io.axiMemControlPort.ar.valid := True
-            vexPeColumnNumFifo.io.push.valid := True
+//            vexPeColumnNumFifo.io.push.valid := True
           }.elsewhen(io.bigPeBusyFlagVec(1) === False){
             vexPeColumnSelect := 1
             io.axiMemControlPort.ar.valid := True
@@ -403,11 +404,11 @@ case class Dispatcher() extends Component {
           }.elsewhen(io.bigPeBusyFlagVec(2) === False){
             vexPeColumnSelect := 2
             io.axiMemControlPort.ar.valid := True
-            vexPeColumnNumFifo.io.push.valid := True
+//            vexPeColumnNumFifo.io.push.valid := True
           }.elsewhen(io.bigPeBusyFlagVec(3) === False){
             vexPeColumnSelect := 3
             io.axiMemControlPort.ar.valid := True
-            vexPeColumnNumFifo.io.push.valid := True
+//            vexPeColumnNumFifo.io.push.valid := True
           }
           when(io.axiMemControlPort.ar.fire){
             vexAddrCnt := vexAddrCnt + 1
