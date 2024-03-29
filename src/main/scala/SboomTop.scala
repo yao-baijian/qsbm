@@ -75,6 +75,10 @@ case class SboomTop() extends Component{
 //    }
   }
 
+  //write back connection from PE to Dispatcher
+  dispatcher.io.writeback_valid :=  peTop.io.writeback_valid
+  dispatcher.io.writeback_payload := peTop.io.writeback_payload
+
 //  val pe0Ready = dispatcher.io.dispatchToEdgeFifoPorts
 
 }

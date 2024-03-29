@@ -59,6 +59,11 @@ case class Dispatcher() extends Component {
     //
     val bigLineSwitchFlag = out Bool()
 
+    // write back ports from PE
+    val writeback_valid     = in Bool()
+    val writeback_payload   = in Bits(DispatcherConfig().size bits)
+
+
   }
 
   noIoPrefix()
@@ -365,7 +370,9 @@ case class Dispatcher() extends Component {
         //        bigLineDetectCnt := 0
 
       }
-    }
+    } //end of READ_VEX_DATA_SEND_EDGE_ADDR state
+
+
 
     //******************************* READ_EDGE_DATA_SEND_VEX_ADDR *********************************//
     val peZeroCntVec = Vec(Reg(UInt(16 bits)) init 0, PeConfig().peNumEachColumn)
@@ -474,11 +481,12 @@ case class Dispatcher() extends Component {
 
       }
 
-    }// end of state
+    }// end of READ_EDGE_DATA_SEND_VEX_ADDR state
 
     val End:State = new State {
 
       whenIsActive{
+
       }
     }
 
