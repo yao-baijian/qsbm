@@ -69,9 +69,9 @@ case class SboomTop() extends Component{
 //    val pe0Ready = dispatcher.io.dispatchToEdgeFifoPorts(i).reduceLeft(_.ready && _.ready)
 //    dispatcher.io.bigPeBusyFlagVec(i) := True
 //    for(j <- 0 until PeConfig().peNumEachColumn){
-      peTop.io.raw_edge_stream(i).payload := dispatcher.io.dispatchToEdgePorts(i).payload.data
-      peTop.io.raw_edge_stream(i).valid := dispatcher.io.dispatchToEdgePorts(i).valid
-      dispatcher.io.dispatchToEdgePorts(i).ready := peTop.io.raw_edge_stream(i).ready
+      peTop.io.edge_stream(i).payload := dispatcher.io.dispatchToEdgePorts(i).payload.data
+      peTop.io.edge_stream(i).valid := dispatcher.io.dispatchToEdgePorts(i).valid
+      dispatcher.io.dispatchToEdgePorts(i).ready := peTop.io.edge_stream(i).ready
 //    }
   }
 

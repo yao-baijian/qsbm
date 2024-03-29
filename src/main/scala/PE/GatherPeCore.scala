@@ -14,7 +14,7 @@ case class GatherPeCore(config:PeConfig) extends Component {
         val writeback_valid     = out Bool()
         val writeback_payload   = out Bits(config.axi_extend_width bits)
         val rd_addr             = out UInt (4 bits)
-        val spmm_rd_data        = in Vec(Bits(31 bits), 32)
+        val spmm_rd_data        = in  Bits(31*32 bits)
         val vertex_rd_data      = in  Bits (config.axi_extend_width bits)
     }
 
@@ -93,7 +93,7 @@ case class GatherPeCore(config:PeConfig) extends Component {
 
     when (h1_valid) {
         for (i <- 0 until 32) {
-            spmm_h2(i)  := io.spmm_rd_data(i).asSInt
+            spmm_h2(i)  := io.spmm_rd_data((i+1)*31-1 downto i*31).asSInt
             x_old_h2(i) := io.vertex_rd_data((i+1)*16-1 downto (i+1)*16-8).asSInt
             y_old_h2(i) := io.vertex_rd_data((i+1)*16-9 downto i*16).asSInt
         }

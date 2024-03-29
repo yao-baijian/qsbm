@@ -30,7 +30,7 @@ case class PeTop(config:PeConfig) extends Component {
 
     val io = new Bundle {
         val last_update         = in Vec(Bool(), config.core_num) //big line ending
-        val raw_edge_stream     = Vec(slave Stream (Bits(config.axi_extend_width bits)), config.core_num)
+        val edge_stream         = Vec(slave Stream (Bits(config.axi_extend_width bits)), config.core_num)
         val tag_stream          = Vec(slave Stream (Bits(config.tag_extend_width bits)), config.core_num) //edge index port
         val vertex_stream       = Vec(slave Stream (Bits(config.axi_extend_width bits)), config.core_num)
         val pe_rdy_table        = out Vec(Bool(), config.core_num)
@@ -48,7 +48,6 @@ case class PeTop(config:PeConfig) extends Component {
 
     val swap_done               = Reg(Bool())                       init False
     val swap                    = Reg(Bool())                       init True
-
     val bundle_busy             = Bool()
     val bundle_busy_table       = Vec(Bool(), config.core_num)
     val last_update             = Reg(Bool())                       init False
@@ -68,44 +67,34 @@ case class PeTop(config:PeConfig) extends Component {
     val pecore_array                = new Array[PeCore](config.core_num)
     val vertex_reg_A                = DualModeReg(Config)
     val vertex_reg_B                = DualModeReg(Config)
-    val update_mem                  = new Array[Mem[Bits]](config.thread_num)
+    val update_mem                  = Mem(Bits(config.spmm_prec*32 bits), wordCount = 16)
     val pe_core_update_reg          = Vec(Vec(Vec(Reg(Bits(config.spmm_prec bits)) init 0, config.matrix_size), config.thread_num), config.core_num)
-    val pe_bundle_wire              = Vec(Vec(SInt(config.spmm_prec bits),config.core_num), config.thread_num)
-    val pe_update_value             = Vec(SInt(config.spmm_prec bits), config.thread_num)
 
-    // Fix update reg and vertex reg size
     for (i <- 0 until config.core_num) {
         pecore_array(i) = PeCore(Config)
         pecore_array(i).setName("pe_bundle_" + i.toString)
     }
 
-    for (i <- 0 until config.thread_num) {
-        update_mem(i) = Mem(Bits(config.spmm_prec bits), wordCount = config.matrix_size)
-    }
     //-----------------------------------------------------
     // Module Wiring
     //-----------------------------------------------------
 
     for (i <- 0 until config.core_num) {
-        pecore_array(i).io_global_reg.vertex_stream << io.vertex_stream(i)
-        pecore_array(i).io_state.last_update <> io.last_update(i)
-        bundle_busy_table(i) := pecore_array(i).io_state.pe_busy
-        high_to_low_converter.io.in_edge_stream(i) <> io.raw_edge_stream(i)
-        high_to_low_converter.io.in_tag_stream(i) <> io.tag_stream(i)
+        high_to_low_converter.io.in_edge_stream(i)  <> io.edge_stream(i)
+        high_to_low_converter.io.in_tag_stream(i)   <> io.tag_stream(i)
+        bundle_busy_table(i)                        <> pecore_array(i).io_state.pe_busy
+        pecore_array(i).io_global_reg.vertex_stream <> io.vertex_stream(i)
+        pecore_array(i).io_state.last_update        <> io.last_update(i)
+        pecore_array(i).io_state.all_zero           <> all_zero(i)
+        pecore_array(i).io_state.switch_done        <> swap_done
+        io.pe_rdy_table(i)                          := pe_rdy_table_all(i).orR
+        all_zero(i)                                 := all_zero_table(i).andR
 
         for (j <- 0 until config.thread_num) {
-            pe_rdy_table_all(i)(j) := pecore_array(i).io_fifo.pe_fifo(j).ready
-            all_zero_table(i)(j) := (high_to_low_converter.io.out_edge_stream(i)(j).payload === 0) & high_to_low_converter.io.out_edge_stream(i)(j).valid
-        }
-
-        io.pe_rdy_table(i) := pe_rdy_table_all(i).orR
-        pecore_array(i).io_state.switch_done <> swap_done
-        all_zero(i) := all_zero_table(i).andR
-        pecore_array(i).io_state.all_zero := all_zero(i)
-
-        for (j <- 0 until config.thread_num) {
-            pecore_array(i).io_fifo.pe_fifo(j) <> high_to_low_converter.io.out_edge_stream(i)(j)
-            pecore_array(i).io_fifo.pe_tag(j) <> high_to_low_converter.io.out_tag_stream(i)(j)
+            pe_rdy_table_all(i)(j)              <> pecore_array(i).io_fifo.pe_fifo(j).ready
+            all_zero_table(i)(j)                := (high_to_low_converter.io.out_edge_stream(i)(j).payload === 0) & high_to_low_converter.io.out_edge_stream(i)(j).valid
+            pecore_array(i).io_fifo.pe_fifo(j)  <> high_to_low_converter.io.out_edge_stream(i)(j)
+            pecore_array(i).io_fifo.pe_tag(j)   <> high_to_low_converter.io.out_tag_stream(i)(j)
             for (k <- 0 until config.matrix_size) {
                 when(update_reg_srst(i)) {
                     pe_core_update_reg(i)(j)(k) := 0
@@ -126,7 +115,6 @@ case class PeTop(config:PeConfig) extends Component {
                 } elsewhen ((pecore_array(i).io_update.wr_addr(7) === j * config.matrix_size + k) && pecore_array(i).io_update.wr_valid(7)) {
                     pe_core_update_reg(i)(j)(k) := pecore_array(i).io_update.wr_data(7)
                 }
-
                 when(pecore_array(i).io_update.rd_addr(j) === j * config.matrix_size + k) {
                     pecore_array(i).io_update.rd_data(j) := pe_core_update_reg(i)(j)(k)
                 } otherwise {
@@ -135,58 +123,48 @@ case class PeTop(config:PeConfig) extends Component {
             }
         }
     }
-    gather_pe_core.io.swap_done := swap_done
-    vertex_reg_A.io.in_stream.valid    := Mux(swap, io.vertex_stream_top.valid , False)
-    vertex_reg_A.io.in_stream.payload  := Mux(swap, io.vertex_stream_top.payload,  B(0))
-    vertex_reg_B.io.in_stream.valid    := Mux(!swap, io.vertex_stream_top.valid, False)
-    vertex_reg_B.io.in_stream.payload  := Mux(!swap, io.vertex_stream_top.payload, B(0))
+    gather_pe_core.io.swap_done         <> swap_done
+    vertex_reg_A.io.swap_done           <> swap_done
+    vertex_reg_B.io.swap_done           <> swap_done
+    vertex_reg_A.io.rd_addr             <> gather_pe_core.io.rd_addr
+    vertex_reg_B.io.rd_addr             <> gather_pe_core.io.rd_addr
+    vertex_reg_A.io.in_stream.valid     := Mux(swap, io.vertex_stream_top.valid , False)
+    vertex_reg_A.io.in_stream.payload   := Mux(swap, io.vertex_stream_top.payload,  B(0))
+    vertex_reg_B.io.in_stream.valid     := Mux(!swap, io.vertex_stream_top.valid, False)
+    vertex_reg_B.io.in_stream.payload   := Mux(!swap, io.vertex_stream_top.payload, B(0))
     vertex_reg_A.io.srst                := Mux(!swap, swap_done, False)
     vertex_reg_B.io.srst                := Mux(swap, swap_done, False)
-    vertex_reg_A.io.rd_addr             := gather_pe_core.io.rd_addr
-    vertex_reg_B.io.rd_addr             := gather_pe_core.io.rd_addr
-    vertex_reg_A.io.swap_done           := swap_done
-    vertex_reg_B.io.swap_done           := swap_done
     gather_pe_core.io.vertex_rd_data    := Mux(!swap, vertex_reg_A.io.rd_data, vertex_reg_B.io.rd_data)
-    io.vertex_stream_top.ready := Mux(swap, vertex_reg_A.io.in_stream.ready,  vertex_reg_B.io.in_stream.ready)
-    gather_pe_busy := !gather_pe_core.io.gather_pe_done
+    io.vertex_stream_top.ready          := Mux(swap, vertex_reg_A.io.in_stream.ready,  vertex_reg_B.io.in_stream.ready)
+    gather_pe_busy                      := !gather_pe_core.io.gather_pe_done
 
     //-----------------------------------------------------
     // Other Logic
     //-----------------------------------------------------
 
-    val write_ptr = Reg(UInt(6 bits)) init 0
-    val write_valid = Reg(Bool()) init False
+    val write_ptr       = Reg(UInt(4 bits)) init 0
+    val write_valid     = Reg(Bool()) init False
+    val pe_update_value = Vec(Bits(config.spmm_prec bits), 32)
+    val pe_bundle_wire  = Vec(Vec(SInt(config.spmm_prec bits), config.core_num), 32)
 
-    for (i <- 0 until config.thread_num) {
+    for (i <- 0 until 32) {
         for (j <- 0 until 4) {
-            pe_bundle_wire(i)(j) := pe_core_update_reg(j)(i)(write_ptr).asSInt
+            pe_bundle_wire(i)(j) := pe_core_update_reg(j)(write_ptr(3 downto 1))((write_ptr(0).asUInt*32+i).resize(6)).asSInt
         }
-        pe_update_value(i) := pe_bundle_wire(i).reduceBalancedTree(_ + _)
-    }
-    for (i <- 0 until config.thread_num) {
-        update_mem(i).write(
-            enable = write_valid,
-            address = write_ptr,
-            data = pe_update_value(i).asBits
-        )
-    }
-    val read_vec = Bool()
-    val update_mem_read_vec = Vec(Vec(Bits(31 bits),32), 8)
-    read_vec := gather_pe_core.io.rd_addr(0)
-    for (i <- 0 until 8) {
-        for (k <- 0 until 32) {
-            update_mem_read_vec(i)(k) := update_mem(i).readAsync( (k+read_vec.asUInt*32).resize(6))
-        }
-    }
-    for (k <- 0 until 32) {
-        gather_pe_core.io.spmm_rd_data(k) := update_mem_read_vec(gather_pe_core.io.rd_addr(3 downto 1))(k)
+        pe_update_value(i) := pe_bundle_wire(i).reduceBalancedTree(_ + _).asBits
     }
 
+    update_mem.write(
+        enable  = write_valid,
+        address = write_ptr,
+        data    = pe_update_value.reduce(_ ## _)
+    )
 
-    io.writeback_payload    := gather_pe_core.io.writeback_payload
-    io.writeback_valid      := gather_pe_core.io.writeback_valid
-    io.bundle_busy_table <> bundle_busy_table
-    bundle_busy := bundle_busy_table.orR
+    io.writeback_payload            <> gather_pe_core.io.writeback_payload
+    io.writeback_valid              <> gather_pe_core.io.writeback_valid
+    io.bundle_busy_table            <> bundle_busy_table
+    gather_pe_core.io.spmm_rd_data  := update_mem.readAsync(gather_pe_core.io.rd_addr)
+    bundle_busy                     := bundle_busy_table.orR
 
     //-----------------------------------------------------
     // State Machine
@@ -221,9 +199,9 @@ case class PeTop(config:PeConfig) extends Component {
               when(last_update) {
                   last_update := False
               }
-              when(need_update && write_ptr =/= 63) {
+              when(need_update && write_ptr =/= 15) {
                   write_ptr     := write_ptr + 1
-              } elsewhen (need_update && write_ptr === 63) {
+              } elsewhen (need_update && write_ptr === 15) {
                   for (i <- 0 until config.core_num) {
                       update_reg_srst(i) := True
                   }
