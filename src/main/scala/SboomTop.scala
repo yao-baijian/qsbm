@@ -37,7 +37,7 @@ case class SboomTop() extends Component{
   //******************************** control signals connection *********************//
   for(i<- 0 until PeConfig().peColumnNum){
     dispatcher.io.bigPeBusyFlagVec(i) := peTop.io.bundle_busy_table(i)
-    peTop.io.last_update(i) := dispatcher.io.switchBigLineFlag
+    peTop.io.last_update(i) := dispatcher.io.bigLineSwitchFlag
     dispatcher.io.edgeFifoReadyVec(i) := peTop.io.pe_rdy_table(i)
   }
 
