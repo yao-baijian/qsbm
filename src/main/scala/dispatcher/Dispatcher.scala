@@ -156,7 +156,8 @@ case class Dispatcher() extends Component {
   val vexSwitchRegOutSelect = Reg(UInt(log2Up(2) bits)) init 0
   // only need one port, leaving the allocation function to PE section
   io.dispatchVexRegOut4Gather.payload.data := vexEdgeOutStreams(0).payload.data
-  io.dispatchVexRegOut4Gather.valid := vexEdgeOutStreams(0).valid
+  io.dispatchVexRegOut4Gather.valid := False
+
 
   //dispatchToVexRegFilePorts Connection
   val vexPeColumnSelect = Reg(UInt(log2Up(4) bits)) init 0
@@ -387,7 +388,12 @@ case class Dispatcher() extends Component {
     val vexAddrCnt = Reg(UInt(16 bits)) init 0
     val bigLineSwitchFlag = Bool()
     bigLineSwitchFlag := False
+    val bigLineSwitchFlagDly = Reg(Bool()) init False
+    when(bigLineSwitchFlag === True){
+      bigLineSwitchFlagDly := True
+    }
     io.bigLineSwitchFlag := bigLineSwitchFlag
+
 
     //    val edgeTransferCnt = Reg(UInt(8 bits)) init 0
 
@@ -426,7 +432,18 @@ case class Dispatcher() extends Component {
 
         //dispatch edge data
         //io.axiMemControlPort.ar.payload.addr := U"32'h00800000" + (32*64) * edgeAddrCnt
-        when((seperatorInDly||seperatorIn) && io.axiMemControlPort.r.last){
+        when((bigLineSwitchFlag || bigLineSwitchFlagDly) && io.axiMemControlPort.r.last){
+
+          //send vex addr for gather
+          io.axiMemControlPort.ar.payload.len := U"8'b0000_0111" // (1+1) transfer in a burst
+          io.axiMemControlPort.ar.payload.addr := U"32'h0000_0000"
+          io.axiMemControlPort.ar.valid := True
+          vexEdgeSelect := 0
+          io.dispatchVexRegOut4Gather.valid := vexEdgeOutStreams(0).valid
+
+          goto(READ_VEX_DATA_FOR_GATHER_SEND_EDGE_ADDR)
+
+        }.elsewhen((seperatorInDly||seperatorIn) && io.axiMemControlPort.r.last){
           //send vex addr
           io.axiMemControlPort.ar.payload.len := U"8'b0000_0001" // (1+1) transfer in a burst
           io.axiMemControlPort.ar.payload.addr := U"32'h0000_0000"
@@ -450,8 +467,9 @@ case class Dispatcher() extends Component {
           }
           when(io.axiMemControlPort.ar.fire){
             vexAddrCnt := vexAddrCnt + 1
+            goto(READ_VEX_DATA_SEND_EDGE_ADDR)
           }
-          goto(READ_VEX_DATA_SEND_EDGE_ADDR)
+
         }.elsewhen((seperatorInDly||seperatorIn) =/= True && io.axiMemControlPort.r.last){
           //send edge addr
           io.axiMemControlPort.ar.payload.len := U"8'b0000_0111" // (7+1) transfer in a burst
@@ -463,11 +481,14 @@ case class Dispatcher() extends Component {
           goto(READ_EDGE_DATA_SEND_VEX_ADDR)
         }
 
-        when(vexAddrCnt === 128) {
-          goto(End)
-        }.elsewhen(io.axiMemControlPort.r.last) {
+        when(edgeAddrCnt === 128){
+
+          io.axiMemControlPort.aw.payload.addr := U"32'h00800000"
+          io.axiMemControlPort.aw.valid := io.writeback_valid
+          io.axiMemControlPort.w.payload.data := io.writeback_payload
 
         }
+
       } //end of whenIsActive
 
       onExit{
@@ -475,18 +496,28 @@ case class Dispatcher() extends Component {
 
         edgeTransferCnt := 0
 
-        when(seperatorIn || seperatorInDly){
-
-        }
-
       }
 
     }// end of READ_EDGE_DATA_SEND_VEX_ADDR state
 
-    val End:State = new State {
+    val READ_VEX_DATA_FOR_GATHER_SEND_EDGE_ADDR :State = new State {
 
       whenIsActive{
+        io.axiMemControlPort.r.ready := True
 
+        when(io.axiMemControlPort.r.last){
+          //send edge addr
+          io.axiMemControlPort.ar.payload.len := U"8'b0000_0111" // (7+1) transfer in a burst
+          io.axiMemControlPort.ar.payload.addr := U"32'h00800000" + (8 * 64) * edgeAddrCnt
+          io.axiMemControlPort.ar.valid := True
+          when(io.axiMemControlPort.ar.fire){
+            edgeAddrCnt := edgeAddrCnt + 1
+          }
+          goto(READ_EDGE_DATA_SEND_VEX_ADDR)
+        }
+      }
+      onExit{
+        bigLineSwitchFlagDly := False
       }
     }
 
