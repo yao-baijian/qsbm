@@ -124,16 +124,12 @@ case class PeTop(config:PeConfig) extends Component {
         }
     }
     gather_pe_core.io.swap_done         <> swap_done
-    vertex_reg_A.io.swap_done           <> swap_done
-    vertex_reg_B.io.swap_done           <> swap_done
     vertex_reg_A.io.rd_addr             <> gather_pe_core.io.rd_addr
     vertex_reg_B.io.rd_addr             <> gather_pe_core.io.rd_addr
     vertex_reg_A.io.in_stream.valid     := Mux(swap, io.vertex_stream_top.valid , False)
     vertex_reg_A.io.in_stream.payload   := Mux(swap, io.vertex_stream_top.payload,  B(0))
     vertex_reg_B.io.in_stream.valid     := Mux(!swap, io.vertex_stream_top.valid, False)
     vertex_reg_B.io.in_stream.payload   := Mux(!swap, io.vertex_stream_top.payload, B(0))
-    vertex_reg_A.io.srst                := Mux(!swap, swap_done, False)
-    vertex_reg_B.io.srst                := Mux(swap, swap_done, False)
     gather_pe_core.io.vertex_rd_data    := Mux(!swap, vertex_reg_A.io.rd_data, vertex_reg_B.io.rd_data)
     io.vertex_stream_top.ready          := Mux(swap, vertex_reg_A.io.in_stream.ready,  vertex_reg_B.io.in_stream.ready)
     gather_pe_busy                      := !gather_pe_core.io.gather_pe_done
