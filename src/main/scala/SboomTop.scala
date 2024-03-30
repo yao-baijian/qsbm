@@ -1,17 +1,21 @@
-import dispatcher.Dispatcher
+import dispatcher._
 import spinal.core._
 import spinal.lib.bus.amba4.axi.{Axi4, Axi4Config}
-import spinal.lib.master
+import spinal.lib.{master, slave}
 import dispatcher._
+import spinal.lib.bus.amba4.axilite.{AxiLite4, AxiLite4Config}
 
 case class SboomTop() extends Component{
 
   val axiConfig = Axi4Config(addressWidth = 32, dataWidth = 512, idWidth = 4)
   val axiEdgeIndexPortConfig = Axi4Config(addressWidth = 32, dataWidth = 128, idWidth = 4)
+  val axiLiteConfig = AxiLite4Config(addressWidth = 32, dataWidth = 32)
 
   val io = new Bundle {
     val topAxiMemControlPort = master(Axi4(axiConfig))
     val topAxiEdgeIndexPort = master(Axi4(axiEdgeIndexPortConfig))
+
+    val topAxiLiteSlave = slave(AxiLite4(axiLiteConfig))
   }
 
   noIoPrefix()
@@ -26,7 +30,21 @@ case class SboomTop() extends Component{
     }
   }
 
-//  axiRename(io.topAxiMemPort, "M_AXI_")
+  def axiLiteRename(axi: AxiLite4, prefix: String): Unit = {
+    axi.flattenForeach { bt =>
+      val names = bt.getName().split("_")
+      val channelName = names(1)
+      val signalName = names.last
+      val newName = (channelName ++ signalName).toUpperCase
+      bt.setName(prefix ++ newName)
+    }
+  }
+
+  axiRename(io.topAxiMemControlPort, "M00_AXI_")
+  axiRename(io.topAxiEdgeIndexPort,  "M01_AXI_")
+  axiLiteRename(io.topAxiLiteSlave,  "S00_AXI_")
+
+  val axiLiteRegCtrl = AxiLiteRegController()
   val dispatcher = Dispatcher()
   val pe_top_config = PE.PeConfig()
   val peTop = PE.PeTop(pe_top_config)
@@ -34,6 +52,9 @@ case class SboomTop() extends Component{
   io.topAxiMemControlPort << dispatcher.io.axiMemControlPort
   io.topAxiEdgeIndexPort << dispatcher.io.axiEdgeIndexPort
 
+  //AxiLiteRegCtrl signals
+  axiLiteRegCtrl.io.axiLiteSlave << io.topAxiLiteSlave
+  dispatcher.io.read_flag := axiLiteRegCtrl.io.sbmConfigPort.startConfigRegOut(0)
   //******************************** control signals connection *********************//
   for(i<- 0 until PeConfig().peColumnNum){
     dispatcher.io.bigPeBusyFlagVec(i) := peTop.io.bundle_busy_table(i)

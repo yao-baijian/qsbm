@@ -296,6 +296,12 @@ case class Dispatcher() extends Component {
     val endLineFlag = Reg(Bool()) init False
     val peColumnSelectInOrderCnt = Reg(UInt(2 bits)) init 0
 
+    // test code, no usage
+    val testCnt = Reg(UInt(8 bits)) init 0
+    when(io.read_flag){
+      testCnt := testCnt + 1
+    }
+
     //******************************* READ_IDLE ***********************************//
     val READ_IDLE = new State with EntryPoint {
       whenIsActive{
