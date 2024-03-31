@@ -86,7 +86,7 @@ case class PeTop(config:PeConfig) extends Component {
         pecore_array(i).io_global_reg.vertex_stream <> io.vertex_stream(i)
         pecore_array(i).io_state.last_update        <> io.last_update(i)
         pecore_array(i).io_state.all_zero           <> all_zero(i)
-        pecore_array(i).io_state.switch_done        <> swap_done
+        pecore_array(i).io_state.swap_done          <> swap_done
         io.pe_rdy_table(i)                          := pe_rdy_table_all(i).orR
         all_zero(i)                                 := all_zero_table(i).andR
 
