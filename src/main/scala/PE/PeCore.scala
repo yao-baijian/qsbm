@@ -22,7 +22,7 @@ case class PeCore(config: PeConfig) extends Component {
 
     val io_state = new Bundle {
         val last_update = in Bool()
-        val switch_done = in Bool()
+        val swap_done = in Bool()
         val all_zero = in Bool()
         val pe_busy = out Bool()
         val need_new_vertex = out Bool()
@@ -50,67 +50,67 @@ case class PeCore(config: PeConfig) extends Component {
     val pe_config = PeConfig()
     val global_reg = GlobalReg(pe_config)
 
-    val vertex_addr = Vec(UInt(config.addr_width bits), config.thread_num)
-    val vertex_data = Vec(Bits(config.data_width bits), config.thread_num)
-    val edge_value = Vec(Bits(config.data_width bits), config.thread_num)
-    val tag_value = Vec(Bits(config.tag_width - 1 bits), config.thread_num)
-    val edge_valid = Vec(Bool(), config.thread_num)
-    val pe_busy = Reg(Bool()) init False
-    val need_new_vertex = Reg(Bool()) init False
-    val fifo_rdy = Vec(Reg(Bool()) init True, config.thread_num)
+    val vertex_addr         = Vec(UInt(config.addr_width bits), config.thread_num)
+    val vertex_data         = Vec(Bits(config.data_width bits), config.thread_num)
+    val edge_value          = Vec(Bits(config.data_width bits), config.thread_num)
+    val tag_value           = Vec(Bits(config.tag_width - 1 bits), config.thread_num)
+    val edge_valid          = Vec(Bool(), config.thread_num)
+    val pe_busy             = Reg(Bool()) init False
+    val need_new_vertex     = Reg(Bool()) init False
+    val fifo_rdy            = Vec(Reg(Bool()) init True, config.thread_num)
 
     //-----------------------------------------------------------
     // Value Declaration
     // Frontend
     //-----------------------------------------------------------
-    val f0_valid = Vec(Bool(), config.thread_num)
-    val real_addr_f0 = Vec(UInt(config.extend_addr_width bits), config.thread_num)
-    val intrahaz_vec_f0 = Vec(Vec(Bool(), config.thread_num), config.thread_num)
-    val intrahaz_val_f0 = Vec(Vec(Bool(), config.thread_num), config.thread_num)
-    val intrahaz_f0 = Vec(Bool(), config.thread_num)
-    val intrahaz_poz_s0_f0 = Vec(UInt(3 bits), config.thread_num)
+    val f0_valid            = Vec(Bool(), config.thread_num)
+    val real_addr_f0        = Vec(UInt(config.extend_addr_width bits), config.thread_num)
+    val intrahaz_vec_f0     = Vec(Vec(Bool(), config.thread_num), config.thread_num)
+    val intrahaz_val_f0     = Vec(Vec(Bool(), config.thread_num), config.thread_num)
+    val intrahaz_f0         = Vec(Bool(), config.thread_num)
+    val intrahaz_poz_s0_f0  = Vec(UInt(3 bits), config.thread_num)
     val intrahaz_poz_add_p1_f0 = Vec(UInt(2 bits), 4)
     val intrahaz_poz_add_p2_f0 = Vec(UInt(3 bits), 2)
-    val intrahaz_all_val = UInt(3 bits)
+    val intrahaz_all_val    = UInt(3 bits)
 
-    val f1_valid = Vec(Reg(Bool()) init False, config.thread_num)
-    val entry_valid_f1 = Vec(Reg(Bool()) init False, config.thread_num)
-    val edge_value_f1 = Vec(Reg(SInt(config.edge_width bits)) init 0, config.thread_num)
-    val update_ram_addr_f1 = Vec(Reg(UInt(config.extend_addr_width bits)) init 0, config.thread_num)
-    val vertex_reg_addr_f1 = Vec(Reg(UInt(config.addr_width bits)) init 0, config.thread_num)
-    val intrahaz_table_f1 = Vec(Reg(Bits(config.haz_table_width bits)) init 0, config.thread_num)
-    val interhaz_f1 = Vec(Bits(8 bits), config.thread_num)
-    val interhaz_val_f1 = Vec(Bool(), config.thread_num)
-    val interhaz_index = Vec(Vec(Bool(), 3), config.thread_num)
-    val interhaz_temp1 = Vec(Bits(4 bits), config.thread_num)
-    val interhaz_temp2 = Vec(Bits(2 bits), config.thread_num)
+    val f1_valid            = Vec(Reg(Bool()) init False, config.thread_num)
+    val entry_valid_f1      = Vec(Reg(Bool()) init False, config.thread_num)
+    val edge_value_f1       = Vec(Reg(SInt(config.edge_width bits)) init 0, config.thread_num)
+    val update_ram_addr_f1  = Vec(Reg(UInt(config.extend_addr_width bits)) init 0, config.thread_num)
+    val vertex_reg_addr_f1  = Vec(Reg(UInt(config.addr_width bits)) init 0, config.thread_num)
+    val intrahaz_table_f1   = Vec(Reg(Bits(config.haz_table_width bits)) init 0, config.thread_num)
+    val interhaz_f1         = Vec(Bits(8 bits), config.thread_num)
+    val interhaz_val_f1     = Vec(Bool(), config.thread_num)
+    val interhaz_index      = Vec(Vec(Bool(), 3), config.thread_num)
+    val interhaz_temp1      = Vec(Bits(4 bits), config.thread_num)
+    val interhaz_temp2      = Vec(Bits(2 bits), config.thread_num)
     val intrahaz_adder_table_f1 = Vec(Vec(Reg(Bool()) init False, config.thread_num), config.thread_num)
-    val adder_en_f1 = Vec(Reg(Bits(config.haz_table_width bits)) init 0, config.extra_adder_num)
+    val adder_en_f1         = Vec(Reg(Bits(config.haz_table_width bits)) init 0, config.extra_adder_num)
 
     //-----------------------------------------------------------
     // Pipeline
     //-----------------------------------------------------------
 
-    val h1_valid = Vec(Reg(Bool()) init False, config.thread_num)
-    val edge_value_h1 = Vec(Reg(SInt(config.edge_width bits)) init 0, config.thread_num)
-    val vertex_reg_data_h1 = Vec(SInt(config.data_width bits), config.thread_num)
-    val multiply_data_h1 = Vec(SInt(20 bits), config.thread_num)
-    val entry_valid_h1 = Vec(Reg(Bool()) init False, config.thread_num)
-    val interhaz_table_h1 = Vec(Reg(Bits(config.haz_table_width bits)) init 0, config.thread_num)
-    val intrahaz_table_h1 = Vec(Reg(Bits(config.haz_table_width bits)) init 0, config.thread_num)
+    val h1_valid            = Vec(Reg(Bool()) init False, config.thread_num)
+    val edge_value_h1       = Vec(Reg(SInt(config.edge_width bits)) init 0, config.thread_num)
+    val vertex_reg_data_h1  = Vec(Reg(SInt(config.data_width bits)), config.thread_num)
+    val multiply_data_h1    = Vec(SInt(20 bits), config.thread_num)
+    val entry_valid_h1      = Vec(Reg(Bool()) init False, config.thread_num)
+    val interhaz_table_h1   = Vec(Reg(Bits(config.haz_table_width bits)) init 0, config.thread_num)
+    val intrahaz_table_h1   = Vec(Reg(Bits(config.haz_table_width bits)) init 0, config.thread_num)
     val intrahaz_adder_table_h1 = Vec(Vec(Reg(Bool()) init False, config.thread_num), config.thread_num)
-    val updata_data_old_h1 = Vec(Reg(SInt(config.spmm_prec bits)) init 0, config.thread_num)
-    val update_ram_addr_h1 = Vec(Reg(UInt(config.extend_addr_width bits)) init 0, config.thread_num)
-    val forward_data_h1 = Vec(SInt(config.spmm_prec bits), config.thread_num)
+    val updata_data_old_h1  = Vec(Reg(SInt(config.spmm_prec bits)) init 0, config.thread_num)
+    val update_ram_addr_h1  = Vec(Reg(UInt(config.extend_addr_width bits)) init 0, config.thread_num)
+    val forward_data_h1     = Vec(SInt(config.spmm_prec bits), config.thread_num)
     val normal_update_data_h1 = Vec(SInt(config.spmm_prec bits), config.thread_num)
-    val updata_data_h1 = Vec(SInt(config.spmm_prec bits), config.thread_num)
-    val adder_en_h1 = Vec(Reg(Bits(config.haz_table_width bits)) init 0, config.extra_adder_num)
+    val updata_data_h1      = Vec(SInt(config.spmm_prec bits), config.thread_num)
+    val adder_en_h1         = Vec(Reg(Bits(config.haz_table_width bits)) init 0, config.extra_adder_num)
     val extra_update_data_h1 = Vec(SInt(config.spmm_prec bits), config.extra_adder_num)
-    val adder_s1_h1 = Vec(Vec(SInt(config.spmm_prec bits), config.thread_num + 1), config.extra_adder_num)
+    val adder_s1_h1         = Vec(Vec(SInt(config.spmm_prec bits), config.thread_num + 1), config.extra_adder_num)
 
-    val h2_valid = Vec(Reg(Bool()) init False, config.thread_num)
-    val update_data_h2 = Vec(Reg(SInt(config.spmm_prec bits)), config.thread_num)
-    val update_ram_addr_h2 = Vec(Reg(UInt(config.extend_addr_width bits)) init 0, config.thread_num)
+    val h2_valid            = Vec(Reg(Bool()) init False, config.thread_num)
+    val update_data_h2      = Vec(Reg(SInt(config.spmm_prec bits)), config.thread_num)
+    val update_ram_addr_h2  = Vec(Reg(UInt(config.extend_addr_width bits)) init 0, config.thread_num)
 
     //-----------------------------------------------------------
     // Wiring
@@ -141,7 +141,7 @@ case class PeCore(config: PeConfig) extends Component {
         val IDLE = new State with EntryPoint
         val OPERATE = new State
         val WAIT = new State
-        val PAUSE = new State
+        val UPDATE_SUM_AND_SWITCH = new State
 
         IDLE
           .whenIsActive {
@@ -152,7 +152,7 @@ case class PeCore(config: PeConfig) extends Component {
                   for (i <- 0 until config.thread_num) {
                       fifo_rdy(i) := False
                   }
-                  goto(PAUSE)
+                  goto(UPDATE_SUM_AND_SWITCH)
               } elsewhen (!need_new_vertex && edge_valid.orR === True) {
                   pe_busy := True
                   for (i <- 0 until config.thread_num) {
@@ -174,7 +174,7 @@ case class PeCore(config: PeConfig) extends Component {
                       for (i <- 0 until config.thread_num) {
                           fifo_rdy(i) := False
                       }
-                      goto(PAUSE)
+                      goto(UPDATE_SUM_AND_SWITCH)
                   } otherwise {
                       pe_busy := False
                       need_new_vertex := True
@@ -182,9 +182,9 @@ case class PeCore(config: PeConfig) extends Component {
                   }
               }
           }
-        PAUSE
+        UPDATE_SUM_AND_SWITCH
           .whenIsActive {
-              when(io_state.switch_done) {
+              when(io_state.swap_done) {
                   pe_busy := False
                   for (i <- 0 until config.thread_num) {
                       fifo_rdy(i) := True

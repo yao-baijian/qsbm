@@ -20,8 +20,8 @@ case class DualModeReg(config: PeConfig) extends Component{
 
     val vertex_mem  = Mem(Bits(config.axi_extend_width bits), 16)
     val wr_pointer  = Reg(UInt(4 bits))  init 0
-    val ready       = Reg(Bool())               init True
-    io.in_stream.ready := ready
+//    val ready       = Reg(Bool())               init True
+    io.in_stream.ready := True
 
     when(io.in_stream.valid && wr_pointer =/= 15 ) {
         wr_pointer := wr_pointer + 1
