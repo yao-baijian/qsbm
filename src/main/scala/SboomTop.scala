@@ -14,7 +14,6 @@ case class SboomTop() extends Component{
   val io = new Bundle {
     val topAxiMemControlPort = master(Axi4(axiConfig))
     val topAxiEdgeIndexPort = master(Axi4(axiEdgeIndexPortConfig))
-
     val topAxiLiteSlave = slave(AxiLite4(axiLiteConfig))
   }
 
