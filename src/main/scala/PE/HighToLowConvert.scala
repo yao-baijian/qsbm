@@ -12,6 +12,7 @@ case class HighToLowConvert(config:PeConfig) extends Component {
         val in_tag_stream = Vec(slave Stream (Bits(config.tag_extend_width bits)), config.core_num)
         val out_edge_stream = Vec(Vec(master Stream (Bits(config.data_width bits)), config.thread_num), config.core_num)
         val out_tag_stream = Vec(Vec(master Stream (Bits(config.tag_width - 1 bits)), config.thread_num), config.core_num)
+        val all_zero     = out Vec(Bool(), config.core_num)
     }
     //-----------------------------------------------------
     // Module Declaration
@@ -20,9 +21,9 @@ case class HighToLowConvert(config:PeConfig) extends Component {
     val edge_convert_fifo   = new Array[StreamFifo[Bits]](config.core_num)
     val tag_convert_fifo    = new Array[StreamFifo[Bits]](config.core_num)
     val all_zero_ff         = Vec(Reg(Bool()) init True ,config.core_num)
-    val single_zero_inval   = Vec(Vec(Bool(),config.thread_num),config.core_num)
     val ready_table         = Vec(Vec(Bool(),config.thread_num),config.core_num)
     val ready_reg           = Vec(Reg(Bool()) init True ,config.core_num)
+    val all_zero_inval         = Vec(Bool(),config.core_num)
     //-----------------------------------------------------
     // Module Instantiation
     //-----------------------------------------------------
@@ -42,9 +43,10 @@ case class HighToLowConvert(config:PeConfig) extends Component {
         tag_convert_fifo(i).io.push.payload     := io.in_tag_stream(i).payload
         io.in_edge_stream(i).ready              := edge_convert_fifo(i).io.push.ready
         io.in_tag_stream(i).ready               := edge_convert_fifo(i).io.push.ready
+        io.all_zero(i)                          := !all_zero_inval(i)
 
         for (j <- 0 until config.thread_num) {
-            io.out_edge_stream(i)(j).valid  := all_zero_ff(i) & single_zero_inval(i)(j) & edge_convert_fifo(i).io.pop.valid
+            io.out_edge_stream(i)(j).valid  := all_zero_ff(i)  & edge_convert_fifo(i).io.pop.valid
             io.out_tag_stream(i)(j).valid   := io.out_edge_stream(i)(j).valid
             io.out_edge_stream(i)(j).payload:= edge_convert_fifo(i).io.pop.payload.subdivideIn(config.axi_width bits)(counter_group(i).value)(config.data_width * (j + 1) - 1 downto config.data_width * j)
             io.out_tag_stream(i)(j).payload := tag_convert_fifo(i).io.pop.payload.subdivideIn(config.tag_width_full bits)(counter_group(i).value)(config.tag_width * (j + 1) - 2 downto config.tag_width * j)
@@ -61,28 +63,18 @@ case class HighToLowConvert(config:PeConfig) extends Component {
             counter_group(i).increment()
         }
 
-        val all_zero_inval         = Vec(Bool(),config.core_num)
+
         when(edge_convert_fifo(i).io.pop.valid) {
-            when(!all_zero_inval(i)) {
+            when (!all_zero_inval(i)) {
                 all_zero_ff(i) := False
+            } otherwise {
+                all_zero_ff(i) := all_zero_ff(i)
             }
         } otherwise {
             all_zero_ff(i) := True
         }
 
-        when(edge_convert_fifo(i).io.pop.valid && edge_convert_fifo(i).io.pop.payload.subdivideIn(config.axi_width bits)(counter_group(i).value) === 0) {
-            all_zero_inval(i) := False
-        } otherwise {
-            all_zero_inval(i) := True
-        }
-
-        for (j <- 0 until config.thread_num) {
-            when(edge_convert_fifo(i).io.pop.valid && all_zero_inval(i) && edge_convert_fifo(i).io.pop.payload.subdivideIn(config.axi_width bits)(counter_group(i).value)(config.data_width * (j + 1) - 1 downto config.data_width * j) === 0) {
-                single_zero_inval(i)(j) := False
-            } otherwise {
-                single_zero_inval(i)(j) := True
-            }
-        }
+        all_zero_inval(i) := (edge_convert_fifo(i).io.pop.valid && edge_convert_fifo(i).io.pop.payload.subdivideIn(config.axi_width bits)(counter_group(i).value) === 0) ? False | True
     }
 }
 

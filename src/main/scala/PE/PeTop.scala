@@ -56,7 +56,6 @@ case class PeTop(config:PeConfig) extends Component {
     val update_reg_srst         = Vec(Reg(Bool()),config.core_num)
     val pe_rdy_table_all        = Vec(Vec(Bool(), config.thread_num),config.core_num)
     val all_zero                = Vec(Bool(), config.core_num)
-    val all_zero_table          = Vec(Vec(Bool(), config.thread_num), config.core_num)
     val Config                  = PeConfig()
 
     //-----------------------------------------------------
@@ -88,11 +87,10 @@ case class PeTop(config:PeConfig) extends Component {
         pecore_array(i).io_state.all_zero           <> all_zero(i)
         pecore_array(i).io_state.swap_done          <> swap_done
         io.pe_rdy_table(i)                          := pe_rdy_table_all(i).orR
-        all_zero(i)                                 := all_zero_table(i).andR
+        all_zero(i)                                 := high_to_low_converter.io.all_zero(i)
 
         for (j <- 0 until config.thread_num) {
             pe_rdy_table_all(i)(j)              <> pecore_array(i).io_fifo.pe_fifo(j).ready
-            all_zero_table(i)(j)                := (high_to_low_converter.io.out_edge_stream(i)(j).payload === 0) & high_to_low_converter.io.out_edge_stream(i)(j).valid
             pecore_array(i).io_fifo.pe_fifo(j)  <> high_to_low_converter.io.out_edge_stream(i)(j)
             pecore_array(i).io_fifo.pe_tag(j)   <> high_to_low_converter.io.out_tag_stream(i)(j)
             for (k <- 0 until config.matrix_size) {

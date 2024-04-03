@@ -63,11 +63,13 @@ case class PeCore(config: PeConfig) extends Component {
     // Value Declaration
     // Frontend
     //-----------------------------------------------------------
-    val f0_valid            = Vec(Bool(), config.thread_num)
-    val real_addr_f0        = Vec(UInt(config.extend_addr_width bits), config.thread_num)
+    val f0_valid            = Vec(Reg(Bool()) init False, config.thread_num)
+    val real_addr_f0        = Vec(Reg(UInt(config.extend_addr_width bits)) init 0, config.thread_num)
     val intrahaz_vec_f0     = Vec(Vec(Bool(), config.thread_num), config.thread_num)
     val intrahaz_val_f0     = Vec(Vec(Bool(), config.thread_num), config.thread_num)
     val intrahaz_f0         = Vec(Bool(), config.thread_num)
+    val vertex_reg_addr_f0  = Vec(Reg(UInt(config.addr_width bits)) init 0, config.thread_num)
+    val edge_value_f0       = Vec(Reg(SInt(config.edge_width bits)) init 0, config.thread_num)
 
     val f1_valid            = Vec(Reg(Bool()) init False, config.thread_num)
     val entry_valid_f1      = Vec(Reg(Bool()) init False, config.thread_num)
@@ -184,7 +186,8 @@ case class PeCore(config: PeConfig) extends Component {
           }
         WAIT
           .whenIsActive {
-              when(h2_valid.orR === False) {
+              // TODO arbitration need change
+              when(h3_valid.orR === False) {
                   when(io_state.last_update) {
                       for (i <- 0 until config.thread_num) {
                           fifo_rdy(i) := False
@@ -214,11 +217,12 @@ case class PeCore(config: PeConfig) extends Component {
     // Frontend
     // f0  find intra stage hazard
     //-----------------------------------------------------------
-    // TODO POWER OVERHEAD?
 
     for (i <- 0 until config.thread_num) {
-        real_addr_f0(i) := ((tag_value(i).asUInt - 1) ## edge_value(i)(9 downto 4)).asUInt
-        f0_valid(i)     := fifo_rdy(i) && edge_valid(i) && edge_value(i) =/= 0
+        f0_valid(i)             := fifo_rdy(i) && edge_valid(i) && edge_value(i) =/= 0
+        vertex_reg_addr_f0(i)   := edge_value(i)(15 downto 10).asUInt
+        edge_value_f0(i)        := edge_value(i)(3 downto 0).asSInt
+        real_addr_f0(i)         := ((tag_value(i).asUInt - 1) ## edge_value(i)(9 downto 4)).asUInt
     }
 
     for (i <- 0 until config.thread_num - 1) {
@@ -252,9 +256,9 @@ case class PeCore(config: PeConfig) extends Component {
     for (i <- 0 until config.thread_num) {
         when(f0_valid(i)) {
             f1_valid(i)             := True
-            vertex_reg_addr_f1(i)   := edge_value(i)(15 downto 10).asUInt
+            vertex_reg_addr_f1(i)   := vertex_reg_addr_f0(i)
             update_ram_addr_f1(i)   := real_addr_f0(i)
-            edge_value_f1(i)        := edge_value(i)(3 downto 0).asSInt
+            edge_value_f1(i)        := edge_value_f0(i)
             intrahaz_f1(i)          := intrahaz_f0(i)
             entry_valid_f1(i)       := !intrahaz_val_f0(i).orR
             for (j <- 0 until config.thread_num) {
