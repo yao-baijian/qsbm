@@ -13,6 +13,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
 import scala.math._
 import scala.util.Random
+import scala.util.control.Breaks
 
 class SboomTopTest extends AnyFunSuite {
 
@@ -110,6 +111,7 @@ class SboomTopTest extends AnyFunSuite {
     // To deal with all lines within good interval and all column blocks
     var blockEmpty = 0
     var bigLineBlockCnt = 0
+    var jumpStep = 0
 
     for (base <- 0 until (goodIntervalBound) by PeConfig().peNumEachColumn) {
       for (col <- 0 until arrayWidth) { //arrayWidth is the number of 64 * 64 blocks
@@ -119,6 +121,7 @@ class SboomTopTest extends AnyFunSuite {
           flag = 0
           for (offset <- 0 until PeConfig().peNumEachColumn) {
             if (blocks(base + offset)(col).nonEmpty) {
+
               blockEmpty = 0
               flag = flag + 1
               edgeCnt = edgeCnt + 1
@@ -149,6 +152,7 @@ class SboomTopTest extends AnyFunSuite {
 
         if(flag == 0){
 //        println("transfer_128 and edgeCnt",transfer_128,edgeCnt)
+          jumpStep = 0
           bigLineBlockCnt = bigLineBlockCnt + 1
           blockEmpty = blockEmpty + 1
           if(blockEmpty == 1){
@@ -175,12 +179,42 @@ class SboomTopTest extends AnyFunSuite {
               edgeCnt = edgeCnt + 1
               edgesArrayBuffer.append(edge)
             }
-            //edgeIndexPadding to make 32b index packet
-            for(i <- 0 until 4){
-              edgeIndexBuffer.append(0.toByte)
+//            //edgeIndexPadding to make 32b index packet
+//            for(i <- 0 until 4){
+//              edgeIndexBuffer.append(0.toByte)
+//            }
+            //break implementatioin in scala
+            val out = new Breaks
+            val inner = new Breaks
+            out.breakable {
+              for (i <- col+1 until arrayWidth) {
+                inner.breakable { // detect one column
+                  for (offset <- 0 until PeConfig().peNumEachColumn) {
+                    if (blocks(base + offset)(i).nonEmpty) {
+                      jumpStep = 0
+                      out.break()
+                    }
+                  }
+                }
+                // if can go out of the for-loop above,then it is an empty column, jumpStep + 1
+                jumpStep = jumpStep + 1
+              }
+            }
+            println("jumpStep",jumpStep)
+            //edgeIndexPadding to make 32b index packet,real padding index
+            if (jumpStep>0){
+              edgeIndexBuffer.append(((jumpStep >> 24) | 0xFF).toByte)
+              edgeIndexBuffer.append(((jumpStep >> 16) & 0xFF).toByte)
+              edgeIndexBuffer.append(((jumpStep >> 8) & 0xFF).toByte)
+              edgeIndexBuffer.append(((jumpStep) & 0xFF).toByte)
+
+            }else {
+              for(i <- 0 until 4){
+                edgeIndexBuffer.append(0.toByte)
+              }
             }
             transfer_128 = transfer_128 + 1
-//            println("debug transfer_128",transfer_128)
+//          println("debug transfer_128",transfer_128)
 
             //judge the number of 128b transfers after the force-added 128'b0 seperator
             if(transfer_128 % 4 == 1){
@@ -223,14 +257,19 @@ class SboomTopTest extends AnyFunSuite {
     }
 
     //To deal with remaining blocks
+    var jumpStep1 = 0
     if (remainder > 0) {
       for (col <- 0 until arrayWidth) {
         do {
           flag = 0
           for (offset <- 0 until remainder) {
             if (blocks(goodIntervalBound + offset)(col).nonEmpty) {
+              println("queue nonempty in remaindar",goodIntervalBound,col)
               blockEmpty = 0
               flag = flag + 1
+
+              val edge = blocks(goodIntervalBound+offset)(col).dequeue()
+              edgesArrayBuffer.append(edge)
               edgeCnt = edgeCnt + 1
               if(edgeCnt>0 && edgeCnt%8 == 0){
                 transfer_128 = transfer_128 + 1
@@ -245,8 +284,7 @@ class SboomTopTest extends AnyFunSuite {
                 edgeIndexBuffer.append(edgeIndexByte.toByte)
                 edgeIndexByte = 0
               }
-              val edge = blocks(goodIntervalBound)(col).dequeue()
-              edgesArrayBuffer.append(edge)
+
             } else {
               //Do Nothing
 //              val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
@@ -262,6 +300,7 @@ class SboomTopTest extends AnyFunSuite {
         } while (flag > 0)
 
         if (flag == 0) {
+          jumpStep1 = 0
           blockEmpty = blockEmpty + 1
           if(blockEmpty == 1){
             //          println("-------transfer_128----------",transfer_128)
@@ -281,15 +320,46 @@ class SboomTopTest extends AnyFunSuite {
               transfer_128 = transfer_128 + 1
             }
 
-            // add extra seperator with 128bit all zeros
+            // forced to add extra seperator with 128bit all zeros
             for(i <- 0 until 8){
               val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
               edgeCnt = edgeCnt + 1
               edgesArrayBuffer.append(edge)
             }
+
+
             //edgeIndexPadding to make 32b index packet
-            for(i <- 0 until 4){
-              edgeIndexBuffer.append(0.toByte)
+//            for(i <- 0 until 4){
+//              edgeIndexBuffer.append(0.toByte)
+//            }
+            //break implementatioin in scala
+            val out1 = new Breaks
+            val inner1 = new Breaks
+            out1.breakable {
+              for (i <- col+1 until arrayWidth) {
+                inner1.breakable { // detect one column
+                  for (offset <- 0 until PeConfig().peNumEachColumn) {
+                    if (blocks(goodIntervalBound + offset)(i).nonEmpty) {
+                      jumpStep1 = 0
+                      out1.break()
+                    }
+                  }
+                }
+                // if can go out of the for-loop above,then it is an empty column, jumpStep + 1
+                jumpStep1 = jumpStep1 + 1
+              }
+            }
+//          println("jumpStep",jumpStep)
+            //edgeIndexPadding to make 32b index packet,real padding index
+            if (jumpStep1>0){
+              edgeIndexBuffer.append(((jumpStep1 >> 24) | 0xFF).toByte)
+              edgeIndexBuffer.append(((jumpStep1 >> 16) & 0xFF).toByte)
+              edgeIndexBuffer.append(((jumpStep1 >> 8) & 0xFF).toByte)
+              edgeIndexBuffer.append(((jumpStep1) & 0xFF).toByte)
+            }else {
+              for(i <- 0 until 4){
+                edgeIndexBuffer.append(0.toByte)
+              }
             }
             transfer_128 = transfer_128 + 1
 
@@ -306,7 +376,6 @@ class SboomTopTest extends AnyFunSuite {
               transfer_128 = transfer_128 + 1
               edgesArrayBuffer.append(padding)
             }
-
           }
 
           // bigLine End flag with additional 512'b0(equivalent to add another 512'b0 seperator after the first seperator)
@@ -315,8 +384,6 @@ class SboomTopTest extends AnyFunSuite {
             transfer_128 = transfer_128 + 4
             edgesArrayBuffer.append(edgePadding)
           }
-
-
         }
       }
     }
@@ -384,8 +451,6 @@ class SboomTopTest extends AnyFunSuite {
 //      axiMemSimModel1.memory.writeArray(0x400000,edgeIndex)
       axiMemSimModel2.memory.writeArray(0x400000,edgeIndex)
       axiMemSimModel1.memory.writeArray(0x800000, edge)
-
-
 
       dut.clockDomain.waitSampling(count = 8)
       dut.clockDomain.waitSampling(count = 100)

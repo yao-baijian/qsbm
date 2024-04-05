@@ -63,7 +63,6 @@ case class Dispatcher() extends Component {
     val writeback_valid     = in Bool()
     val writeback_payload   = in Bits(DispatcherConfig().size bits)
 
-
   }
 
   noIoPrefix()
@@ -356,19 +355,23 @@ case class Dispatcher() extends Component {
           }
         }
 
-        //send edge addr
-        //axiEdgeIndexPort for Edge Index
-        io.axiEdgeIndexPort.ar.valid := True
-        io.axiEdgeIndexPort.ar.payload.len := U"8'b0000_1111" //burst length = 15 + 1
-        io.axiEdgeIndexPort.ar.payload.addr := U"32'h00400000" + (16 * 16) * edgeAddrCnt
+        when(io.axiMemControlPort.r.last){
 
-        // axiMemControlPort for Edge Data
-        io.axiMemControlPort.ar.valid := True
-        io.axiMemControlPort.ar.payload.len := U"8'b0000_0111" //burst length = 7 + 1
-        io.axiMemControlPort.ar.payload.addr := U"32'h00800000" + (8 * 64) * edgeAddrCnt
-        when(io.axiMemControlPort.ar.fire){
-          edgeAddrCnt := edgeAddrCnt + 1
+          //send edge addr
+          //axiEdgeIndexPort for Edge Index
+          io.axiEdgeIndexPort.ar.valid := True
+          io.axiEdgeIndexPort.ar.payload.len := U"8'b0000_0111" //burst length = 7 + 1
+          io.axiEdgeIndexPort.ar.payload.addr := U"32'h00400000" + (8 * 16) * edgeAddrCnt
+
+          // axiMemControlPort for Edge Data
+          io.axiMemControlPort.ar.valid := True
+          io.axiMemControlPort.ar.payload.len := U"8'b0000_0111" //burst length = 7 + 1
+          io.axiMemControlPort.ar.payload.addr := U"32'h00800000" + (8 * 64) * edgeAddrCnt
+          when(io.axiMemControlPort.ar.fire){
+            edgeAddrCnt := edgeAddrCnt + 1
+          }
         }
+
       }
 
       onExit {
@@ -415,6 +418,8 @@ case class Dispatcher() extends Component {
 
       whenIsActive {
         io.axiMemControlPort.r.ready := True
+        io.axiEdgeIndexPort.r.ready := True
+
         edgeCacheFifo.io.push.valid := vexEdgeOutStreams(1).valid
         edgeTransferCnt := edgeTransferCnt + 1
 
@@ -477,6 +482,12 @@ case class Dispatcher() extends Component {
           }
 
         }.elsewhen((seperatorInDly||seperatorIn) =/= True && io.axiMemControlPort.r.last){
+
+          //axiEdgeIndexPort for Edge Index
+          io.axiEdgeIndexPort.ar.valid := True
+          io.axiEdgeIndexPort.ar.payload.len := U"8'b0000_0111" //burst length = 7 + 1
+          io.axiEdgeIndexPort.ar.payload.addr := U"32'h00400000" + (8 * 16) * edgeAddrCnt
+
           //send edge addr
           io.axiMemControlPort.ar.payload.len := U"8'b0000_0111" // (7+1) transfer in a burst
           io.axiMemControlPort.ar.payload.addr := U"32'h00800000" + (8 * 64) * edgeAddrCnt
@@ -510,6 +521,7 @@ case class Dispatcher() extends Component {
 
       whenIsActive{
         io.axiMemControlPort.r.ready := True
+        io.dispatchVexRegOut4Gather.valid := True
 
         when(io.axiMemControlPort.r.last){
           //send edge addr
