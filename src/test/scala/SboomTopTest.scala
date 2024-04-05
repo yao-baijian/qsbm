@@ -17,7 +17,25 @@ import scala.util.control.Breaks
 
 class SboomTopTest extends AnyFunSuite {
 
-    def dataGen(): Array[Byte] = {
+  object MySpinalConfig extends SpinalConfig(
+    defaultConfigForClockDomains = ClockDomainConfig(resetKind = ASYNC,resetActiveLevel = HIGH),
+    targetDirectory = "fpga/target",
+    oneFilePerComponent = false
+  )
+
+  val simConfig = SpinalSimConfig(_spinalConfig = MySpinalConfig)
+  //val xSimConfig = simConfig.copy(_workspacePath = "xSimWorkspace".withXSim.withXSimSourcesPaths(xciSource)Paths,ArrayBuffer(""))
+
+  //    val compiled= simConfig.withWave.withXilinxDevice("xczu7ev-ffvc1156-2-e").withXSim.compile(SboomTop())
+  val compiled= simConfig.withWave.compile(SboomTop())
+
+
+  //  val compiled= xSimConfig.withWave.compile(SboomTop())
+  //  val axiMemSimConfig = AxiMemorySimConfig()
+  //  val axiMemSimModel = AxiMemorySim(compiled.dut.io.topAxiMemControlPort, compiled.dut.clockDomain, axiMemSimConfig)
+
+
+  def dataGen(): Array[Byte] = {
       val data = new Array[Byte](100)
 
       for (i <- 0 until 100) {
@@ -89,16 +107,45 @@ class SboomTopTest extends AnyFunSuite {
       // To deal with all lines within good interval and all column blocks
       var blockEmpty = 0
       var bigLineBlockCnt = 0
-      var jumpStep = 0
+      var jumpStep1 = 0
 
       for (base <- 0 until (goodIntervalBound) by PeConfig().peNumEachColumn) {
         for (col <- 0 until arrayWidth) { //arrayWidth is the number of 64 * 64 blocks
-          flag = 0
+          jumpStep1 = 0
+          // firsr walk through the big column and find the last one with valid data
+          var lastNonEmptyBlockNum = 0
+          for(offset <- 0 until PeConfig().peNumEachColumn){
+            if(blocks(base + offset)(col).nonEmpty){
+              lastNonEmptyBlockNum = offset
+            }
+          }
+          // add the edges in respective small blocks in one big column
           for (offset <- 0 until PeConfig().peNumEachColumn) {
+            if(offset == lastNonEmptyBlockNum ){
+              //look ahead to calculate how many jumps needed
+              //break implementatioin in scala
+              val out1 = new Breaks
+              val inner1 = new Breaks
+              out1.breakable {
+                for (i <- col+1 until arrayWidth) {
+                  inner1.breakable { // detect one column
+                    for (offset <- 0 until PeConfig().peNumEachColumn) {
+                      if (blocks(base + offset)(i).nonEmpty) {
+                        jumpStep1 = 0
+                        out1.break()
+                      }
+                    }
+                  }
+                  // if can go out of the for-loop above,then it is an empty column, jumpStep + 1
+                  jumpStep1 = jumpStep1 + 1
+                }
+              }
+//              println("jumpStep1",jumpStep1)
+            }
             // first add header for one small block in one big column
             if (blocks(base + offset)(col).nonEmpty) {
               val edge1 = ArrayBuffer[Byte](0.toByte, offset.toByte)
-              val edge2 = ArrayBuffer[Byte](0.toByte, offset.toByte)
+              val edge2 = ArrayBuffer[Byte](jumpStep1.toByte, 0.toByte)
               edgesArrayBuffer.append(edge1)
               edgesArrayBuffer.append(edge2)
             }
@@ -107,7 +154,7 @@ class SboomTopTest extends AnyFunSuite {
               val edge = blocks(base + offset)(col).dequeue()
               edgesArrayBuffer.append(edge)
             }
-            //
+            // add extra padding zeros to make up for 128b
             if(blocks(base + offset)(col).isEmpty){
               var edgePaddingTo128Remainder = edgesArrayBuffer.length % 8
               if(edgePaddingTo128Remainder != 0){
@@ -117,9 +164,9 @@ class SboomTopTest extends AnyFunSuite {
                   edgesArrayBuffer.append(edge)
                }
               }
+
             }
           }
-
         }
       }
 
@@ -142,24 +189,9 @@ class SboomTopTest extends AnyFunSuite {
 
       println("dataArrayLen", dataArray.toArray.length)
 
+      dataArray.toArray //return edgesArray
+
     }
-
-  object MySpinalConfig extends SpinalConfig(
-    defaultConfigForClockDomains = ClockDomainConfig(resetKind = ASYNC,resetActiveLevel = HIGH),
-    targetDirectory = "fpga/target",
-    oneFilePerComponent = false
-  )
-
-  val simConfig = SpinalSimConfig(_spinalConfig = MySpinalConfig)
-  //val xSimConfig = simConfig.copy(_workspacePath = "xSimWorkspace".withXSim.withXSimSourcesPaths(xciSource)Paths,ArrayBuffer(""))
-
-  //    val compiled= simConfig.withWave.withXilinxDevice("xczu7ev-ffvc1156-2-e").withXSim.compile(SboomTop())
-  val compiled= simConfig.withWave.compile(SboomTop())
-
-
-  //  val compiled= xSimConfig.withWave.compile(SboomTop())
-  //  val axiMemSimConfig = AxiMemorySimConfig()
-  //  val axiMemSimModel = AxiMemorySim(compiled.dut.io.topAxiMemControlPort, compiled.dut.clockDomain, axiMemSimConfig)
 
   test("SboomTopTest"){
 
