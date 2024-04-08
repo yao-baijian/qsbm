@@ -17,24 +17,6 @@ import scala.util.control.Breaks
 
 class SboomTopTest extends AnyFunSuite {
 
-  object MySpinalConfig extends SpinalConfig(
-    defaultConfigForClockDomains = ClockDomainConfig(resetKind = ASYNC, resetActiveLevel = HIGH),
-    targetDirectory = "fpga/target",
-    oneFilePerComponent = false
-  )
-
-  val simConfig = SpinalSimConfig(_spinalConfig = MySpinalConfig)
-  //val xSimConfig = simConfig.copy(_workspacePath = "xSimWorkspace".withXSim.withXSimSourcesPaths(xciSource)Paths,ArrayBuffer(""))
-
-  //    val compiled= simConfig.withWave.withXilinxDevice("xczu7ev-ffvc1156-2-e").withXSim.compile(SboomTop())
-  val compiled = simConfig.withWave.compile(SboomTop())
-
-
-  //  val compiled= xSimConfig.withWave.compile(SboomTop())
-  //  val axiMemSimConfig = AxiMemorySimConfig()
-  //  val axiMemSimModel = AxiMemorySim(compiled.dut.io.topAxiMemControlPort, compiled.dut.clockDomain, axiMemSimConfig)
-
-
   def dataGen(): Array[Byte] = {
     val data = new Array[Byte](100)
 
@@ -109,7 +91,7 @@ class SboomTopTest extends AnyFunSuite {
       var bigLineBlockCnt = 0
       var firstJumpStep = 0
 
-      var jumpStep = 0
+
 
 //      import scala.util.control.Breaks._
 //      breakable{
@@ -131,29 +113,34 @@ class SboomTopTest extends AnyFunSuite {
       var initNonEmptyCol = 0
       var initNonOffset = 0
 
-      var calNonEmptyLock = 0
-      var calNonEmptyBase = 0
-      var calNonEmptyCol = 0
-      var calNonOffset = 0
+      var calFirstNonEmptyLock = 0
+      var calFirstNonEmptyBase = 0
+      var calFirstNonEmptyCol = 0
+      var calFirstNonEmptyOffset = 0
+
+      var jumpStep = 0
+      var bigLineJumpStep = 0
 
       for (base <- 0 until  arrayWidth by PeConfig().peNumEachColumn) {
-          calNonEmptyLock = 0
+          calFirstNonEmptyLock = 0
           for (col <- 0 until arrayWidth) { //arrayWidth is the number of 64 * 64 blocks
             var bigLineJumpStep = 0
+            calFirstNonEmptyLock = 0
             import scala.util.control.Breaks._
             breakable{
               // firsr walk through the big column and find the last one with valid data
-              var lastNonEmptyBlockNum = 0 //small block
+              var lastNonEmptyBlockNum = 0 //small block, from 1 to 8
               for (offset <- 0 until PeConfig().peNumEachColumn) {
                 if (blocks(base + offset)(col).nonEmpty) {
                   lastNonEmptyBlockNum = offset + 1
 
-                  if(calNonEmptyLock == 0){
-                    calNonEmptyBase = base
-                    calNonEmptyCol =  col
-                    calNonOffset = offset
+                  if(calFirstNonEmptyLock == 0){
+                    calFirstNonEmptyBase = base
+                    calFirstNonEmptyCol =  col
+                    calFirstNonEmptyOffset = offset
+
                   }
-                  calNonEmptyLock = 1
+                  calFirstNonEmptyLock = 1
 
                   if (initLock == 0) {
                     initNonEmptyBase  = base
@@ -174,7 +161,8 @@ class SboomTopTest extends AnyFunSuite {
               }
 
               // add the edges in respective small blocks in one big column
-              for (offset <- 0 until PeConfig().peNumEachColumn) {
+              var crossBigLineJumpStep = 0
+              for (offset <- calFirstNonEmptyOffset until PeConfig().peNumEachColumn) {
                 //calculate the jumpSteps in a bigLine
                 if (offset == lastNonEmptyBlockNum-1) {
                   jumpStep = 0
@@ -196,11 +184,36 @@ class SboomTopTest extends AnyFunSuite {
                     }
                   }
                   println("jumpStep",jumpStep)
+                  if (col + jumpStep >= arrayWidth - 1) {
+                    //println("col + jumpStep >= arrayWidth - 1",col + jumpStep, col,jumpStep)
+//                    crossBigLineFlag = 1
+                    //look ahead to next bigLine and calculate the bigLinejumpStep
+
+                    //look ahead to calculate how many jumps needed
+                    //break implementatioin in scala
+                    val out2 = new Breaks
+                    val inner2 = new Breaks
+                    out2.breakable {
+                      for (i <- base + PeConfig().peNumEachColumn until arrayWidth by PeConfig().peNumEachColumn) {
+                        inner2.breakable { // detect one column
+                          for (col <- 0 until arrayWidth) {
+                            if (blocks(base + offset)(i).nonEmpty) {
+                              jumpStep = col
+                              out2.break()
+                            }
+                          }
+                        }
+                        // if can go out of the for-loop above,then it is an empty column, jumpStep + 1
+                        bigLineJumpStep = bigLineJumpStep + 1
+                      }
+                    }
+                  }
                 }
+
                 // first add header for one small block in one big column
                 if (blocks(base + offset)(col).nonEmpty) {
-                  val edge1 = ArrayBuffer[Byte](255.toByte, 0.toByte)
-                  val edge2 = ArrayBuffer[Byte]((offset + 1).toByte, jumpStep.toByte)
+                  val edge1 = ArrayBuffer[Byte](0.toByte, (offset + 1).toByte)
+                  val edge2 = ArrayBuffer[Byte](bigLineJumpStep.toByte, jumpStep.toByte)
                   edgesArrayBuffer.append(edge1)
                   edgesArrayBuffer.append(edge2)
 
@@ -222,93 +235,25 @@ class SboomTopTest extends AnyFunSuite {
                   }
 
                   if ((lastNonEmptyBlockNum > 0 && lastNonEmptyBlockNum < 9) && blocks(base + lastNonEmptyBlockNum - 1)(col).isEmpty) {
-                    //add 128b seperator to distinguish different colunms
-                    var bigLineJumpStep = 0
-                    var crossBigLineJumpStep = 0
-                    var crossBigLineFlag = 0
-                    if (col + jumpStep >= arrayWidth - 1) {
-//                      println("col + jumpStep >= arrayWidth - 1",col + jumpStep, col,jumpStep)
-                      crossBigLineFlag = 1
-                      //look ahead to next bigLine and calculate the bigLinejumpStep
 
-                      //look ahead to calculate how many jumps needed
-                      //break implementatioin in scala
-                      val out2 = new Breaks
-                      val inner2 = new Breaks
-                      out2.breakable {
-                        for (i <- base + PeConfig().peNumEachColumn until arrayWidth by PeConfig().peNumEachColumn) {
-                          inner2.breakable { // detect one column
-                            for (col <- 0 until arrayWidth) {
-                              if (blocks(base + offset)(i).nonEmpty) {
-
-                                crossBigLineJumpStep = col
-                                out2.break()
-                              }
-                            }
-                          }
-                          // if can go out of the for-loop above,then it is an empty column, jumpStep + 1
-                          bigLineJumpStep = bigLineJumpStep + 1
-                        }
-                      }
-
-                      //add 128b seperator as (64'b1,)
-                      for (i <- 0 until 4) {
-                        val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(255.toByte)
-                        edgesArrayBuffer.append(edge)
-                      }
-
-                      val edge1 = ArrayBuffer[Byte]((bigLineJumpStep>>24).toByte, (bigLineJumpStep>>16).toByte.toByte)
-                      val edge2 = ArrayBuffer[Byte]((bigLineJumpStep>>8).toByte.toByte, bigLineJumpStep.toByte)
-                      edgesArrayBuffer.append(edge1)
-                      edgesArrayBuffer.append(edge2)
-
-                      val edge3 = ArrayBuffer[Byte]((crossBigLineJumpStep >> 24).toByte, (crossBigLineJumpStep >> 16).toByte)
-                      val edge4 = ArrayBuffer[Byte]((crossBigLineJumpStep >> 8).toByte.toByte, crossBigLineJumpStep.toByte)
-                      edgesArrayBuffer.append(edge3)
-                      edgesArrayBuffer.append(edge4)
-                    }
-                    else {
-                      // add 128b all zeros as seperator between two big columns
-                      for (i <- 0 until 8) {
-                        val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
-                        edgesArrayBuffer.append(edge)
-                      }
+                    // add 128b all zeros as seperator between two big columns
+                    for (i <- 0 until 8) {
+                      val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
+                      edgesArrayBuffer.append(edge)
                     }
 
                     //pad zeros to make up for 512b allignment
                     var edgePaddingTo512Remainder = edgesArrayBuffer.length % 32
                     if (edgePaddingTo512Remainder != 0) {
-                      if(crossBigLineFlag == 0){
-                        for (i <- 0 until 32 - edgePaddingTo512Remainder) {
-                          val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
-                          edgesArrayBuffer.append(edge)
-                        }
-                      }else{
-                        for (i <- 0 until (32 - edgePaddingTo512Remainder)/8){
-                          //add 128b seperator as (64'b1,32'bBiglineJumpStep,32'bjumpStep)
-                          for (i <- 0 until 4) {
-                            val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(255.toByte)
-                            edgesArrayBuffer.append(edge)
-                          }
-
-                          val edge1 = ArrayBuffer[Byte]((bigLineJumpStep>>24).toByte, (bigLineJumpStep>>16).toByte.toByte)
-                          val edge2 = ArrayBuffer[Byte]((bigLineJumpStep>>8).toByte.toByte, bigLineJumpStep.toByte)
-                          edgesArrayBuffer.append(edge1)
-                          edgesArrayBuffer.append(edge2)
-
-                          val edge3 = ArrayBuffer[Byte]((crossBigLineJumpStep >> 24).toByte, (crossBigLineJumpStep >> 16).toByte)
-                          val edge4 = ArrayBuffer[Byte]((crossBigLineJumpStep >> 8).toByte.toByte, crossBigLineJumpStep.toByte)
-                          edgesArrayBuffer.append(edge3)
-                          edgesArrayBuffer.append(edge4)
-                        }
+                      for (i <- 0 until 32 - edgePaddingTo512Remainder) {
+                        val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
+                        edgesArrayBuffer.append(edge)
                       }
-
                     }
                   }
                 }
               }
             }
-
           }
       }
 
@@ -337,6 +282,24 @@ class SboomTopTest extends AnyFunSuite {
 
   test("SboomTopTest"){
 
+    val indexArray = vexGen()
+    val edgeArray =  edgeGen()
+    object MySpinalConfig extends SpinalConfig(
+      defaultConfigForClockDomains = ClockDomainConfig(resetKind = ASYNC, resetActiveLevel = HIGH),
+      targetDirectory = "fpga/target",
+      oneFilePerComponent = false
+    )
+
+    val simConfig = SpinalSimConfig(_spinalConfig = MySpinalConfig)
+    //val xSimConfig = simConfig.copy(_workspacePath = "xSimWorkspace".withXSim.withXSimSourcesPaths(xciSource)Paths,ArrayBuffer(""))
+
+    val compiled= simConfig.withWave.withXilinxDevice("xczu7ev-ffvc1156-2-e").withXSim.compile(SboomTop())
+    //  val compiled = simConfig.withWave.compile(SboomTop())
+
+
+    //  val compiled= xSimConfig.withWave.compile(SboomTop())
+    //  val axiMemSimConfig = AxiMemorySimConfig()
+    //  val axiMemSimModel = AxiMemorySim(compiled.dut.io.topAxiMemControlPort, compiled.dut.clockDomain, axiMemSimConfig)
 
     compiled.doSim { dut =>
       dut.clockDomain.forkStimulus(100) //产生周期为10个单位的时钟
@@ -349,11 +312,11 @@ class SboomTopTest extends AnyFunSuite {
       axiMemSimModel1.start()
 //      edgeGen()
 //      axiMemSimModel2.start()
-      axiMemSimModel1.memory.writeArray(0, vexGen())
+      axiMemSimModel1.memory.writeArray(0, indexArray)
 //      val (edgeIndex, edge) = edgeGen()
 //         axiMemSimModel1.memory.writeArray(0x400000,edgeIndex)
 //      axiMemSimModel2.memory.writeArray(0x400000,edgeIndex)
-      axiMemSimModel1.memory.writeArray(0x800000, edgeGen())
+      axiMemSimModel1.memory.writeArray(0x800000, edgeArray)
       dut.clockDomain.waitSampling(count = 8)
       dut.clockDomain.waitSampling(count = 100)
 //      val dataRead = axiMemSimModel1.memory.readArray(0, 10)

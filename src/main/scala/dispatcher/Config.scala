@@ -25,7 +25,12 @@ case class DispatcherConfig(){
 
   val vexPeColumnNumFifoWidth = 2
 
+  val initBase = 0
+  val initCol = 0
+  val initOffset = 0
+
 }
+
 
 case class PeConfig(){
   val peColumnNum = 4

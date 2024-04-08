@@ -58,6 +58,9 @@ case class AxiLiteRegController() extends Component {
   //  val alphaChangeVal = axiLiteCtrl.createReadAndWrite(UInt(32 bits),address = (2*1024*1024*1024 + 20)& 0xffffffffL) init 0
   //  val xi = axiLiteCtrl.createReadAndWrite(UInt(32 bits),address = (2*1024*1024*1024 + 24)& 0xffffffffL) init 0
   //  val dt = axiLiteCtrl.createReadAndWrite(UInt(32 bits),address = (2*1024*1024*1024 + 28)& 0xffffffffL) init 0
+  val initBase = axiLiteCtrl.createReadAndWrite(UInt(32 bits),address  =    (2*1024*1024*1024 + 32)& 0xffffffffL) init 0
+  val initCol = axiLiteCtrl.createReadAndWrite(UInt(32 bits),address   =     (2*1024*1024*1024 + 36)& 0xffffffffL) init 0
+  val initOffeset = axiLiteCtrl.createReadAndWrite(UInt(32 bits),address = (2*1024*1024*1024 + 40)& 0xffffffffL) init 0
 
   //  val completeFlagReg = axiLiteCtrl.driveAndRead(io.sbmConfigPort.startConfigRegOut,address = 16*1024*1024 + 4) init 0
 
