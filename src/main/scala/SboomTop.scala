@@ -74,13 +74,13 @@ case class SboomTop() extends Component{
   }
 
   //********************************** edge Index port connection from dispatcher to PE ***************************//
-  for(i <- 0 until PeConfig().peColumnNum){
-
-    peTop.io.tag_stream(i).payload := dispatcher.io.dispatchToedgeIndexPorts(i).payload.data
-    peTop.io.tag_stream(i).valid := dispatcher.io.dispatchToedgeIndexPorts(i).valid
-    dispatcher.io.dispatchToedgeIndexPorts(i).ready := peTop.io.tag_stream(i).ready
-
-  }
+//  for(i <- 0 until PeConfig().peColumnNum){
+//
+//    peTop.io.tag_stream(i).payload := dispatcher.io.dispatchToedgeIndexPorts(i).payload.data
+//    peTop.io.tag_stream(i).valid := dispatcher.io.dispatchToedgeIndexPorts(i).valid
+//    dispatcher.io.dispatchToedgeIndexPorts(i).ready := peTop.io.tag_stream(i).ready
+//
+//  }
 
   //********************************** edge port connection from dispatcher to PE *******************************//
   for(i <- 0 until PeConfig().peColumnNum){
