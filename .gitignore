@@ -3,7 +3,6 @@
 *.bak
 
 data/
-
 # sbt specific
 .cache/
 .history/
@@ -45,5 +44,14 @@ bin/
 
 
 simWorkspace/
+xSimWorkspace/SboomTop/*
 tmp/
 null
+
+
+
+*.jou
+*.log
+*.wcfg
+*.wdb
+/xsim.dir
