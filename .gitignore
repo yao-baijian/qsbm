@@ -48,6 +48,8 @@ xSimWorkspace/SboomTop/*
 tmp/
 null
 
+quantization/result/*
+
 
 
 *.jou
