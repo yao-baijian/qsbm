@@ -15,11 +15,12 @@ def simulated_bifurcation(sb_type, J, init_x, init_y, num_iters, dt):
     for i in range(num_iters):
         
         # bsb
-        y_comp += ((-1 + alpha[i]) * x_comp + xi * (J @ x_comp)) * dt 
-        x_comp += y_comp * dt 
-        y_comp[np.abs(x_comp) > 1] = 0.
-        np.clip(x_comp,-1, 1)
-    
+        if (sb_type == "bsb"):
+            y_comp += ((-1 + alpha[i]) * x_comp + xi * (J @ x_comp)) * dt 
+            x_comp += y_comp * dt 
+            y_comp[np.abs(x_comp) > 1] = 0.
+            x_comp = np.clip(x_comp,-1, 1)
+
     # dsb
     # y_comp += ((-1 + alpha[i]) * x_comp + xi * (J @ x_comp.sign())) * dt
     # x_comp += y_comp * dt
@@ -39,7 +40,7 @@ def simulated_bifurcation(sb_type, J, init_x, init_y, num_iters, dt):
 
     return energies
 
-def qSB(J, init_x, init_y, num_iters, dt, best_known = 0, factor = [8,3,3], q = -127):
+def qSB(J, init_x, init_y, num_iters, best_known = 0, factor = [8,3,3], q = -127):
     N = J.shape[0]
     x_comp = (init_x.copy()) //scale # position
     y_comp = (init_y.copy()) //scale # momentum
@@ -54,10 +55,12 @@ def qSB(J, init_x, init_y, num_iters, dt, best_known = 0, factor = [8,3,3], q = 
 
         # y_comp += ((-1 + alpha[i]) * x_comp + xi * (J @ x_comp)) * dt  # update the momentum
         mv = np.array(J @ x_comp)
+        
         mv_list = []
         for elem in mv:
             mv_list.append(int(elem) * factor[0])
         mv = np.array(mv_list)
+        
         temp = (q + alpha[i]) * x_comp + mv
         temp_list = []
         for elem in temp:
@@ -89,15 +92,21 @@ def qSB(J, init_x, init_y, num_iters, dt, best_known = 0, factor = [8,3,3], q = 
     return np.array(energies), step
 
 def cal_energy(J, best_known = 0):
-    N = J.shape[0]
     J = (J.T + J) 
     num_iter = 1000
     dt = 0.25
     init_x = np.random.uniform(-0.1,0.1,J.shape[0])
     init_y = np.random.uniform(-0.1,0.1,J.shape[0])
-    qsb_energy, qsb_step = qSB(J,init_x,init_y, num_iter,dt,best_known)
-    dsb_energy = simulated_bifurcation(J,init_x,init_y, num_iter,dt)
+    qsb_energy, qsb_step = qSB(J,init_x,init_y, num_iter, best_known)
+    dsb_energy = simulated_bifurcation("bsb",J,init_x,init_y, num_iter,dt)
     return qsb_energy, qsb_step, dsb_energy
+
+def rescale(targets, factor):
+    rescaled_targets = []
+    for target in targets:
+        rescaled_targets.append(int(target) * factor)
+    return np.array(rescaled_targets)
+    
 
 
 
