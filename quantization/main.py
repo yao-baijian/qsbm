@@ -5,23 +5,57 @@ from simuated_bifurcation import *
 import time
 
 if __name__ == '__main__':
-    data_list   = {'G9': 2054, 'G47': 6634, 'G39': 2356, 'G42': 2394}
+    data_list   = {'G9': 2054, 
+                   'G47': 6634, 
+                   'G39': 2356, 
+                   'G42': 2394}
+    
+    qsb_type = ['non-converge', 'scaleup']
+    sb_type  = "bsb"
+    quant_index = [7, 6, 5]
+    # quant_index = [7]
+    num_iter = 1000
+    dt = 0.25
+        
     for set_name, best_known in data_list.items():
+        J = load_data(set_name)        
+        J = (J.T + J)
+        init_x = np.random.uniform(-0.1,0.1,J.shape[0])
+        init_y = np.random.uniform(-0.1,0.1,J.shape[0])
+
+        # for scaleup 
+        # factor = [7, 128,4],  [8, 16, 16], [7,16,16]
+        # for noscale
+        # factor = [7, 4 ,4],  [8, 4, 4]
+        qsb_energies = []
+        if (qsb_type[0] == 'improve') :
+            for qi in quant_index:
+                fc = [qi, 16, 16]
+                qsb_energy, qsb_step = qSB_improve(J, init_x, init_y, num_iter, best_known, factor = fc, qtz_type=qsb_type[1])
+                qsb_energies.append(gaussian_filter(qsb_energy, sigma=3))
+        elif (qsb_type[0] == 'non-converge'):
+            fc = [7, 4, 4]
+            qsb_energy, qsb_step = qSB_improve(J, init_x, init_y, num_iter, best_known, factor = fc, qtz_type='scaleup')
+            qsb_energies.append(gaussian_filter(qsb_energy, sigma=3))
+        else:
+            qsb_energy, qsb_step = qSB(J, init_x, init_y, num_iter, best_known)
+            
+            
+        bsb_energy = gaussian_filter(SB(sb_type, J, init_x, init_y, num_iter, dt), sigma=3) 
+
+        
+        print(set_name, ", steps: ", qsb_step)
+        
         plt.xlabel('iterations')
         plt.ylabel('Ising Energy')
-        J = load_data(set_name)
-        # J = init_data()
-        # J = (J.T + J) / 2
-        qsb_energy, step, dsb_energy = cal_energy(J, best_known)
-        qsb_energy = qsb_energy [3:]
-        dsb_energy = dsb_energy [3:]
-        print(set_name, ", steps: ", step)
+        plt.axvline(x=qsb_step, color='grey', linestyle='--',linewidth=0.5, label='TTS')
         
-        smooth_qsb_energy = gaussian_filter(qsb_energy, sigma=1)
-        smooth_dsb_energy = gaussian_filter(dsb_energy, sigma=1)
-        plt.axvline(x=step, color='grey', linestyle='--',linewidth=0.5, label='TTS')
-        plt.plot(smooth_qsb_energy,label='QSB ' + set_name)
-        plt.plot(smooth_dsb_energy,label='dSB ' + set_name)
+        idx = 0
+        for qsb_energy in qsb_energies:
+            plt.plot(qsb_energy,label='qSB (n=' + str(quant_index[idx]) + ')'+ set_name)
+            idx += 1
+            
+        plt.plot(bsb_energy,label='bSB ' + set_name)
         plt.legend()
         plt.savefig('./quantization/result/set_'+ set_name+'_ising_solution.pdf')
         plt.show()

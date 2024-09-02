@@ -254,9 +254,9 @@ if __name__ == '__main__':
     data_list3 = ['G13', 'G34', 'G19', 'G21','G20', 'G18', 'G51', 'G53', 'G54', 'G47', 'G40', 'G39', 'G42', 'G41', 'G9', 'G31']
 
     for name in data_list3:
-        matrix_cnt(name)
+        # matrix_cnt(name)
         # twod_loop(name)
-        # threed_loop(name)
+        threed_loop(name)
         # bar3d_loop(name)
         
         

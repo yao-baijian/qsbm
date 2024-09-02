@@ -2,7 +2,10 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-
+import matplotlib.pyplot as plt
+from scipy.ndimage import gaussian_filter
+from misc import *
+from simuated_bifurcation import *
 import torch.quantization
 
 
@@ -27,7 +30,7 @@ class SimulatedBifurcationModel(nn.Module):
         for i in range(self.num_iters):
             y_comp += ((-1 + alpha[i]) * x_comp + self.xi * (self.J @ x_comp)) * self.dt
             x_comp += y_comp * self.dt
-            y_comp[torch.abs(x_comp) > 1] = 0.
+            y_comp [torch.abs(x_comp) > 1] = 0.
             x_comp = torch.clamp(x_comp, -1, 1)
             
             sol = torch.sign(x_comp)
@@ -38,7 +41,14 @@ class SimulatedBifurcationModel(nn.Module):
         return energies
 
 # 示例参数
-J = np.random.randn(10, 10)
+
+data_list   = {'G9': 2054, 'G47': 6634, 'G39': 2356, 'G42': 2394}
+# for set_name, best_known in data_list.items():
+# plt.xlabel('iterations')
+# plt.ylabel('Ising Energy')
+J = load_data('G9')
+J = (J.T + J)
+# J = np.random.randn(10, 10)
 init_x = np.random.uniform(-0.1, 0.1, J.shape[0])
 init_y = np.random.uniform(-0.1, 0.1, J.shape[0])
 num_iters = 1000
@@ -48,23 +58,32 @@ dt = 0.25
 model = SimulatedBifurcationModel(J, init_x, init_y, num_iters, dt)
 
 # 定义校准数据集
-calibration_data = torch.randn(100, J.shape[0])
+calibration_data = simulated_bifurcation("bsb", J, init_x, init_y, 1000, dt)
 
 # 准备模型进行静态量化
 model.eval()
 model.qconfig = torch.quantization.get_default_qconfig('fbgemm')
 torch.quantization.prepare(model, inplace=True)
 
+with torch.no_grad():
+    for data in calibration_data:
+        model(data)
+        
 # 转换为量化模型
 torch.quantization.convert(model, inplace=True)
 
 # 运行量化模型
-quantized_energies = model()
-print(quantized_energies)
+qsb_model_energies = model()
+dsb_energies = simulated_bifurcation("bsb",J,init_x ,init_y, 1000 ,dt)
+# print(quantized_energies)
 
-# 打印量化后的模型
-print(model)
+smooth_quantized_energies = gaussian_filter(qsb_model_energies, sigma=1)
+smooth_dsb_energies = gaussian_filter(dsb_energies, sigma=1)
 
+plt.axvline(x=1000, color='grey', linestyle='--',linewidth=0.5, label='TTS')
+plt.plot(smooth_quantized_energies,label='qSB')
+plt.plot(smooth_dsb_energies,label='dSB')
+plt.legend()
+# plt.savefig('./quantization/result/set_'+ set_name+'_ising_solution.pdf')
+plt.show()
 
-# energies = model()
-# print(energies)
