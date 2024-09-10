@@ -57,3 +57,5 @@ quantization/result/*
 *.wcfg
 *.wdb
 /xsim.dir
+
+build/*

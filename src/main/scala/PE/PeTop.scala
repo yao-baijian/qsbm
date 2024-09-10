@@ -38,7 +38,6 @@ case class PeTop(config:PeConfig) extends Component {
         val writeback_valid     = out Bool()
         val writeback_payload   = out Bits(config.axi_extend_width bits)
         val srst                = in Bool()
-        val bundle_sel          = in Vec(Bool(), config.core_num)
     }
 
     //-----------------------------------------------------

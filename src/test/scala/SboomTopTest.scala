@@ -53,10 +53,19 @@ class SboomTopTest extends AnyFunSuite {
 
       dut.clockDomain.waitSampling(200)
       
+      // write start flag
       axiLite.write(0x0, 1)
 
-      dut.clockDomain.waitSampling(10000)
+      axiLite.write(0x08, 0)
+      axiLite.write(0x12, 0)
+      axiLite.write(0x16, 0)
+      axiLite.write(0x20, 1)
+      axiLite.write(0x24, 2)
+      axiLite.write(0x28, 16)
 
+      dut.clockDomain.waitSampling(10000)
+      
+      // read finish flag
       axiLite.read(0x32)
     }
   }

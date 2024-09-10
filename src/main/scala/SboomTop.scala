@@ -49,11 +49,11 @@ case class SboomTop() extends Component{
 
   //AxiLiteRegCtrl signals
   axiLiteRegCtrl.io.axi_lite << io.topAxiLiteSlave
-  dispatcher.io.read_flag := axiLiteRegCtrl.io.start(0)
+  dispatcher.io.start := axiLiteRegCtrl.io.start(0)
 
 
   for(i<- 0 until PeConfig().peColumnNum){
-    dispatcher.io.bigPeBusyFlagVec(i) := peTop.io.bundle_busy_table(i)
+    dispatcher.io.pe_busy(i) := peTop.io.bundle_busy_table(i)
     peTop.io.last_update(i) := dispatcher.io.RB_switch
     dispatcher.io.edgeFifoReadyVec(i) := peTop.io.pe_rdy_table(i)
   }
@@ -64,7 +64,6 @@ case class SboomTop() extends Component{
     peTop.io.vertex_stream_pe(i).valid := dispatcher.io.vex2pe(i).valid
   }
   for(i <- 0 until PeConfig().peColumnNum){
-    peTop.io.bundle_sel(i) := dispatcher.io.edgePeColumnSelectOH(i)
     peTop.io.edge_stream(i).payload := dispatcher.io.edge2pe(i).payload.data
     peTop.io.edge_stream(i).valid := dispatcher.io.edge2pe(i).valid
     dispatcher.io.edge2pe(i).ready := peTop.io.edge_stream(i).ready

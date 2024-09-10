@@ -38,15 +38,6 @@ object Config {
     val haz_table_width:    Int = 4
 
     val spmm_prec:          Int = 31
-
-    def test(): Unit = {
-        println(addr_width)
-        println(vertex_read_cnt_max)
-        println(extend_addr_width)
-    }
-    def main(args: Array[String]): Unit = {
-        test()
-    }
 }
 
 case class PeConfig(axi_width:          Int = Config.axi_width,
