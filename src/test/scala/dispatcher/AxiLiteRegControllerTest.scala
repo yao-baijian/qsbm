@@ -1,5 +1,0 @@
-package dispatcher
-
-class AxiLiteRegControllerTest {
-
-}

@@ -31,10 +31,10 @@ case class PeTop(config:PeConfig) extends Component {
     val io = new Bundle {
         val last_update         = in Vec(Bool(), config.core_num) //big line ending
         val edge_stream         = Vec(slave Stream (Bits(config.axi_extend_width bits)), config.core_num)
-        val vertex_stream       = Vec(slave Stream (Bits(config.axi_extend_width bits)), config.core_num)
+        val vertex_stream_pe    = Vec(slave Stream (Bits(config.axi_extend_width bits)), config.core_num)
+        val vertex_stream_ge    = slave Stream (Bits(config.axi_extend_width bits))
         val pe_rdy_table        = out Vec(Bool(), config.core_num)
         val bundle_busy_table   = out Vec(Bool(), config.core_num)
-        val vertex_stream_top   = slave Stream (Bits(config.axi_extend_width bits))
         val writeback_valid     = out Bool()
         val writeback_payload   = out Bits(config.axi_extend_width bits)
         val srst                = in Bool()
@@ -82,7 +82,7 @@ case class PeTop(config:PeConfig) extends Component {
     for (i <- 0 until config.core_num) {
         high_to_low_converter.io.in_edge_stream(i)  <> io.edge_stream(i)
         bundle_busy_table(i)                        <> pecore_array(i).io_state.pe_busy
-        pecore_array(i).io_global_reg.vertex_stream <> io.vertex_stream(i)
+        pecore_array(i).io_global_reg.vertex_stream <> io.vertex_stream_pe(i)
         pecore_array(i).io_state.last_update        <> io.last_update(i)
         pecore_array(i).io_state.all_zero           <> all_zero(i)
         pecore_array(i).io_state.swap_done          <> swap_done
@@ -105,12 +105,12 @@ case class PeTop(config:PeConfig) extends Component {
     gather_pe_core.io.swap_done         <> swap_done
     vertex_reg_A.io.rd_addr             <> gather_pe_core.io.rd_addr
     vertex_reg_B.io.rd_addr             <> gather_pe_core.io.rd_addr
-    vertex_reg_A.io.in_stream.valid     := Mux(swap, io.vertex_stream_top.valid , False)
-    vertex_reg_A.io.in_stream.payload   := Mux(swap, io.vertex_stream_top.payload,  B(0))
-    vertex_reg_B.io.in_stream.valid     := Mux(!swap, io.vertex_stream_top.valid, False)
-    vertex_reg_B.io.in_stream.payload   := Mux(!swap, io.vertex_stream_top.payload, B(0))
+    vertex_reg_A.io.in_stream.valid     := Mux(swap, io.vertex_stream_ge.valid , False)
+    vertex_reg_A.io.in_stream.payload   := Mux(swap, io.vertex_stream_ge.payload,  B(0))
+    vertex_reg_B.io.in_stream.valid     := Mux(!swap, io.vertex_stream_ge.valid, False)
+    vertex_reg_B.io.in_stream.payload   := Mux(!swap, io.vertex_stream_ge.payload, B(0))
     gather_pe_core.io.vertex_rd_data    := Mux(!swap, vertex_reg_A.io.rd_data, vertex_reg_B.io.rd_data)
-    io.vertex_stream_top.ready          := Mux(swap, vertex_reg_A.io.in_stream.ready,  vertex_reg_B.io.in_stream.ready)
+    io.vertex_stream_ge.ready           := Mux(swap, vertex_reg_A.io.in_stream.ready,  vertex_reg_B.io.in_stream.ready)
     gather_pe_busy                      := !gather_pe_core.io.gather_pe_done
 
     //-----------------------------------------------------

@@ -1,88 +1,42 @@
 package dispatcher
-
-package dispatcher
-
 import spinal.core.Component
 import spinal.core.{B, _}
 import spinal.lib._
 import spinal.lib.bus.amba4.axilite._
 import spinal.lib.tools.DataAnalyzer
 
-case class SbmConfigPort() extends Bundle with IMasterSlave{
-
-  val startConfigRegOut = UInt(32 bits)
-
-  val rowsInOneIterRegOut = UInt(32 bits)
-  val blocksInOneRowRegOut = UInt(32 bits)
-  val alphaNumber = UInt(32 bits)
-  val alphaChangeVal = UInt(32 bits)
-  val xi = UInt(32 bits)
-  val dt = UInt(32 bits)
-
-  override def asMaster(): Unit = {
-
-    out(startConfigRegOut)
-    out(rowsInOneIterRegOut)
-    out(blocksInOneRowRegOut)
-    out(alphaNumber)
-    out(alphaChangeVal)
-    out(xi)
-    out(dt)
-
-  }
-}
-
 case class AxiLiteRegController() extends Component {
 
-  val axiLiteConfig = AxiLite4Config(addressWidth = 32, dataWidth = 32)
+	val io = new Bundle{
 
-  val io = new Bundle{
+		val axi_lite= slave(AxiLite4(32, 32))
+		val disp    = in Bits(4 bits)
+		val mem_ctrl= in Bits(4 bits)
+		val done 	= in Bits(4 bits)
 
-    val axiLiteSlave =  slave(AxiLite4(axiLiteConfig))
-    val sbmConfigPort = master(SbmConfigPort())
+		val start	= out UInt(32 bits)
+		val srst   	= out UInt(32 bits)
+		val CB_init = out UInt(32 bits)
+		val RB_init = out UInt(32 bits)
+		val ai_init = out UInt(32 bits)
+		val ai_incr = out UInt(32 bits)
+		val xi 		= out UInt(32 bits)
+		val dt 		= out UInt(32 bits)
+	}
 
-    val signalsFromDisp = in Bits(4 bits)
-    val signalsFromAxiMemCtrl = in Bits(4 bits)
+	val axiLiteCtrl = AxiLite4SlaveFactory(io.axi_lite)
 
-  }
+	var addr_base   = 2*1024*1024*1024
 
-  val axiLiteCtrl = AxiLite4SlaveFactory(io.axiLiteSlave)
+	val start_flag  = axiLiteCtrl.driveAndRead(io.start, address = 0x00) init 0
+	val srst        = axiLiteCtrl.createReadAndWrite(io.srst, address = 0x04) init 0
+	val CB_init     = axiLiteCtrl.createReadAndWrite(io.CB_init, address = 0x08) init 0
+	val RB_init     = axiLiteCtrl.createReadAndWrite(io.RB_init, address = 0x12) init 0
+	val ai_init 	= axiLiteCtrl.createReadAndWrite(io.ai_init, address = 0x16) init 0
+    val ai_incr 	= axiLiteCtrl.createReadAndWrite(io.ai_incr, address = 0x20) init 0
+	val xi 			= axiLiteCtrl.createReadAndWrite(io.xi, address = 0x24) init 0
+	val dt 			= axiLiteCtrl.createReadAndWrite(io.dt, address = 0x28) init 0
 
-  //axilite memory mapped Regs inside//
-  val startFlagReg = axiLiteCtrl.driveAndRead(io.sbmConfigPort.startConfigRegOut,address = (2*1024*1024*1024 + 0)& 0xffffffffL) init 0 //driveAndRead()函数返回的就是一个Reg
-  //  val completeFlagReg = axiLiteCtrl.createReadAndWrite(UInt(32 bits),address = (2*1024*1024*1024 + 4)& 0xffffffffL) init 0
-  //
-  //  val rowsInOneIter = axiLiteCtrl.createReadAndWrite(UInt(32 bits),address = (2*1024*1024*1024 + 8)& 0xffffffffL) init 0
-  //  val blocksInOneRow = axiLiteCtrl.createReadAndWrite(UInt(32 bits),address = (2*1024*1024*1024 + 12)& 0xffffffffL) init 0
-  //  val alphaNumber = axiLiteCtrl.createReadAndWrite(UInt(32 bits),address = (2*1024*1024*1024 + 16)& 0xffffffffL) init 0
-  //  val alphaChangeVal = axiLiteCtrl.createReadAndWrite(UInt(32 bits),address = (2*1024*1024*1024 + 20)& 0xffffffffL) init 0
-  //  val xi = axiLiteCtrl.createReadAndWrite(UInt(32 bits),address = (2*1024*1024*1024 + 24)& 0xffffffffL) init 0
-  //  val dt = axiLiteCtrl.createReadAndWrite(UInt(32 bits),address = (2*1024*1024*1024 + 28)& 0xffffffffL) init 0
-  val initBase = axiLiteCtrl.createReadAndWrite(UInt(32 bits),address  =    (2*1024*1024*1024 + 32)& 0xffffffffL) init 0
-  val initCol = axiLiteCtrl.createReadAndWrite(UInt(32 bits),address   =     (2*1024*1024*1024 + 36)& 0xffffffffL) init 0
-  val initOffeset = axiLiteCtrl.createReadAndWrite(UInt(32 bits),address = (2*1024*1024*1024 + 40)& 0xffffffffL) init 0
-
-  //  val completeFlagReg = axiLiteCtrl.driveAndRead(io.sbmConfigPort.startConfigRegOut,address = 16*1024*1024 + 4) init 0
-
-  //  when(io.signalsFromDisp === B"4'b0001"){
-  //
-  ////    startFlagReg := 0
-  //
-  //  }
-  //
-  //  when(io.signalsFromAxiMemCtrl === B"4'b0001"){
-  ////    completeFlagReg := 1
-  //  }
-
-
-  noIoPrefix()
-
-  //  io.sbmConfigPort.startConfigRegOut :=  startFlagReg
-
-  //  io.sbmConfigPort.rowsInOneIterRegOut := rowsInOneIter
-  //  io.sbmConfigPort.blocksInOneRowRegOut := blocksInOneRow
-  //  io.sbmConfigPort.alphaNumber := alphaNumber
-  //  io.sbmConfigPort.alphaChangeVal := alphaChangeVal
-  //  io.sbmConfigPort.xi := xi
-  //  io.sbmConfigPort.dt := dt
+	val done_1 		= axiLiteCtrl.createReadOnly(io.done, address = 0x32) init 0
+  	noIoPrefix()
 }

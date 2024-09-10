@@ -37,32 +37,6 @@ class ScheduleBoardTest extends AnyFunSuite {
       cmdQueue3.enqueue { payload => payload.randomize() }
       cmdQueue3.enqueue { payload => payload.randomize() }
 
-
-
-//      StreamDriver(dut.io.scheduleBoardWrPorts(0), dut.clockDomain) { payload =>
-////        dut.io.scheduleBoardWrPorts(0).valid #= true
-//        payload.randomize()
-//        true
-//      }
-
-//      StreamDriver(dut.io.scheduleBoardWrPorts(1), dut.clockDomain) { payload =>
-////        dut.io.scheduleBoardWrPorts(1).valid #= true
-//        payload.randomize()
-//        true
-//      }
-
-//      StreamDriver(dut.io.scheduleBoardWrPorts(2), dut.clockDomain) { payload =>
-//        dut.io.scheduleBoardWrPorts(2).valid #= false
-////        payload.randomize()
-//        true
-//      }
-
-//      StreamDriver(dut.io.scheduleBoardWrPorts(3), dut.clockDomain) { payload =>
-//        dut.io.scheduleBoardWrPorts(3).valid #= false
-////        payload.randomize()
-//        true
-//      }
-
       dut.clockDomain.waitSampling(count = 100)
     }
   }

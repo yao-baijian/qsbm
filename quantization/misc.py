@@ -3,7 +3,56 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.backends.backend_pdf import PdfPages
+from scipy.interpolate import griddata
 from misc import *
+
+from misc import *
+import matplotlib.pyplot as plt
+from scipy.ndimage import gaussian_filter
+from simuated_bifurcation import *
+import time
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
+
+# if __name__ == '__main__':
+#     data_list = {'G9': 2054}
+    
+#     qsb_type = ['non-converge', 'scaleup']
+#     sb_type = "bsb"
+#     quant_index = [7, 6, 5]
+#     num_iter = 1000
+#     dt = 0.25
+        
+#     for set_name, best_known in data_list.items():
+#         J = load_data(set_name)        
+#         J = (J.T + J)
+#         init_x = np.random.uniform(-0.1, 0.1, J.shape[0])
+#         init_y = np.random.uniform(-0.1, 0.1, J.shape[0])
+
+#         non_con_qsb_energy, qsb_step = qSB_improve(J, init_x, init_y, num_iter, best_known, factor=[7, 4, 4], qtz_type='scaleup')
+#         static_qsb_energy, qsb_step = qSB_improve(J, init_x, init_y, num_iter, best_known, factor=[7, 32, 32], qtz_type='unscale')
+#         con_qsb_energy, qsb_step = qSB_improve(J, init_x, init_y, num_iter, best_known, factor=[7, 16, 16], qtz_type='scaleup')
+            
+#         non_con_qsb_energy = gaussian_filter(non_con_qsb_energy[0:800], sigma=20) 
+#         static_qsb_energy = gaussian_filter(static_qsb_energy[0:800], sigma=20) 
+#         con_qsb_energy = gaussian_filter(con_qsb_energy[0:800], sigma=20) 
+
+#         print(set_name, ", steps: ", qsb_step)
+#         plt.figure(figsize=(10, 6))
+#         plt.xlabel('iterations')
+#         plt.ylabel('Ising Energy')
+#         # plt.axvline(x=qsb_step, color='grey', linestyle='--', linewidth=0.5, label='TTS')
+        
+#         iter = np.arange(num_iter)[0:800]
+#         plt.plot(iter, non_con_qsb_energy, label='over dumped non-converge qSB')
+#         plt.plot(iter, static_qsb_energy, label='no dumped qSB')
+#         plt.plot(iter, con_qsb_energy, label='converge qSB')
+
+#         # Set the x-axis limits of the main plot
+#         plt.xlim(0, num_iter)
+
+#         plt.legend()
+#         plt.savefig('./quantization/result/set_' + set_name + '_ising_solution_with_zoom.png')
+#         plt.show()
 
 def load_data(name='G30'):
     file = open('./data/'+name, 'r')
@@ -325,3 +374,53 @@ if __name__ == '__main__':
 #                          verticalalignment = "center"
 #                          )
 # plt.show()
+
+def plot_surface(non_zero_counts, title):
+    num_blocks = non_zero_counts.shape[0]
+    xy_index = np.arange(num_blocks)
+    xx, yy = np.meshgrid(xy_index, xy_index)
+
+    # Create a finer grid for interpolation
+    fine_grid_x = np.linspace(0, num_blocks-1, 100)
+    fine_grid_y = np.linspace(0, num_blocks-1, 100)
+    fine_xx, fine_yy = np.meshgrid(fine_grid_x, fine_grid_y)
+
+    # Interpolate the data
+    fine_non_zero_counts = griddata((xx.flatten(), yy.flatten()), non_zero_counts.flatten(), (fine_xx, fine_yy), method='cubic')
+
+    fig = plt.figure(figsize=(8, 6))
+    axes = plt.axes(projection="3d")
+    surf = axes.plot_surface(fine_xx, fine_yy, fine_non_zero_counts, rstride=1, cstride=1, cmap="rainbow")
+    fig.colorbar(surf, ax=axes, shrink=0.5, aspect=5)
+    axes.set_title(title)
+    plt.savefig('./quantization/result/' + title)
+    plt.show()
+
+# Majority Red (High Numbers)
+num_blocks = 4
+non_zero_counts_high = np.zeros((num_blocks, num_blocks))
+for i in range(num_blocks):
+    for j in range(num_blocks):
+        non_zero_counts_high[i, j] = np.random.randint(10, 16) if np.random.rand() > 0.2 else np.random.randint(0, 5)
+
+plot_surface(non_zero_counts_high, "high energy state")
+
+
+# Majority Blue (Low Numbers)
+non_zero_counts_low = np.zeros((num_blocks, num_blocks))
+for i in range(num_blocks):
+    for j in range(num_blocks):
+        non_zero_counts_low[i, j] = np.random.randint(0, 5) if np.random.rand() > 0.1 else np.random.randint(10, 16)
+
+plot_surface(non_zero_counts_low, "low energy state")
+
+# Half Red, Half Blue
+non_zero_counts_half = np.zeros((num_blocks, num_blocks))
+for i in range(num_blocks):
+    for j in range(num_blocks):
+        if (i + j) % 2 == 0:
+            non_zero_counts_half[i, j] = np.random.randint(10, 16)
+        else:
+            non_zero_counts_half[i, j] = np.random.randint(0, 5)
+
+plot_surface(non_zero_counts_half, "normal state")
