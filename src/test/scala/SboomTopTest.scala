@@ -37,7 +37,7 @@ class SboomTopTest extends AnyFunSuite {
     .withWave
     .withXilinxDevice("xcu280-fsvh2892-2L-e")
     .withXSim
-    .compile(SboomTop())
+    .compile(SboomTop(Config()))
 
   test("SboomTopTest"){
     compiled.doSim { dut =>
@@ -95,8 +95,7 @@ class SboomTopTest extends AnyFunSuite {
     val filename = "./data/G34"
     val firstLine = Source.fromFile(filename).getLines().next()
     val firFields = firstLine.split(' ')
-    val width = scala.math.ceil(parseUnsignedLong(firFields(0)).toDouble / 64).toInt
-    val arrayWidth = width
+    val arrayWidth = scala.math.ceil(parseUnsignedLong(firFields(0)).toDouble / 64).toInt
     //put a queue inside each block
     val blocks = Array.ofDim[mutable.Queue[ArrayBuffer[Byte]]](arrayWidth, arrayWidth)
     for (row <- 0 until arrayWidth) {
@@ -128,19 +127,19 @@ class SboomTopTest extends AnyFunSuite {
     var transfer_128 = 0
     var block_empty = 0
     var edgeCnt = 0
-    val goodIntervalBound = arrayWidth / PeConfig().peNumEachColumn * PeConfig().peNumEachColumn
-    val remainder = arrayWidth % (PeConfig().peNumEachColumn)
+    val goodIntervalBound = arrayWidth
+    val remainder = arrayWidth % (Config().pe_thread)
 
     // To deal with all lines within good interval and all column blocks
     var blockEmpty = 0
     var bigLineBlockCnt = 0
 
-    for (base <- 0 until (goodIntervalBound) by PeConfig().peNumEachColumn) {
+    for (base <- 0 until (goodIntervalBound) by Config().pe_thread) {
       for (col <- 0 until arrayWidth) { //arrayWidth is the number of 64 * 64 blocks
         do {
           // 128bits conccatenation
           flag = 0
-          for (offset <- 0 until PeConfig().peNumEachColumn) {
+          for (offset <- 0 until Config().pe_thread) {
             if (blocks(base + offset)(col).nonEmpty) {
               blockEmpty = 0
               flag = flag + 1
@@ -165,7 +164,7 @@ class SboomTopTest extends AnyFunSuite {
             if(edgePaddingTo128Remainder != 0){
               //padding to make a 128b packet
               for(i <- 0 until 8-edgePaddingTo128Remainder){
-                val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
+                val edge = ArrayBuffer.fill(Config().edgeByteLen)(0.toByte)
                 edgeCnt = edgeCnt + 1
                 edgesArrayBuffer.append(edge)
               }
@@ -174,7 +173,7 @@ class SboomTopTest extends AnyFunSuite {
 
             //forced to add seperator with 128b all zeros
             for(i <- 0 until 8){
-              val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
+              val edge = ArrayBuffer.fill(Config().edgeByteLen)(0.toByte)
               edgeCnt = edgeCnt + 1
               edgesArrayBuffer.append(edge)
             }
@@ -235,7 +234,7 @@ class SboomTopTest extends AnyFunSuite {
             if(edgePaddingTo128Remainder != 0){
               //padding to make a 128b packet
               for(i <- 0 until 8-edgePaddingTo128Remainder){
-                val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
+                val edge = ArrayBuffer.fill(Config().edgeByteLen)(0.toByte)
                 edgesArrayBuffer.append(edge)
               }
               transfer_128 = transfer_128 + 1
@@ -243,7 +242,7 @@ class SboomTopTest extends AnyFunSuite {
 
             // add extra seperator with 128bit all zeros
             for(i <- 0 until 8){
-              val edge = ArrayBuffer.fill(DispatcherConfig().edgeByteLen)(0.toByte)
+              val edge = ArrayBuffer.fill(Config().edgeByteLen)(0.toByte)
               edgeCnt = edgeCnt + 1
               edgesArrayBuffer.append(edge)
             }

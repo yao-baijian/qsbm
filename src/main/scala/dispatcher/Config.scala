@@ -14,4 +14,5 @@ case class Config(){
   val initCol = 0
   val initOffset = 0
   val pe_num = 4
+  val pe_thread = 8
 }
