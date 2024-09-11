@@ -27,7 +27,7 @@ case class SboomTop(config:Config) extends Component{
     ctrl_reg.io.axi_lite << io.topAxiLiteSlave
     dispatcher.io.start 	:= ctrl_reg.io.start(0)
     dispatcher.io.srst   	:= ctrl_reg.io.srst(0)
-    ctrl_reg.io.done(0)     := dispatcher.io.done
+    ctrl_reg.io.done      := dispatcher.io.done
     dispatcher.io.qsb_cfg 	<> ctrl_reg.io.qsb_cfg
     dispatcher.io.vex_a_base:= ctrl_reg.io.vex_a_base
     dispatcher.io.vex_b_base:= ctrl_reg.io.vex_b_base

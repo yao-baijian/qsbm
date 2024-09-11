@@ -1,4 +1,4 @@
-name := "sboom"
+name := "qsbm"
 
 version := "1.0"
 

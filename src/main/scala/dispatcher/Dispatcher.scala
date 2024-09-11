@@ -27,23 +27,23 @@ case class Dispatcher(config: Config) extends Component {
     // MEM
     val axiMemControlPort = master(Axi4(axiConfig))
 	// Config Space
-	val qsb_cfg 	= slave(qsbConfig())
+	  val qsb_cfg 	= slave(qsbConfig())
     val start 		= in Bool()
-    val done 		= out Bool()
+    val done 		  = out Bool()
     val srst   		= in Bool()
-    val vex_a_base 	= in UInt(32 bits)
-    val vex_b_base 	= in UInt(32 bits)
-    val edge_base 	= in UInt(32 bits)
+    val vex_a_base= in UInt(32 bits)
+    val vex_b_base= in UInt(32 bits)
+    val edge_base = in UInt(32 bits)
     // to PE
     val pe_busy 	= in Vec(Bool(), config.pe_num)
-    val pe_rdy      = in Vec(Bool(), config.pe_num)
-    val RB_switch 	= out Bool()
+    val pe_rdy    = in Vec(Bool(), config.pe_num)
+    val RB_switch = out Bool()
     val vex2pe  	= Vec(master(Flow(AxiMemControllerPort(config.axi_width))), config.pe_num)
     val edge2pe 	= Vec(master(Stream(AxiMemControllerPort(config.axi_width))), config.pe_num)
     // GE
     val vex2ge 		= master(Flow(AxiMemControllerPort(config.axi_width)))
-    val wb_valid    = in Bool()
-    val wb_payload  = in Bits(config.axi_width bits)
+    val wb_valid  = in Bool()
+    val wb_payload= in Bits(config.axi_width bits)
 
   }
 
@@ -84,10 +84,10 @@ case class Dispatcher(config: Config) extends Component {
     val pe_select           = Reg(UInt(log2Up(4) bits)) init 0
     val vexSwitchRegOutSelect = Reg(UInt(log2Up(2) bits)) init 0
 
-    val itr_cnt             = Reg(UInt(8 bits)) init 0
-    val vex_base_addr       = UInt(32 bits) init 0
-    val vex_base_addr_r     = UInt(32 bits) init 0
+    val itr_cnt             = Reg(UInt(10 bits)) init 0
     val switch              = Reg(Bool()) init True
+    val vex_base_addr       = UInt(32 bits)
+    val vex_base_addr_r     = UInt(32 bits)
 
     vex_base_addr   := Mux(switch, io.vex_a_base, io.vex_b_base)
     vex_base_addr_r := Mux(!switch, io.vex_a_base, io.vex_b_base)
