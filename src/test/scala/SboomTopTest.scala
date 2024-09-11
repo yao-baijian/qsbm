@@ -52,22 +52,26 @@ class SboomTopTest extends AnyFunSuite {
       axiMemSimModel1.memory.writeArray(0x800000, edgeGen())
 
       dut.clockDomain.waitSampling(200)
-      
-      // write start flag
+
+      axiLite.write(0x0C, 1000)   // 1000 iteration
+      axiLite.write(0x10, 2000)   // matrix size 2000
+      axiLite.write(0x14, 64)     // tile 64
+      axiLite.write(0x18, 32)     // max CB number = 2000 / 64 = 32
+      // math.ceil(matrixSize.toFloat/blockSize).toInt
+      axiLite.write(0x1C, 0)      // CB init
+      axiLite.write(0x20, 0)      // RB init
+      axiLite.write(0x24, 0)      // ai init
+      axiLite.write(0x28, 1)      // ai incr
+      axiLite.write(0x2C, 1)      // xi
+      axiLite.write(0x30, 16)     // dt
+      axiLite.write(0x40, 16)     // max RB number = 2000 / 512 = 4
+
+      axiLite.write(0x34, 0)      // vex_a_base
+      axiLite.write(0x38, 0x400000)     // vex_b_base
+      axiLite.write(0x3C, 0x800000)     // edge_base
+
+      // start
       axiLite.write(0x0, 1)
-
-      axiLite.write(0x08, 0)
-      axiLite.write(0x12, 0)
-      axiLite.write(0x16, 0)
-      axiLite.write(0x20, 1)
-      axiLite.write(0x24, 2)
-      axiLite.write(0x28, 16)
-
-	// var addr_base   = 0x8000_0000
-  // "32'h00000000"
-	// "32'h00400000"
-	// "32'h00800000"
-  // math.ceil(matrixSize.toFloat/blockSize).toInt
 
       dut.clockDomain.waitSampling(10000)
       

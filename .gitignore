@@ -59,3 +59,6 @@ quantization/result/*
 /xsim.dir
 
 build/*
+
+.Xil
+vivado_pid15228.str
