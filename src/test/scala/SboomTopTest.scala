@@ -63,6 +63,12 @@ class SboomTopTest extends AnyFunSuite {
       axiLite.write(0x24, 2)
       axiLite.write(0x28, 16)
 
+	// var addr_base   = 0x8000_0000
+  // "32'h00000000"
+	// "32'h00400000"
+	// "32'h00800000"
+  // math.ceil(matrixSize.toFloat/blockSize).toInt
+
       dut.clockDomain.waitSampling(10000)
       
       // read finish flag
