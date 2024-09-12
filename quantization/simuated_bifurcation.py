@@ -90,15 +90,17 @@ def qSB_improve(J,
     N = J.shape[0]
     xi = (0.7 / math.sqrt(N))
     
-    x_comp = (init_x.copy()) * scale
-    y_comp = (init_y.copy()) * scale
+    # x_comp = (init_x.copy()) * scale
+    # y_comp = (init_y.copy()) * scale
     alpha = np.linspace(0, 1, num_iters)
     
     step = num_iters
     acc_reach = 0
     
-    x_comp = scaleup(np.array(x_comp), 12)
-    y_comp = scaleup(np.array(y_comp), 12)
+    x_comp = scaleup(np.array(init_x.copy()), 127)
+    y_comp = scaleup(np.array(init_y.copy()), 127)
+    
+    x_comp_init = x_comp.copy() 
     
     for i in range(num_iters):
         '''
@@ -147,7 +149,7 @@ def qSB_improve(J,
     #     if y == 0.:
     #         zero_momentum += 1
     # print("total zero y", zero_momentum)
-    return np.array(energies), step
+    return np.array(energies), step, x_comp_init
 
 def scaleup(targets, factor):
     rescaled_targets = []

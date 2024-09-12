@@ -15,9 +15,6 @@
  * Copyright (c) 2023 by ${git_name_email}, All Rights Reserved. 
  */
 
-
-// Todo, interface and corresponding apply method need to be added
-
 package PE
 
 import spinal.core._

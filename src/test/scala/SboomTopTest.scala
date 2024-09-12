@@ -15,6 +15,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
 import scala.math._
+import scala.sys.process._
 import scala.util.Random
 
 class SboomTopTest extends AnyFunSuite {
@@ -39,6 +40,13 @@ class SboomTopTest extends AnyFunSuite {
     .withXSim
     .compile(SboomTop(Config()))
 
+  val num_iter = 1000
+  val cmp_type = "bsb"
+  val filename = "G34"
+  val bestknown = 2054
+  val matrix_size = 2000
+  val tile_xy   = 64
+
   test("SboomTopTest"){
     compiled.doSim { dut =>
       dut.clockDomain.forkStimulus(100)
@@ -47,15 +55,25 @@ class SboomTopTest extends AnyFunSuite {
       val axiMemSimModel1 = AxiMemorySim(compiled.dut.io.topAxiMemControlPort, compiled.dut.clockDomain, axiMemSimConfig1)
       val axiLite         = AxiLite4Driver(dut.io.topAxiLiteSlave, dut.clockDomain)
 
+      val result = Seq("python", "quantization/spinal_test.py",
+        filename,
+        bestknown.toString,
+        cmp_type,
+        num_iter.toString).!!
+
+      val lines = result.split("\n")
+      val vexValues = lines(0).split(",").map(_.trim).filter(_.matches("-?\\d+")).map(_.toByte)
+      val resultValues = lines(1).split(",").map(_.toFloat)
+
       axiMemSimModel1.start()
-      axiMemSimModel1.memory.writeArray(0, vexGen())
-      axiMemSimModel1.memory.writeArray(0x800000, edgeGen())
+      axiMemSimModel1.memory.writeArray(0, vexGen(vexValues))
+      axiMemSimModel1.memory.writeArray(0x800000, edgeGen("./data/" + filename))
 
       dut.clockDomain.waitSampling(200)
 
-      axiLite.write(0x0C, 1000)   // 1000 iteration
-      axiLite.write(0x10, 2000)   // matrix size 2000
-      axiLite.write(0x14, 64)     // tile 64
+      axiLite.write(0x0C, num_iter)   // 1000 iteration
+      axiLite.write(0x10, matrix_size)   // matrix size 2000
+      axiLite.write(0x14, tile_xy)     // tile 64
       axiLite.write(0x18, 32)     // max CB number = 2000 / 64 = 32
       // math.ceil(matrixSize.toFloat/blockSize).toInt
       axiLite.write(0x1C, 0)      // CB init
@@ -77,26 +95,29 @@ class SboomTopTest extends AnyFunSuite {
       
       // read finish flag
       axiLite.read(0x32)
+
+      val vexValue = axiMemSimModel1.memory.readArray(0, vexValues.length)
+
+      if (resultValues.sameElements(vexValue)) {
+        println("数据比对成功！")
+      } else {
+        println("数据比对失败！")
+      }
+
     }
   }
 
-  def vexGen() = {
-
-    val random = new Random()
+  def vexGen(vexValues:Array[Byte]) = {
     val vertexBuffer = ArrayBuffer[Byte]()
     for (i <- 0 until 128 * 16) {
-
-      val num = 1.toByte //(random.nextInt(33) - 16).toByte
+      val num = vexValues(i % vexValues.length) //(random.nextInt(33) - 16).toByte
       vertexBuffer.append(num)
-
     }
     vertexBuffer.toArray
-
   }
 
   //generate edges and corresponding indices
-  def edgeGen() = {
-    val filename = "./data/G34"
+  def edgeGen(filename: String) = {
     val firstLine = Source.fromFile(filename).getLines().next()
     val firFields = firstLine.split(' ')
     val arrayWidth = scala.math.ceil(parseUnsignedLong(firFields(0)).toDouble / 64).toInt
@@ -129,7 +150,6 @@ class SboomTopTest extends AnyFunSuite {
     val edgesArrayBuffer = ArrayBuffer[ArrayBuffer[Byte]]()
     var flag = 0
     var transfer_128 = 0
-    var block_empty = 0
     var edgeCnt = 0
     val goodIntervalBound = arrayWidth
     val remainder = arrayWidth % (Config().pe_thread)

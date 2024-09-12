@@ -397,30 +397,30 @@ def plot_surface(non_zero_counts, title):
     plt.show()
 
 # Majority Red (High Numbers)
-num_blocks = 4
-non_zero_counts_high = np.zeros((num_blocks, num_blocks))
-for i in range(num_blocks):
-    for j in range(num_blocks):
-        non_zero_counts_high[i, j] = np.random.randint(10, 16) if np.random.rand() > 0.2 else np.random.randint(0, 5)
+# num_blocks = 4
+# non_zero_counts_high = np.zeros((num_blocks, num_blocks))
+# for i in range(num_blocks):
+#     for j in range(num_blocks):
+#         non_zero_counts_high[i, j] = np.random.randint(10, 16) if np.random.rand() > 0.2 else np.random.randint(0, 5)
 
-plot_surface(non_zero_counts_high, "high energy state")
+# plot_surface(non_zero_counts_high, "high energy state")
 
 
 # Majority Blue (Low Numbers)
-non_zero_counts_low = np.zeros((num_blocks, num_blocks))
-for i in range(num_blocks):
-    for j in range(num_blocks):
-        non_zero_counts_low[i, j] = np.random.randint(0, 5) if np.random.rand() > 0.1 else np.random.randint(10, 16)
+# non_zero_counts_low = np.zeros((num_blocks, num_blocks))
+# for i in range(num_blocks):
+#     for j in range(num_blocks):
+#         non_zero_counts_low[i, j] = np.random.randint(0, 5) if np.random.rand() > 0.1 else np.random.randint(10, 16)
 
-plot_surface(non_zero_counts_low, "low energy state")
+# plot_surface(non_zero_counts_low, "low energy state")
 
 # Half Red, Half Blue
-non_zero_counts_half = np.zeros((num_blocks, num_blocks))
-for i in range(num_blocks):
-    for j in range(num_blocks):
-        if (i + j) % 2 == 0:
-            non_zero_counts_half[i, j] = np.random.randint(10, 16)
-        else:
-            non_zero_counts_half[i, j] = np.random.randint(0, 5)
+# non_zero_counts_half = np.zeros((num_blocks, num_blocks))
+# for i in range(num_blocks):
+#     for j in range(num_blocks):
+#         if (i + j) % 2 == 0:
+#             non_zero_counts_half[i, j] = np.random.randint(10, 16)
+#         else:
+#             non_zero_counts_half[i, j] = np.random.randint(0, 5)
 
-plot_surface(non_zero_counts_half, "normal state")
+# plot_surface(non_zero_counts_half, "normal state")

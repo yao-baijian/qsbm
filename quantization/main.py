@@ -10,7 +10,7 @@ if __name__ == '__main__':
                    'G39': 2356, 
                    'G42': 2394}
     
-    qsb_type = ['non-converge', 'scaleup']
+    qsb_type = ['improve', 'scaleup']
     sb_type  = "bsb"
     quant_index = [7, 6, 5]
     # quant_index = [7]
@@ -23,6 +23,7 @@ if __name__ == '__main__':
         init_x = np.random.uniform(-0.1,0.1,J.shape[0])
         init_y = np.random.uniform(-0.1,0.1,J.shape[0])
 
+        vex_return = init_x.copy()
         # for scaleup 
         # factor = [7, 128,4],  [8, 16, 16], [7,16,16]
         # for noscale
