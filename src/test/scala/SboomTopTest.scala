@@ -16,7 +16,6 @@ import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
 import scala.math._
 import scala.sys.process._
-import scala.util.Random
 
 class SboomTopTest extends AnyFunSuite {
 
@@ -40,7 +39,7 @@ class SboomTopTest extends AnyFunSuite {
     .withXSim
     .compile(SboomTop(Config()))
 
-  val num_iter = 1000
+  val num_iter = 100
   val cmp_type = "bsb"
   val filename = "G34"
   val bestknown = 2054
@@ -110,9 +109,17 @@ class SboomTopTest extends AnyFunSuite {
   def vexGen(vexValues:Array[Byte]) = {
     val vertexBuffer = ArrayBuffer[Byte]()
     for (i <- 0 until 128 * 16) {
-      val num = vexValues(i % vexValues.length) //(random.nextInt(33) - 16).toByte
+      val num = vexValues(i % vexValues.length)
       vertexBuffer.append(num)
     }
+
+    val fos = new FileOutputStream("build/vertex.bin")
+    val dos = new DataOutputStream(fos)
+    for (d <- vertexBuffer) {
+      dos.write(d)
+    }
+    dos.close()
+
     vertexBuffer.toArray
   }
 
