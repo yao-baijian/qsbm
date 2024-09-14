@@ -39,8 +39,8 @@ case class SboomTop(config:Config) extends Component{
 
     for(i<-0 until config.pe_num){
 
-        dispatcher.io.pe_busy(i)                := pe_top.io.bundle_busy_table(i)
-        pe_top.io.last_update(i)                := dispatcher.io.RB_switch
+        dispatcher.io.pe_busy(i)      := pe_top.io.bundle_busy_table(i)
+        pe_top.io.last_update(i)      := dispatcher.io.RB_switch
         dispatcher.io.pe_rdy(i)       := pe_top.io.pe_rdy_table(i)
 
         pe_top.io.vertex_stream_pe(i).payload   := dispatcher.io.vex2pe(i).payload.data
