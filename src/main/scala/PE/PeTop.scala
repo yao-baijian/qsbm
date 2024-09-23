@@ -17,7 +17,7 @@
 
 package PE
 
-import spinal.core._
+import spinal.core.{Reg, _}
 import spinal.lib._
 import spinal.lib.fsm._
 
@@ -31,7 +31,8 @@ case class PeTop(config:PeConfig) extends Component {
         val vertex_stream_pe    = Vec(slave Stream (Bits(config.axi_extend_width bits)), config.core_num)
         val vertex_stream_ge    = slave Stream (Bits(config.axi_extend_width bits))
         val pe_rdy_table        = out Vec(Bool(), config.core_num)
-        val bundle_busy_table   = out Vec(Bool(), config.core_num)
+        val pe_busy             = out Vec(Bool(), config.core_num)
+        val update_busy         = out Bool()
         val writeback_valid     = out Bool()
         val writeback_payload   = out Bits(config.axi_extend_width bits)
         val srst                = in Bool()
@@ -43,10 +44,8 @@ case class PeTop(config:PeConfig) extends Component {
 
     val swap_done               = Reg(Bool())                       init False
     val swap                    = Reg(Bool())                       init True
-    val bundle_busy             = Bool()
-    val bundle_busy_table       = Vec(Bool(), config.core_num)
+    val pe_busy                 = Vec(Bool(), config.core_num)
     val last_update             = Reg(Bool())                       init False
-    val need_update             = Reg(Bool())                       init False
     val gather_pe_busy          = Bool()
     val update_reg_srst         = Vec(Reg(Bool()),config.core_num)
     val pe_rdy_table_all        = Vec(Vec(Bool(), config.thread_num),config.core_num)
@@ -77,7 +76,7 @@ case class PeTop(config:PeConfig) extends Component {
 
     for (i <- 0 until config.core_num) {
         high_to_low_converter.io.in_edge_stream(i)  <> io.edge_stream(i)
-        bundle_busy_table(i)                        <> pecore_array(i).io_state.pe_busy
+        pe_busy(i)                                  <> pecore_array(i).io_state.pe_busy
         pecore_array(i).io_global_reg.vertex_stream <> io.vertex_stream_pe(i)
         pecore_array(i).io_state.last_update        <> io.last_update(i)
         pecore_array(i).io_state.all_zero           <> all_zero(i)
@@ -137,10 +136,11 @@ case class PeTop(config:PeConfig) extends Component {
 
     io.writeback_payload            <> gather_pe_core.io.writeback_payload
     io.writeback_valid              <> gather_pe_core.io.writeback_valid
-    io.bundle_busy_table            <> bundle_busy_table
+    io.pe_busy                      <> pe_busy
     gather_pe_core.io.spmm_rd_data  := update_mem.readAsync(gather_pe_core.io.rd_addr)
-    bundle_busy                     := bundle_busy_table.orR
 
+    val update_busy = Reg(Bool()) init False
+    io.update_busy := update_busy
     //-----------------------------------------------------
     // State Machine
     //-----------------------------------------------------
@@ -153,7 +153,7 @@ case class PeTop(config:PeConfig) extends Component {
 
         IDLE
           .whenIsActive(
-              when(bundle_busy) {
+              when(pe_busy.orR) {
                   goto(OPERATE)
               }
           )
@@ -162,11 +162,13 @@ case class PeTop(config:PeConfig) extends Component {
               when (!last_update) {
                   last_update := io.last_update(0)
               }
-              when(last_update & !bundle_busy & !gather_pe_busy) {
-                  need_update := True
-                  write_ptr   := 0
+              when(last_update) {
                   write_valid := True
-                  goto(UPDATE_SUM_AND_SWITCH)
+                  write_ptr   := 0
+                  when (!pe_busy.orR & !gather_pe_busy) {
+                      update_busy := True
+                      goto(UPDATE_SUM_AND_SWITCH)
+                  }
               }
           }
         UPDATE_SUM_AND_SWITCH
@@ -174,14 +176,14 @@ case class PeTop(config:PeConfig) extends Component {
               when(last_update) {
                   last_update := False
               }
-              when(need_update && write_ptr =/= 15) {
+              when(update_busy && write_ptr =/= 15) {
                   write_ptr     := write_ptr + 1
-              } elsewhen (need_update && write_ptr === 15) {
+              } elsewhen (update_busy && write_ptr === 15) {
                   for (i <- 0 until config.core_num) {
                       update_reg_srst(i) := True
                   }
+                  update_busy := False
                   write_valid := False
-                  need_update := False
                   swap := !swap
                   swap_done := True
               } otherwise {
@@ -189,11 +191,7 @@ case class PeTop(config:PeConfig) extends Component {
                       update_reg_srst(i) := False
                   }
                   swap_done := False
-                  when (bundle_busy) {
-                      goto(OPERATE)
-                  } otherwise {
-                      goto(IDLE)
-                  }
+                  goto(IDLE)
               }
           }
     }

@@ -56,7 +56,7 @@ case class PeCore(config: PeConfig) extends Component {
     val edge_value          = Vec(Bits(config.data_width bits), config.thread_num)
     val edge_valid          = Vec(Bool(), config.thread_num)
     val pe_busy             = Reg(Bool()) init False
-    val need_new_vertex     = Reg(Bool()) init False
+    val need_new_vertex     = Reg(Bool()) init True
     val fifo_rdy            = Vec(Reg(Bool()) init True, config.thread_num)
 
     //-----------------------------------------------------------
@@ -169,18 +169,18 @@ case class PeCore(config: PeConfig) extends Component {
           .whenIsActive {
               when(global_reg.io.reg_full) {
                   need_new_vertex := False
-              }
-              when(io_state.last_update) {
-                  for (i <- 0 until config.thread_num) {
-                      fifo_rdy(i) := False
-                  }
-                  goto(UPDATE_SUM_AND_SWITCH)
-              } elsewhen (!need_new_vertex && edge_valid.orR === True) {
                   pe_busy := True
+              }
+              when(!need_new_vertex && edge_valid.orR === True) {
                   for (i <- 0 until config.thread_num) {
                       fifo_rdy(i) := True
                   }
                   goto(OPERATE)
+              } elsewhen (io_state.last_update) {
+                  for (i <- 0 until config.thread_num) {
+                      fifo_rdy(i) := False
+                  }
+                  goto(UPDATE_SUM_AND_SWITCH)
               }
           }
         OPERATE
@@ -191,24 +191,26 @@ case class PeCore(config: PeConfig) extends Component {
           }
         WAIT
           .whenIsActive {
-              // TODO arbitration need change
-              when(h3_valid.orR === False) {
-                  when(io_state.last_update) {
-                      for (i <- 0 until config.thread_num) {
-                          fifo_rdy(i) := False
-                      }
-                      goto(UPDATE_SUM_AND_SWITCH)
-                  } otherwise {
-                      pe_busy := False
-                      need_new_vertex := True
-                      goto(IDLE)
-                  }
-              }
+            // TODO arbitration need change
+            when(h3_valid.orR === False
+              && h2_valid.orR === False
+              && h1_valid.orR === False) {
+                when(io_state.last_update) {
+                    for (i <- 0 until config.thread_num) {
+                        fifo_rdy(i) := False
+                    }
+                    pe_busy := False
+                    goto(UPDATE_SUM_AND_SWITCH)
+                } otherwise {
+                    pe_busy := False
+                    need_new_vertex := True
+                    goto(IDLE)
+                }
+            }
           }
         UPDATE_SUM_AND_SWITCH
           .whenIsActive {
               when(io_state.swap_done) {
-                  pe_busy := False
                   for (i <- 0 until config.thread_num) {
                       fifo_rdy(i) := True
                   }

@@ -8,11 +8,9 @@ import spinal.lib.bus.amba4.axilite.sim.AxiLite4Driver
 import dispatcher._
 
 import java.io._
-
 import java.io.{File, FileOutputStream}
 import java.lang.Long.{parseLong, parseUnsignedLong}
-import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable._
 import scala.io.Source
 import scala.math._
 import scala.sys.process._
@@ -20,7 +18,12 @@ import scala.sys.process._
 class SboomTopTest extends AnyFunSuite {
 
   object MySpinalConfig extends SpinalConfig(
-    defaultConfigForClockDomains = ClockDomainConfig(resetKind = ASYNC,resetActiveLevel = HIGH),
+
+    defaultConfigForClockDomains = ClockDomainConfig(
+      resetKind = ASYNC,
+      resetActiveLevel = HIGH
+    ),
+    defaultClockDomainFrequency = FixedFrequency(300 MHz),
     targetDirectory = "fpga/target",
     oneFilePerComponent = false
   )
@@ -39,288 +42,319 @@ class SboomTopTest extends AnyFunSuite {
     .withXSim
     .compile(SboomTop(Config()))
 
-  val num_iter = 100
-  val cmp_type = "bsb"
-  val filename = "G34"
-  val bestknown = 2054
-  val matrix_size = 2000
-  val tile_xy   = 64
+  val num_iter      = 100
+  val cmp_type      = "bsb"
+  val filename      = "G34"
+  val bestknown     = 2054
+  val RB_length     = 512.0
+  val tile_xy       = 64
+  val dbg_iter      = 1
+
+  val firstLine     = Source.fromFile("data/"+filename).getLines().next()
+  val matrix_size   = firstLine.split(" ")(0).toInt
+
+  val vex_a_base    = 0x0
+  val vex_b_base    = 0x400000
+  val edge_base     = 0x800000
+  val RB_max        = ceil(matrix_size / RB_length).toInt
+
+  val dbg_option     = true
 
   test("SboomTopTest"){
     compiled.doSim { dut =>
       dut.clockDomain.forkStimulus(100)
 
-      val axiMemSimConfig1= AxiMemorySimConfig(maxOutstandingReads = 2, maxOutstandingWrites = 8)
-      val axiMemSimModel1 = AxiMemorySim(compiled.dut.io.topAxiMemControlPort, compiled.dut.clockDomain, axiMemSimConfig1)
-      val axiLite         = AxiLite4Driver(dut.io.topAxiLiteSlave, dut.clockDomain)
-
+      // algorithm
       val result = Seq("python", "quantization/spinal_test.py",
         filename,
         bestknown.toString,
         cmp_type,
-        num_iter.toString).!!
+        num_iter.toString,
+        dbg_iter.toString).!!
 
       val lines = result.split("\n")
-      val vexValues = lines(0).split(",").map(_.trim).filter(_.matches("-?\\d+")).map(_.toByte)
-      val resultValues = lines(1).split(",").map(_.toFloat)
+      val x_comp_init   = lines(0).split(",").map(_.trim).filter(_.matches("-?\\d+")).map(_.toByte)
+      val y_comp_init   = lines(1).split(",").map(_.trim).filter(_.matches("-?\\d+")).map(_.toByte)
+      val JX_dbg        = lines(2).split(",").map(_.trim).filter(_.matches("-?\\d+")).map(_.toInt)
+      val x_comp_dbg    = lines(3).split(",").map(_.trim).filter(_.matches("-?\\d+")).map(_.toByte)
+      val y_comp_dbg    = lines(4).split(",").map(_.trim).filter(_.matches("-?\\d+")).map(_.toInt)
+      val qsb_energy    = lines(5).split(",").map(_.toFloat)
 
+      val combined_init = new Array[Byte] (x_comp_init.length * 2)
+
+      for (i <- x_comp_init.indices) {
+        combined_init(2 * i) = x_comp_init(i)
+        combined_init(2 * i + 1) = y_comp_init(i)
+      }
+
+      // hardware
+      val axiMemSimConfig1= AxiMemorySimConfig(maxOutstandingReads = 3, maxOutstandingWrites = 8)
+      val axiMemSimModel1 = AxiMemorySim(compiled.dut.io.topAxiMemControlPort, compiled.dut.clockDomain, axiMemSimConfig1)
+      val axiLite         = AxiLite4Driver(dut.io.topAxiLiteSlave, dut.clockDomain)
       axiMemSimModel1.start()
-      axiMemSimModel1.memory.writeArray(0, vexGen(vexValues))
-      axiMemSimModel1.memory.writeArray(0x800000, edgeGen("./data/" + filename))
+      axiMemSimModel1.memory.writeArray(0, vexGen(combined_init))
+      axiMemSimModel1.memory.writeArray(0x400000, vexGen(combined_init))
+      val (rb, cb, cb_length, edge) = edgeGen("./data/" + filename, tile_xy)
+      axiMemSimModel1.memory.writeArray(0x800000, edge)
+
+      // memory dbg
+      mem_dbg(dbg_option, axiMemSimModel1)
 
       dut.clockDomain.waitSampling(200)
 
-      axiLite.write(0x0C, num_iter)   // 1000 iteration
-      axiLite.write(0x10, matrix_size)   // matrix size 2000
+      axiLite.write(0x0C, num_iter)    // 1000 iteration
+      axiLite.write(0x10, matrix_size) // matrix size 2000
       axiLite.write(0x14, tile_xy)     // tile 64
-      axiLite.write(0x18, 32)     // max CB number = 2000 / 64 = 32
+      axiLite.write(0x18, BigInt(ceil(matrix_size / tile_xy).toLong))    // max CB number = 2000 / 64 = 32
+      axiLite.write(0x40, RB_max)    // max RB number = 2000 / 512 = 4
       // math.ceil(matrixSize.toFloat/blockSize).toInt
-      axiLite.write(0x1C, 0)      // CB init
-      axiLite.write(0x20, 0)      // RB init
+
+      axiLite.write(0x1C, cb)      // CB init
+      axiLite.write(0x20, rb)      // RB init
+      axiLite.write(0x44, cb_length)      // RB init
+
       axiLite.write(0x24, 0)      // ai init
       axiLite.write(0x28, 1)      // ai incr
       axiLite.write(0x2C, 1)      // xi
       axiLite.write(0x30, 16)     // dt
-      axiLite.write(0x40, 16)     // max RB number = 2000 / 512 = 4
 
-      axiLite.write(0x34, 0)      // vex_a_base
-      axiLite.write(0x38, 0x400000)     // vex_b_base
-      axiLite.write(0x3C, 0x800000)     // edge_base
+      axiLite.write(0x34, vex_a_base)       // vex_a_base
+      axiLite.write(0x38, vex_b_base)       // vex_b_base
+      axiLite.write(0x3C, edge_base)        // edge_base
 
       // start
       axiLite.write(0x0, 1)
 
+//      fork {
+//        var previousData = dut.io.topAxiMemControlPort.r.data.toBigInt
+//        while (true) {
+//          dut.clockDomain.waitSampling(10000)
+//          val currentData = dut.io.topAxiMemControlPort.r.data.toBigInt
+//          if (currentData != previousData) {
+//            println(s"数据变化: $currentData")
+//            previousData = currentData
+//          }
+//        }
+//      }
       dut.clockDomain.waitSampling(10000)
-      
+
       // read finish flag
       axiLite.read(0x32)
 
-      val vexValue = axiMemSimModel1.memory.readArray(0, vexValues.length)
+      val x_y_comp_result = axiMemSimModel1.memory.readArray(0, combined_init.length)
 
-      if (resultValues.sameElements(vexValue)) {
-        println("数据比对成功！")
-      } else {
-        println("数据比对失败！")
+      val x_comp_result = new Array[Byte] (x_comp_init.length)
+      val y_comp_result = new Array[Byte] (x_comp_init.length)
+
+      for (i <- x_comp_init.indices) {
+        x_comp_result(i) = combined_init(2 * i)
+        y_comp_result(i) = combined_init(2 * i + 1)
       }
 
+      scoreboard("x_comp", x_comp_result, x_comp_dbg, dbg_iter)
+      // TODO need to fix y_comp_dbg
+      scoreboard("y_comp", y_comp_result, x_comp_dbg, dbg_iter)
+
+      println(s"qsb_energy: ${qsb_energy.mkString(", ")}")
+    }
+  }
+
+  def mem_dbg(dbg: Boolean, mem: AxiMemorySim): Unit = {
+    if (dbg) {
+      log_dbg(dbg_option, ("vex_all", mem.memory.readArray(0x0, 64)))
+      log_dbg(dbg_option, ("vex2", mem.memory.readArray(0x0, 16)))
+      log_dbg(dbg_option, ("vex1", mem.memory.readArray(0x10, 16)))
+      log_dbg(dbg_option, ("edge_dbg", mem.memory.readArray(0x800000, 300)))
+    }
+  }
+
+  def log_dbg(dbg: Boolean, namesAndTargets: (String, Any)*): Unit = {
+    if (dbg) {
+      namesAndTargets.foreach { case (name, target) =>
+        println(s"name: $name")
+        target match {
+          case arr: Array[Byte] =>
+            arr.zipWithIndex.foreach { case (value, i) =>
+              if (i % 16 == 0 && i != 0) println()
+              print(f"$value%02x ")
+            }
+            println()
+          case _ =>
+            println(s"target: $target")
+        }
+      }
+    }
+  }
+
+  def scoreboard(name: String, target: Array[Byte], scoreboard: Array[Byte], sample_time: Int): Unit = {
+    if (target.sameElements(scoreboard)) {
+      println("数据比对成功！")
+    } else {
+      println("数据比对失败！")
+      println(s"sample iteration: ${sample_time.toString}")
+      println(s"${name} target length: ${target.length}")
+      println(s"${name} scoreboard length: ${scoreboard.length}")
+      println(s"${name} target: ${target.mkString(", ")}")
+      println(s"${name} scoreboard: ${scoreboard.mkString(", ")}")
     }
   }
 
   def vexGen(vexValues:Array[Byte]) = {
-    val vertexBuffer = ArrayBuffer[Byte]()
-    for (i <- 0 until 128 * 16) {
-      val num = vexValues(i % vexValues.length)
-      vertexBuffer.append(num)
-    }
-
     val fos = new FileOutputStream("build/vertex.bin")
     val dos = new DataOutputStream(fos)
-    for (d <- vertexBuffer) {
+    for (d <- vexValues) {
       dos.write(d)
     }
     dos.close()
-
-    vertexBuffer.toArray
+    vexValues
   }
 
-  //generate edges and corresponding indices
-  def edgeGen(filename: String) = {
+  def edgeGen(filename: String, tile_xy: Int) = {
+
     val firstLine = Source.fromFile(filename).getLines().next()
     val firFields = firstLine.split(' ')
-    val arrayWidth = scala.math.ceil(parseUnsignedLong(firFields(0)).toDouble / 64).toInt
+    val arrayWidth = scala.math.ceil(parseUnsignedLong(firFields(0)).toDouble / tile_xy).toInt
     //put a queue inside each block
-    val blocks = Array.ofDim[mutable.Queue[ArrayBuffer[Byte]]](arrayWidth, arrayWidth)
+    val blocks = Array.ofDim[ArrayBuffer[Byte]](arrayWidth, arrayWidth)
+
     for (row <- 0 until arrayWidth) {
       for (col <- 0 until (arrayWidth)) {
-        blocks(row)(col) = mutable.Queue[ArrayBuffer[Byte]]()
+        blocks(row)(col) = ArrayBuffer[Byte]()
       }
     }
+
     val remainLines = Source.fromFile(filename).getLines().drop(1)
+
     for (line <- remainLines) {
-      val row = parseUnsignedLong(line.split(' ')(0)) - 1
-      val col = parseUnsignedLong(line.split(' ')(1)) - 1
+      val row   = parseUnsignedLong(line.split(' ')(0)) - 1
+      val col   = parseUnsignedLong(line.split(' ')(1)) - 1
       val value = parseLong(line.split(' ')(2))
-      val edge = (row & ((1 << 6) - 1)) << 10 |
-        (col & ((1 << 6) - 1)) << 6 |
-        value & ((1 << 4) - 1)
-      val edgeBytes = ArrayBuffer[Byte](
-        edge.toByte,
-        (edge >>> 8).toByte
-      )
 
-      val block_row = (row / 64).toInt
-      val block_col = (col / 64).toInt
-      blocks(block_row)(block_col).enqueue(edgeBytes)
-      blocks(block_col)(block_row).enqueue(edgeBytes)
-    } //put all the edges into all queues
+      //  edge = | src : dst : value | = | 6 : 6 : 4 |    <--->     | 8 : 8 |
+      val edge = (row & ((1 << 6) - 1)) << 10 | (col & ((1 << 6) - 1)) << 6 | value & ((1 << 4) - 1)
+      //  TODO need check here
+      val edgeBytes = ArrayBuffer[Byte]( edge.toByte, (edge >>> 8).toByte)
 
-    val edgesArrayBuffer = ArrayBuffer[ArrayBuffer[Byte]]()
-    var flag = 0
-    var transfer_128 = 0
-    var edgeCnt = 0
-    val goodIntervalBound = arrayWidth
-    val remainder = arrayWidth % (Config().pe_thread)
-
-    // To deal with all lines within good interval and all column blocks
-    var blockEmpty = 0
-    var bigLineBlockCnt = 0
-
-    for (base <- 0 until (goodIntervalBound) by Config().pe_thread) {
-      for (col <- 0 until arrayWidth) { //arrayWidth is the number of 64 * 64 blocks
-        do {
-          // 128bits conccatenation
-          flag = 0
-          for (offset <- 0 until Config().pe_thread) {
-            if (blocks(base + offset)(col).nonEmpty) {
-              blockEmpty = 0
-              flag = flag + 1
-              edgeCnt = edgeCnt + 1
-              if(edgeCnt >0 && edgeCnt%8 == 0){
-                transfer_128 = transfer_128 + 1
-              }
-              val edge = blocks(base + offset)(col).dequeue()
-              edgesArrayBuffer.append(edge)
-            }
-          } // 128bits conccatenation and paddings
-        } while (flag > 0) //  flag>0 means that there is no allZeros
-
-        if(flag == 0){
-//        println("transfer_128 and edgeCnt",transfer_128,edgeCnt)
-          bigLineBlockCnt = bigLineBlockCnt + 1
-          blockEmpty = blockEmpty + 1
-          if(blockEmpty == 1){
-            var edgePaddingTo128Remainder = edgeCnt % 8
-            var edgeIndexPaddingByteNum = (8 - edgePaddingTo128Remainder)/2
-//            println("edgePaddingTo128Remainder",edgePaddingTo128Remainder)
-            if(edgePaddingTo128Remainder != 0){
-              //padding to make a 128b packet
-              for(i <- 0 until 8-edgePaddingTo128Remainder){
-                val edge = ArrayBuffer.fill(Config().edgeByteLen)(0.toByte)
-                edgeCnt = edgeCnt + 1
-                edgesArrayBuffer.append(edge)
-              }
-              transfer_128 = transfer_128 + 1
-            }
-
-            //forced to add seperator with 128b all zeros
-            for(i <- 0 until 8){
-              val edge = ArrayBuffer.fill(Config().edgeByteLen)(0.toByte)
-              edgeCnt = edgeCnt + 1
-              edgesArrayBuffer.append(edge)
-            }
-            transfer_128 = transfer_128 + 1
-            if(transfer_128 % 4 == 1){
-
-              val edgePadding =  ArrayBuffer.fill(16 * 3)(0.toByte)
-              transfer_128 = transfer_128 + 3
-              edgesArrayBuffer.append(edgePadding)
-            } else if(transfer_128 % 4 == 2){
-              val edgePadding = ArrayBuffer.fill(16 * 2)(0.toByte)
-              val indexPadding = ArrayBuffer.fill(2)(0.toByte)
-              transfer_128 = transfer_128 + 2
-              edgesArrayBuffer.append(edgePadding)
-            } else if (transfer_128 % 4 == 3) {
-              val edgePadding = ArrayBuffer.fill(16 * 1)(0.toByte)
-              transfer_128 = transfer_128 + 1
-              edgesArrayBuffer.append(edgePadding)
-            }
-          }
-
-// bigLine End flag with additional 512'b0(equivalent to add another 512'b0 seperator after the first seperator)
-          if(bigLineBlockCnt%32 == 0){
-            val edgePadding =  ArrayBuffer.fill(16 * 4)(0.toByte)
-            transfer_128 = transfer_128 + 4
-            edgesArrayBuffer.append(edgePadding)
-          }
-        }
-      }
+      // J = (J.T + J)
+      val block_row = (row / tile_xy).toInt
+      val block_col = (col / tile_xy).toInt
+      blocks(block_row)(block_col) ++= edgeBytes
+      blocks(block_col)(block_row) ++= edgeBytes
     }
 
-    //To deal with remaining blocks
-    if (remainder > 0) {
+    val edges_new           = ArrayBuffer[Byte]()
+    val CB_last_non_empty_tile  = Queue[Int]()
+    val RB_last_non_empty_CB    = Queue[Int]()
+    val CB_length           = Queue[Int]()
+    val CB_list             = Queue[Int]()
+    val RB_list             = Queue[Int]()
+    var non_empty_tile      = false
+    var non_empty_CB        = false
+    var last_non_empty_tile = 0
+    var last_non_empty_CB   = 0
+    var RB_init             = 0
+    var CB_init             = 0
+    var next_CB             = 0
+    var next_RB             = 0
+    var next_CB_length      = 0
+    var CB_length_128       = 0
+    var CB_length_init      = 0
+
+    // RB
+    for (base <- 0 until  arrayWidth by Config().pe_thread) {
+      // CB
+      last_non_empty_CB = 0
+      non_empty_CB = false
+
       for (col <- 0 until arrayWidth) {
-        do {
-          flag = 0
-          for (offset <- 0 until remainder) {
-            if (blocks(goodIntervalBound + offset)(col).nonEmpty) {
-              blockEmpty = 0
-              flag = flag + 1
-              edgeCnt = edgeCnt + 1
-              if(edgeCnt>0 && edgeCnt%8 == 0){
-                transfer_128 = transfer_128 + 1
-              }
-              val edge = blocks(goodIntervalBound)(col).dequeue()
-              edgesArrayBuffer.append(edge)
-            }
-          }
-        } while (flag > 0)
-
-        if (flag == 0) {
-          blockEmpty = blockEmpty + 1
-          if(blockEmpty == 1){
-            //          println("-------transfer_128----------",transfer_128)
-            var edgePaddingTo128Remainder = edgeCnt % 8
-            var edgeIndexPaddingByteNum = (8 - edgePaddingTo128Remainder)/2
-
-            if(edgePaddingTo128Remainder != 0){
-              //padding to make a 128b packet
-              for(i <- 0 until 8-edgePaddingTo128Remainder){
-                val edge = ArrayBuffer.fill(Config().edgeByteLen)(0.toByte)
-                edgesArrayBuffer.append(edge)
-              }
-              transfer_128 = transfer_128 + 1
-            }
-
-            // add extra seperator with 128bit all zeros
-            for(i <- 0 until 8){
-              val edge = ArrayBuffer.fill(Config().edgeByteLen)(0.toByte)
-              edgeCnt = edgeCnt + 1
-              edgesArrayBuffer.append(edge)
-            }
-
-            transfer_128 = transfer_128 + 1
-
-            if (transfer_128 % 4 == 1) {
-              val padding = ArrayBuffer.fill(16 * 3)(0.toByte)
-              transfer_128 = transfer_128 + 3
-              edgesArrayBuffer.append(padding)
-            } else if (transfer_128 % 4 == 2) {
-              val padding = ArrayBuffer.fill(16 * 2)(0.toByte)
-              transfer_128 = transfer_128 + 2
-              edgesArrayBuffer.append(padding)
-            } else if (transfer_128 % 4 == 3) {
-              val padding = ArrayBuffer.fill(16 * 1)(0.toByte)
-              transfer_128 = transfer_128 + 1
-              edgesArrayBuffer.append(padding)
-            }
-
-          }
-
-          // bigLine End flag with additional 512'b0(equivalent to add another 512'b0 seperator after the first seperator)
-          if(bigLineBlockCnt%32 == 0){
-            val edgePadding =  ArrayBuffer.fill(16 * 4)(0.toByte)
-            transfer_128 = transfer_128 + 4
-            edgesArrayBuffer.append(edgePadding)
+        non_empty_tile = false
+        CB_length_128  = 0
+        for (offset <- 0 until Config().pe_thread) {
+          if (blocks(base + offset)(col).nonEmpty) {
+            last_non_empty_tile = offset + 1
+            CB_length_128 += ceil((blocks(base + offset)(col).length + 6) / 16.0).toInt // 5 byte for header
+            non_empty_tile = true
           }
         }
+
+        if (non_empty_tile) {
+          if (CB_length_128 % 4 == 0) {
+            CB_length += CB_length_128 / 4 + 1
+          } else {
+            CB_length += floor(CB_length_128 / 4.0).toInt + 1
+          }
+          CB_list += col + 1
+          CB_last_non_empty_tile += last_non_empty_tile
+          non_empty_CB = true
+          last_non_empty_CB = col + 1
+        }
+      }
+
+      if (non_empty_CB) {
+        RB_list += floor(base / 8).toInt + 1
+        RB_last_non_empty_CB += last_non_empty_CB
       }
     }
 
-    val dataArray = ArrayBuffer[Byte]()
-    for (i <- edgesArrayBuffer.indices) {
-      val innerArr = edgesArrayBuffer(i)
-      for (j <- innerArr.indices) {
-        dataArray.append(innerArr(j))
+    RB_init   = RB_list.dequeue()
+    CB_init   = CB_list.dequeue()
+    CB_length_init = CB_length.dequeue()
+
+    RB_list.enqueue(RB_init)
+    CB_list.enqueue(CB_init)
+    CB_length.enqueue(CB_length_init)
+
+    log_dbg(dbg_option, ("RB_init", RB_init), ("CB_init", CB_init) , ("CB_length", CB_length))
+
+    for (base <- 0 until  arrayWidth by Config().pe_thread) {
+      last_non_empty_CB = 0
+      next_RB = 0
+      for (col <- 0 until arrayWidth) {
+        last_non_empty_tile = 0
+        next_CB = 0
+        next_CB_length = 0
+        for (offset <- 0 until Config().pe_thread) {
+          if (blocks(base + offset)(col).nonEmpty) {
+            if (last_non_empty_CB == 0) { last_non_empty_CB  = RB_last_non_empty_CB.dequeue() }
+            if (last_non_empty_tile == 0) { last_non_empty_tile  = CB_last_non_empty_tile.dequeue() }
+            if (col + 1 == last_non_empty_CB && offset + 1 == last_non_empty_tile && next_RB == 0) {
+              next_RB = RB_list.dequeue()
+              log_dbg(dbg_option, ("next_RB", next_RB))
+            }
+            if (offset + 1 == last_non_empty_tile && next_CB == 0 ) {
+              next_CB         = CB_list.dequeue()
+              next_CB_length  = CB_length.dequeue()
+            }
+            // TODO next_CB_length can not handle matrix elements more that 32 * 256
+            edges_new ++= ArrayBuffer[Byte] (0.toByte, (offset + 1).toByte, next_RB.toByte, next_CB.toByte, next_CB_length.toByte, 0.toByte)
+            edges_new ++= blocks(base + offset)(col)
+
+            if (edges_new.length % 16 != 0) {
+              // padding to make a 128b packet
+              for (i <- 0 until 16 - edges_new.length % 16) {
+                edges_new ++= ArrayBuffer[Byte] (0.toByte)
+              }
+            }
+
+            // pad zeros for 512b alignment
+            if (last_non_empty_tile == offset + 1) {
+              for (i <- 0 until 64 - edges_new.length % 64) {
+                val zero512 = ArrayBuffer[Byte] (0.toByte)
+                edges_new ++= zero512
+              }
+            }
+          }
+        }
       }
     }
 
     val fos = new FileOutputStream("build/edge.bin")
     val dos = new DataOutputStream(fos)
-    for (d <- dataArray) {
-      dos.write(d.toByte)
+    for (d <- edges_new) {
+      dos.write(d)
     }
     dos.close()
 
-    dataArray.toArray
+    (RB_init, CB_init, CB_length_init, edges_new.toArray)
   }
 }

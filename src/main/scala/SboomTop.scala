@@ -39,7 +39,7 @@ case class SboomTop(config:Config) extends Component{
 
     for(i<-0 until config.pe_num){
 
-        dispatcher.io.pe_busy(i)      := pe_top.io.bundle_busy_table(i)
+        dispatcher.io.pe_busy(i)      := pe_top.io.pe_busy(i)
         pe_top.io.last_update(i)      := dispatcher.io.RB_switch
         dispatcher.io.pe_rdy(i)       := pe_top.io.pe_rdy_table(i)
 
@@ -50,6 +50,8 @@ case class SboomTop(config:Config) extends Component{
         pe_top.io.edge_stream(i).valid          := dispatcher.io.edge2pe(i).valid
         dispatcher.io.edge2pe(i).ready          := pe_top.io.edge_stream(i).ready
     }
+
+    dispatcher.io.update_busy := pe_top.io.update_busy
 
     // dispatcher - ddr
     dispatcher.io.wb_valid :=  pe_top.io.writeback_valid

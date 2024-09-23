@@ -36,6 +36,7 @@ case class AxiLiteReg() extends Component {
   axiLiteCtrl.readAndWrite(io.qsb_cfg.xi, address = 0x2C)
   axiLiteCtrl.readAndWrite(io.qsb_cfg.dt, address = 0x30)
   axiLiteCtrl.readAndWrite(io.qsb_cfg.RB_max, address = 0x40)
+  axiLiteCtrl.readAndWrite(io.qsb_cfg.CB_length, address = 0x44)
 
   axiLiteCtrl.readAndWrite(io.vex_a_base, address = 0x34)
   axiLiteCtrl.readAndWrite(io.vex_b_base, address = 0x38)

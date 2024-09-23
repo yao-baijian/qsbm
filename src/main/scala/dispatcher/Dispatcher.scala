@@ -37,6 +37,7 @@ case class Dispatcher(config: Config) extends Component {
     val RB_switch = out Bool()
     val vex2pe  	= Vec(master(Flow(Axi2Stream())), config.pe_num)
     val edge2pe 	= Vec(master(Stream(Axi2Stream())), config.pe_num)
+    val update_busy = in Bool()
     // GE
     val vex2ge 		= master(Flow(Axi2Stream()))
     val wb_valid  = in Bool()
@@ -67,24 +68,12 @@ case class Dispatcher(config: Config) extends Component {
   val ping_pong           = Reg(Bool()) init True
   val vex_base_addr       = UInt(32 bits)
   val vex_base_addr_r     = UInt(32 bits)
-  val all_zero_out_r      = Reg(Bool()) init False
-  val fifo_pop            = Reg(Bool()) init True
-  val inter_edge_stream   = Stream(Axi2Stream())
   val pe_nxt              = Reg(UInt(2 bits)) init 0
   val pe_nxt_rdy          = Reg(Bool()) init True
 
-  val edgeFifo = StreamFifo(
-    dataType = Axi2Stream(),
-    depth = 128
-  )
-
-  inter_edge_stream.payload := edgeFifo.io.pop.payload
-  inter_edge_stream.valid   := edgeFifo.io.pop.valid && fifo_pop
-  edgeFifo.io.pop.ready     := inter_edge_stream.ready && fifo_pop
-
-  val data_stream  = StreamDemux(io.axiMemControlPort.r, vexEdgeSelect, 2) // to vex, to edge
-  val edge_stream  = StreamDemux(inter_edge_stream, pe_select, config.pe_num)// edge to pe 1, 2, 3, 4
-  val vex_stream   = StreamDemux(data_stream(0), pe_select, config.pe_num) // vex to pe 1, 2, 3, 4
+  val data_stream         = StreamDemux(io.axiMemControlPort.r, vexEdgeSelect, 2) // to vex, to edge
+  val edge_stream         = StreamDemux(data_stream(1), pe_select, config.pe_num) // edge to pe 1, 2, 3, 4
+  val vex_stream          = StreamDemux(data_stream(0), pe_select, config.pe_num) // vex to pe 1, 2, 3, 4
 
   for (i <- 0 until config.pe_num) {
     io.vex2pe(i).payload.data  := vex_stream(i).payload.data
@@ -109,49 +98,33 @@ case class Dispatcher(config: Config) extends Component {
   io.axiMemControlPort.ar.payload.burst := B"2'b01"  // incr type
   io.axiMemControlPort.ar.len 			    := U"8'b0000_0000"
   io.axiMemControlPort.ar.payload.addr 	:= 0
-  // Flow:  data_stream   -> edgefifo
-  //        edgefifo      -> edge_stream | edge_stream | edge_stream | edge_stream -> pe_1 | pe_2 | pe_3 | pe_4
 
-  data_stream(1).ready          := edgeFifo.io.push.ready
-  edgeFifo.io.push.payload.data := data_stream(1).payload.data
-  edgeFifo.io.push.valid        := data_stream(1).valid
+  // Flow:
+  //        data_stream  -> edge_stream | edge_stream | edge_stream | edge_stream -> pe_1 | pe_2 | pe_3 | pe_4
 
   for (i <- 0 until config.pe_num) {
-    io.edge2pe(i)  <>  edge_stream(i)
-
-    when(all_zero_out_r){
-      edge_stream(i).ready := False
-    }.otherwise{
-      edge_stream(i).ready := io.pe_rdy(i)
-    }
+    edge_stream(i).ready        := io.edge2pe(i).ready
+    io.edge2pe(i).payload.data  := edge_stream(i).payload.data
+    io.edge2pe(i).valid         := edge_stream(i).valid
   }
 
   // dispatcher 2 ge
   io.vex2ge.payload.data  := data_stream(0).payload.data
   io.vex2ge.valid         := False
 
-
   // edge read in, detect zero
-  val single_zero_in         = UInt(4 bits)
-  val partial_zero_in        = Bool()
-  val partial_zero_in_r          = Reg(Bool()) init False
-  val edge_in_ptr_in         = UInt(4 bits)
-  val single_zero_out         = UInt(4 bits)
+  val single_zero_in       = UInt(4 bits)
+  val partial_zero_in      = Bool()
+  val partial_zero_in_r    = Reg(Bool()) init False
+  val edge_in_ptr_in       = UInt(4 bits)
 
   for(i <- 0 until config.pe_num) {
-    single_zero_in(i)  := (data_stream(1).payload.data.subdivideIn(128 bits)(i) === 0)
-    single_zero_out(i)  := (edgeFifo.io.pop.payload.data.subdivideIn(128 bits)(i) === 0) && (edgeFifo.io.pop.valid)
+    single_zero_in(i)  := (data_stream(1).payload.data.subdivideIn(128 bits)(i) === 0) && data_stream(1).valid
   }
   partial_zero_in := single_zero_in.orR
 
-  when( partial_zero_in === True ){
+  when( partial_zero_in){
     partial_zero_in_r := True
-  }
-
-  when (single_zero_out.orR) {
-    get_nxt_pe()
-    all_zero_out_r := True
-    disable_edge()
   }
 
   switch(single_zero_in) {
@@ -163,37 +136,54 @@ case class Dispatcher(config: Config) extends Component {
   }
 
   // edge send out, decide nxt CB, RB
+  val header 		          = Bool()
   val head		            = UInt(4 bits)
-  val header 		          = head.orR
-  val RB_incr_nxt 		    = Reg(UInt(8 bits)) init 0
-  val CB_incr_nxt 		    = Reg(UInt(8 bits)) init 0
   val header_ptr          = UInt(2 bits)
+  val RB_nxt 		          = UInt(8 bits)
+  val CB_nxt 		          = UInt(8 bits)
+  val RB_nxt_r 		        = Reg(UInt(8 bits)) init 0
+  val CB_nxt_r 		        = Reg(UInt(8 bits)) init 0
+  val edge_length         = UInt(8 bits)
+  val edge_length_r       = Reg(UInt(8 bits)) init 0
+  val last_r              = Reg(Bool()) init False
+  val RB_switch 		      = Reg(Bool()) init False
 
+  for(i <- 0 until config.pe_num) {
+    head(i) := (data_stream(1).payload.data.subdivideIn(128 bits)(i).subdivideIn(8 bits)(0) === 0x00 &&
+                data_stream(1).payload.data.subdivideIn(128 bits)(i).subdivideIn(8 bits)(1) =/= 0x00)
+  }
+
+  // If multiple header is read in, the header with larger idx store the RB_nxt, CB_nxt, edge_length
   switch(head) {
+    is (8, 9, 10, 11, 12, 13, 14, 15) { header_ptr := 3 }
+    is (4, 5, 6, 7) { header_ptr := 2 }
+    is (2, 3) { header_ptr := 1 }
     is (1) { header_ptr := 0 }
-    is (2) { header_ptr := 1 }
-    is (4) { header_ptr := 2 }
-    is (8) { header_ptr := 3 }
     default { header_ptr := 0 }
   }
 
-  for(i <- 0 until config.pe_num) {
-    head(i) := (edgeFifo.io.pop.payload.data.subdivideIn(128 bits)(i).subdivideIn(8 bits)(0) === 0x00 &&
-                edgeFifo.io.pop.payload.data.subdivideIn(128 bits)(i).subdivideIn(8 bits)(1) =/= 0x00)
+  header := head.orR && data_stream(1).valid
+
+  RB_nxt := header ? data_stream(1).payload.data.subdivideIn(128 bits)(header_ptr).subdivideIn(8 bits)(2).asUInt | 0
+  CB_nxt := header ? data_stream(1).payload.data.subdivideIn(128 bits)(header_ptr).subdivideIn(8 bits)(3).asUInt | 0
+  edge_length  := header ? data_stream(1).payload.data.subdivideIn(128 bits)(header_ptr).subdivideIn(8 bits)(4).asUInt | 0
+
+  when (RB_nxt =/= 0) {
+    RB_nxt_r := RB_nxt
   }
 
-  when(header){
-    RB_incr_nxt 	:= edgeFifo.io.pop.payload.data.subdivideIn(128 bits)(header_ptr).subdivideIn(8 bits)(2).asUInt
-    CB_incr_nxt 	:= edgeFifo.io.pop.payload.data.subdivideIn(128 bits)(header_ptr).subdivideIn(8 bits)(3).asUInt
+  when (CB_nxt =/= 0) {
+    CB_nxt_r := CB_nxt
   }
 
-  io.RB_switch := False
-  when(RB_incr_nxt > 0) {
-    io.RB_switch := True
+  when (edge_length =/= 0) {
+    edge_length_r := edge_length
   }
 
   // Dispatcher fsm
   pe_nxt_rdy := !io.pe_busy.andR
+
+  io.RB_switch := RB_switch
 
   when(!io.pe_busy(0)) { pe_nxt := 0 }
     .elsewhen(!io.pe_busy(1)){ pe_nxt := 1}
@@ -201,10 +191,26 @@ case class Dispatcher(config: Config) extends Component {
     .elsewhen(!io.pe_busy(3)){ pe_nxt := 3}
     .otherwise{ pe_nxt := 0}
 
-  val axi4MemCtrlFsm = new StateMachine {
+  val axi_addr_l   = UInt(32 bits)
+  val axi_addr_h   = UInt(32 bits)
+  val page_4k      = UInt(32 bits)
+  val last_page    = UInt(8 bits)
+  val next_page    = UInt(8 bits)
+  val edge_addr    = Reg(UInt(16 bits)) init 0
+  axi_addr_l := io.edge_base + (64) * edge_addr
+  axi_addr_h := io.edge_base + (64) * (edge_addr + edge_length_r - 1)
 
-    val edge_addr   = Reg(UInt(16 bits)) init 0
-    val RB_all      = Reg(UInt(8 bits)) init 0
+  page_4k(31 downto 12) := axi_addr_h(31 downto 12)
+  page_4k(11 downto 0)  := 0
+  last_page := (( page_4k - axi_addr_l ) >> 6).resize(8)
+  next_page := edge_length_r - last_page
+
+  val axi4MemCtrlFsm = new StateMachine {
+    val RB            = Reg(UInt(32 bits)) init 0
+    val flg_4k        = Reg(Bool()) init True
+    val axi_addr_l_r  = Reg(UInt(32 bits)) init 0
+    val axi_addr_h_r  = Reg(UInt(32 bits)) init 0
+    val fired         = Reg(Bool()) init False
 
     val IDLE = new State with EntryPoint {
       onEntry {
@@ -218,12 +224,17 @@ case class Dispatcher(config: Config) extends Component {
     }
 
     val SEND_INIT_VEX_ADDR: State = new State {
+      onEntry {
+        edge_length_r := io.qsb_cfg.CB_length.resize(8)
+        edge_addr     := 0
+      }
       whenIsActive {
-        set_read(U(0), U(1), vex_base_addr + io.qsb_cfg.CB_init) // read to initial vex addr
         when(io.pe_busy.orR === False) {
-          enable_read ()
+          set_read(U(1), U(1), vex_base_addr + (128 * io.qsb_cfg.CB_init.resize(8))) // read to initial vex addr
+          enable_read()
         }
         when(io.axiMemControlPort.ar.fire) {
+          disable_read()
           goto(READ_VEX_DATA_SEND_EDGE_ADDR)
         }
       }
@@ -232,82 +243,131 @@ case class Dispatcher(config: Config) extends Component {
     val READ_VEX_DATA_SEND_EDGE_ADDR: State = new State {
       onEntry{
         vexEdgeSelect := 0
+        get_nxt_pe()
+        flg_4k := True
+        axi_addr_l_r := axi_addr_l
+        axi_addr_h_r := axi_addr_h
+        fired := False
       }
       whenIsActive {
-        set_read(U(1), U(7), io.edge_base + (8 * 64) * edge_addr) // read to edge addr
-        data_stream(0).ready := True
-        enable_read ()
-        when(io.axiMemControlPort.r.last) {
-          disable_read ()
-          edge_addr := edge_addr + 1
-          goto(READ_EDGE_DATA_SEND_VEX_ADDR)
-
-        }
+        // Deal with request cross AXI 4K boundary
+        when (axi_addr_l_r >> 12 =/= axi_addr_h_r >> 12) {
+          when (flg_4k) {
+            enable_read()
+            set_read(U(1), last_page - 1 , io.edge_base + (64) * edge_addr) // read first page
+            when (io.axiMemControlPort.r.fire) {
+              flg_4k    := False
+            }
+          } otherwise {
+            enable_read()
+            set_read(U(1), next_page - 1 , io.edge_base + (64) * (edge_addr + last_page)(15 downto 0)) // read next page
+            when (io.axiMemControlPort.r.last) {
+              disable_read()
+              edge_addr := edge_addr + edge_length_r
+              goto(READ_EDGE_DATA_SEND_VEX_ADDR)
+            }
+          }
+        } otherwise {
+          set_read(U(1), edge_length_r - 1, axi_addr_l) // read to edge addr
+          enable_read()
+          data_stream(0).ready := True
+          when (io.axiMemControlPort.ar.fire) {
+            fired := True
+            edge_addr := edge_addr + edge_length_r
+          }
+          when (io.axiMemControlPort.ar.fire || fired) {
+            disable_read()
+          }
+          when (io.axiMemControlPort.r.last) {
+            disable_read()
+            goto(READ_EDGE_DATA_SEND_VEX_ADDR)
+          }
+        } // normal request
       }
     }
 
     val READ_EDGE_DATA_SEND_VEX_ADDR: State = new State {
       onEntry{
-        all_zero_out_r := False
         partial_zero_in_r := False
-        enable_edge()
-      }
-      whenIsActive {
-        // by default, set read next to be edge
         vexEdgeSelect := 1
-        set_read(U(1), U(7), io.edge_base  + (8 * 64) * edge_addr)
-        when (partial_zero_in_r || partial_zero_in) {
-          when(io.RB_switch) {
-            // all zero detected and RB switch, need to collect vertex for GE
-            set_read(U(2) , U(7), vex_base_addr)
-            enable_read()   // issue read
-            io.vex2ge.valid := data_stream(0).valid
-            goto(READ_VEX_DATA_GE_SEND_VEX_ADDR)
-          } otherwise {
-            // all zero detected, transfer to read nxt vertex, it is possible that still some edge remains in edge FIFO
-            // and its also possible no PE is available, the state machine jump until nxt pe is confirmed
-            set_read(U(0), U(1), vex_base_addr + (2*64) * CB_incr_nxt)
-            when(pe_nxt_rdy) {
-              enable_read()
-            }
-            when(io.axiMemControlPort.ar.fire) {
-              partial_zero_in_r := False
-              goto(READ_VEX_DATA_SEND_EDGE_ADDR)
+      }
+
+      whenIsActive {
+        when (io.axiMemControlPort.r.last) {
+          last_r := io.axiMemControlPort.r.last
+        }
+        when(RB_nxt_r > 0) {
+          RB_switch := True
+        }
+        when (io.axiMemControlPort.r.payload.last || last_r) {
+          when (partial_zero_in  || partial_zero_in_r) {
+            when(RB_nxt_r > 0 || RB_nxt > 0 || RB_switch) {
+              when (io.pe_busy.orR === False) {
+                set_read(U(2), U(15), vex_base_addr)
+                enable_read()
+              }
+              when(io.axiMemControlPort.ar.fire) {
+                partial_zero_in_r := False
+                io.vex2ge.valid   := data_stream(0).valid
+                goto(READ_VEX_DATA_GE_SEND_VEX_ADDR)
+              }
+            } otherwise {
+              when (io.pe_busy.andR === False) {
+                set_read(U(1), U(1), vex_base_addr + (128) * CB_nxt_r)
+                enable_read()
+              }
+              when(io.axiMemControlPort.ar.fire) {
+                partial_zero_in_r := False
+                goto(READ_VEX_DATA_SEND_EDGE_ADDR)
+              }
             }
           }
-        } elsewhen(io.axiMemControlPort.r.payload.last) {
-            enable_read()
-            edge_addr := edge_addr + 1
         }
+      }
+      onExit {
+        last_r := False
       }
     }
 
     val READ_VEX_DATA_GE_SEND_VEX_ADDR :State = new State {
       onEntry{
         vexEdgeSelect   := 0
-        io.axiMemControlPort.ar.valid         := False
+        io.axiMemControlPort.ar.valid   := False
       }
       whenIsActive{
         // After get all vertex, need local nxt RB, CB, issue next vertex using CB increment
+        when(io.update_busy) {
+          RB_switch     := False
+        }
+        when (io.axiMemControlPort.r.last) {
+          last_r := io.axiMemControlPort.r.last
+        }
         io.vex2ge.valid := data_stream(0).valid
-        set_read(U(0), U(1), vex_base_addr + io.qsb_cfg.CB_init)
-        enable_read()
+        set_read(U(1), U(1), vex_base_addr + (128) * CB_nxt_r)
         // in last cycle,
-        when(io.axiMemControlPort.r.last){
+        when(io.axiMemControlPort.r.last || last_r){
           when (itr_cnt === io.qsb_cfg.iteration) {
             goto(IDLE)
           } otherwise {
-            RB_all := RB_all + 1
-            when(RB_all === io.qsb_cfg.RB_max) {
+            when(RB === io.qsb_cfg.RB_max) {
               ping_pong := !ping_pong
               itr_cnt   := itr_cnt + 1
-              RB_all    := 0
-              edge_addr := 0
+              RB_nxt_r  := 0
+              RB        := io.qsb_cfg.RB_init
               goto(SEND_INIT_VEX_ADDR)
+            }.elsewhen (!io.update_busy) {
+              enable_read()
+              when (io.axiMemControlPort.ar.fire) {
+                RB_nxt_r  := 0
+                RB        := RB_nxt_r.resize(32)
+                goto(READ_VEX_DATA_SEND_EDGE_ADDR)
+              }
             }
-            goto(READ_VEX_DATA_SEND_EDGE_ADDR)
           }
         }
+      }
+      onExit {
+        last_r := False
       }
     }
   }
@@ -318,14 +378,6 @@ case class Dispatcher(config: Config) extends Component {
 
   def enable_read () = {
     io.axiMemControlPort.ar.valid := True
-  }
-
-  def disable_edge () = {
-    fifo_pop := False
-  }
-
-  def enable_edge () = {
-    fifo_pop := True
   }
 
   def disable_read () = {

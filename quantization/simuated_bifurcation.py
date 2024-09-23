@@ -81,6 +81,7 @@ def qSB_improve(J,
                 init_x, 
                 init_y, 
                 num_iters, 
+                dbg_iter, 
                 best_known = 0, 
                 factor = [6, 4 ,4], 
                 qtz_type = 'scaleup'):
@@ -89,6 +90,7 @@ def qSB_improve(J,
     scale = 2 ** factor[0] - 1
     N = J.shape[0]
     xi = (0.7 / math.sqrt(N))
+    JX_dbg = []
     
     # x_comp = (init_x.copy()) * scale
     # y_comp = (init_y.copy()) * scale
@@ -101,6 +103,9 @@ def qSB_improve(J,
     y_comp = scaleup(np.array(init_y.copy()), 127)
     
     x_comp_init = x_comp.copy() 
+    y_comp_init = y_comp.copy() 
+    x_comp_dbg  = []
+    y_comp_dbg  = []
     
     for i in range(num_iters):
         '''
@@ -131,8 +136,15 @@ def qSB_improve(J,
             # need implement uniform quantization here
             x_comp = x_comp + scaledown(y_comp, factor[2])
         
+
+            
         y_comp[np.abs(x_comp) > scale] = 0.
         x_comp = np.clip(x_comp, -scale, scale)
+        
+        if i == dbg_iter:
+            JX_dbg = J @ x_comp
+            x_comp_dbg = x_comp.copy()
+            y_comp_dbg = y_comp.copy()
         
         sol = np.sign(x_comp)
         e = - 1 / 2 * sol.T @ J @ sol  #
@@ -149,7 +161,7 @@ def qSB_improve(J,
     #     if y == 0.:
     #         zero_momentum += 1
     # print("total zero y", zero_momentum)
-    return np.array(energies), step, x_comp_init
+    return np.array(energies), step, x_comp_init, y_comp_init, JX_dbg, x_comp_dbg, y_comp_dbg
 
 def scaleup(targets, factor):
     rescaled_targets = []

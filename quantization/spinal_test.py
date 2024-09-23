@@ -8,8 +8,7 @@ if __name__ == '__main__':
     best_known = int(sys.argv[2])
     sb_type  = sys.argv[3]
     num_iter = int(sys.argv[4])
-    qsb_type = ['non-converge', 'scaleup']
-    quant_index = [7, 6, 5]
+    dbg_iter = int(sys.argv[5])
     dt = 0.25
     J = load_data(filename)
     J = (J.T + J)
@@ -19,16 +18,20 @@ if __name__ == '__main__':
     # factor = [7, 128,4],  [8, 16, 16], [7,16,16]
     # for noscale
     # factor = [7, 4 ,4],  [8, 4, 4]
-    if (qsb_type[0] == 'improve') :
-        for qi in quant_index:
-            fc = [qi, 16, 16]
-            qsb_energy, qsb_step, x_comp_init = qSB_improve(J, init_x, init_y, num_iter, best_known, factor = fc, qtz_type=qsb_type[1])
-    elif (qsb_type[0] == 'non-converge'):
-        fc = [7, 4, 4]
-        qsb_energy, qsb_step, x_comp_init = qSB_improve(J, init_x, init_y, num_iter, best_known, factor = fc, qtz_type='scaleup')
-    else:
-        qsb_energy, qsb_step = qSB(J, init_x, init_y, num_iter, best_known)
+    fc = [7, 16, 16]
+    qsb_energy, qsb_step, x_comp_init, y_comp_init, JX_dbg, x_comp_dbg, y_comp_dbg = qSB_improve(J, 
+                                                                                                init_x, 
+                                                                                                init_y, 
+                                                                                                num_iter, 
+                                                                                                dbg_iter, 
+                                                                                                best_known, 
+                                                                                                factor = fc, 
+                                                                                                qtz_type='scaleup')
     bsb_energy = SB(sb_type, J, init_x, init_y, num_iter, dt)
 
     print(','.join(map(str, x_comp_init)))
+    print(','.join(map(str, y_comp_init)))
+    print(','.join(map(str, JX_dbg)))
+    print(','.join(map(str, x_comp_dbg)))
+    print(','.join(map(str, y_comp_dbg)))
     print(','.join(map(str, qsb_energy)))
