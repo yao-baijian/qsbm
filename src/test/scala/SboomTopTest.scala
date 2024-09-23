@@ -66,11 +66,11 @@ class SboomTopTest extends AnyFunSuite {
 
       // algorithm
       val result = Seq("python", "quantization/spinal_test.py",
-        filename,
-        bestknown.toString,
-        cmp_type,
-        num_iter.toString,
-        dbg_iter.toString).!!
+      filename,
+      bestknown.toString,
+      cmp_type,
+      num_iter.toString,
+      dbg_iter.toString).!!
 
       val lines = result.split("\n")
       val x_comp_init   = lines(0).split(",").map(_.trim).filter(_.matches("-?\\d+")).map(_.toByte)
@@ -102,61 +102,109 @@ class SboomTopTest extends AnyFunSuite {
 
       dut.clockDomain.waitSampling(200)
 
-      axiLite.write(0x0C, num_iter)    // 1000 iteration
-      axiLite.write(0x10, matrix_size) // matrix size 2000
-      axiLite.write(0x14, tile_xy)     // tile 64
-      axiLite.write(0x18, BigInt(ceil(matrix_size / tile_xy).toLong))    // max CB number = 2000 / 64 = 32
-      axiLite.write(0x40, RB_max)    // max RB number = 2000 / 512 = 4
-      // math.ceil(matrixSize.toFloat/blockSize).toInt
-
-      axiLite.write(0x1C, cb)      // CB init
-      axiLite.write(0x20, rb)      // RB init
-      axiLite.write(0x44, cb_length)      // RB init
-
-      axiLite.write(0x24, 0)      // ai init
-      axiLite.write(0x28, 1)      // ai incr
-      axiLite.write(0x2C, 1)      // xi
-      axiLite.write(0x30, 16)     // dt
-
-      axiLite.write(0x34, vex_a_base)       // vex_a_base
-      axiLite.write(0x38, vex_b_base)       // vex_b_base
-      axiLite.write(0x3C, edge_base)        // edge_base
+      // sbm initialization
+      sbm_init(axiLite, cb , rb, cb_length)
 
       // start
-      axiLite.write(0x0, 1)
+      start(axiLite)
 
-//      fork {
-//        var previousData = dut.io.topAxiMemControlPort.r.data.toBigInt
-//        while (true) {
-//          dut.clockDomain.waitSampling(10000)
-//          val currentData = dut.io.topAxiMemControlPort.r.data.toBigInt
-//          if (currentData != previousData) {
-//            println(s"数据变化: $currentData")
-//            previousData = currentData
-//          }
-//        }
-//      }
-      dut.clockDomain.waitSampling(10000)
-
-      // read finish flag
-      axiLite.read(0x32)
-
-      val x_y_comp_result = axiMemSimModel1.memory.readArray(0, combined_init.length)
-
-      val x_comp_result = new Array[Byte] (x_comp_init.length)
-      val y_comp_result = new Array[Byte] (x_comp_init.length)
-
-      for (i <- x_comp_init.indices) {
-        x_comp_result(i) = combined_init(2 * i)
-        y_comp_result(i) = combined_init(2 * i + 1)
+      val timeout_thread = fork {
+        dut.clockDomain.waitSampling(20000)
       }
 
-      scoreboard("x_comp", x_comp_result, x_comp_dbg, dbg_iter)
-      // TODO need to fix y_comp_dbg
-      scoreboard("y_comp", y_comp_result, x_comp_dbg, dbg_iter)
+      val JX_dbg_thread  = fork {
+        var previous_busy = dut.update_busy.toBoolean
+        while (true) {
+          dut.clockDomain.waitSampling()
+          val current_busy = dut.update_busy.toBoolean
+
+          // 检测下降沿
+          if (previous_busy && !current_busy) {
+            // 读取 update_mem 的值
+            val update_mem_values = (0 until 16).map(i => dut.pe_top.update_mem.readSync(i))
+
+            // 将 update_mem 的每一行值分成 32 个字节，并与 JX_dbg 的前 512 个字节进行比较
+            for (i <- 0 until 16) {
+              val update_mem_bits = update_mem_values(i).toBigInt
+              for (j <- 0 until 32) {
+                val update_mem_value = (update_mem_bits >> (j * 31)) & ((1 << 31) - 1)
+                val JX_dbg_value = JX_dbg(i*32 + j)
+                assert(update_mem_value == JX_dbg_value, s"Mismatch at index ${(i * 32 + j)}: update_mem_value = $update_mem_value, JX_dbg_value = $JX_dbg_value")
+              }
+            }
+          }
+          previous_busy = current_busy
+        }
+      }
+
+      val x_y_comp_dbg_thread = fork {
+        var previous_busy = dut.pe_top.gather_pe_busy.toBoolean
+
+        while (dut.pe_top.gather_pe_busy.toBoolean) {
+          dut.clockDomain.waitSampling()
+        }
+
+        while (true) {
+          dut.clockDomain.waitSampling()
+          val current_busy = dut.pe_top.gather_pe_busy.toBoolean
+
+          // 检测下降沿
+          if (previous_busy && !current_busy) {
+            val x_y_comp_result = axiMemSimModel1.memory.readArray(0, combined_init.length)
+            val x_comp_result = new Array[Byte](x_comp_init.length)
+            val y_comp_result = new Array[Byte](x_comp_init.length)
+
+            for (i <- x_comp_init.indices) {
+              x_comp_result(i) = combined_init(2 * i)
+              y_comp_result(i) = combined_init(2 * i + 1)
+            }
+            scoreboard("x_comp", x_comp_result, x_comp_dbg, dbg_iter)
+            scoreboard("y_comp", y_comp_result, x_comp_dbg, dbg_iter)
+          }
+          previous_busy = current_busy
+        }
+        simSuccess()
+      }
+
+      timeout_thread.join()
+      JX_dbg_thread.join()
+      x_y_comp_dbg_thread.join()
+
+      if (!dut.io.done.toBoolean) {
+        simFailure("Simulation timed out")
+      }
 
       println(s"qsb_energy: ${qsb_energy.mkString(", ")}")
     }
+  }
+  def qsb_python_thread (): Unit = {
+  }
+
+  def sbm_init(axi_driver : AxiLite4Driver, cb : Int, rb : Int, cb_length : Int): Unit = {
+    axi_driver.write(0x0C, num_iter)    // 1000 iteration
+    axi_driver.write(0x10, matrix_size) // matrix size 2000
+    axi_driver.write(0x14, tile_xy)     // tile 64
+    axi_driver.write(0x18, BigInt(ceil(matrix_size / tile_xy).toLong))    // max CB number = 2000 / 64 = 32
+    axi_driver.write(0x40, RB_max)    // max RB number = 2000 / 512 = 4
+    axi_driver.write(0x1C, cb)      // CB init
+    axi_driver.write(0x20, rb)      // RB init
+    axi_driver.write(0x44, cb_length)      // RB init
+    axi_driver.write(0x24, 0)      // ai init
+    axi_driver.write(0x28, 1)      // ai incr
+    axi_driver.write(0x2C, 1)      // xi
+    axi_driver.write(0x30, 16)     // dt
+    axi_driver.write(0x34, vex_a_base)       // vex_a_base
+    axi_driver.write(0x38, vex_b_base)       // vex_b_base
+    axi_driver.write(0x3C, edge_base)        // edge_base
+  }
+  def start(axi_driver : AxiLite4Driver): Unit = {
+    axi_driver.write(0x0, 1)
+    axi_driver.write(0x0, 0)
+  }
+
+  def srst(axi_driver : AxiLite4Driver): Unit = {
+    axi_driver.write(0x4, 1)
+    axi_driver.write(0x4, 0)
   }
 
   def mem_dbg(dbg: Boolean, mem: AxiMemorySim): Unit = {

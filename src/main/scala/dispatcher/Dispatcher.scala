@@ -7,6 +7,7 @@ import spinal.lib.bus.amba4.axi.{Axi4, Axi4Config}
 import spinal.lib.tools.DataAnalyzer
 import spinal.lib.fsm._
 import PE.qsbConfig
+import spinal.core.sim.SimDataPimper
 
 case class Axi2Stream() extends Bundle {
   val data = Bits(Config().axi_width bits)
@@ -33,11 +34,13 @@ case class Dispatcher(config: Config) extends Component {
     val edge_base = in UInt(32 bits)
     // to PE
     val pe_busy 	= in Vec(Bool(), config.pe_num)
-    val pe_rdy    = in Vec(Bool(), config.pe_num)
     val RB_switch = out Bool()
     val vex2pe  	= Vec(master(Flow(Axi2Stream())), config.pe_num)
     val edge2pe 	= Vec(master(Stream(Axi2Stream())), config.pe_num)
     val update_busy = in Bool()
+
+    update_busy.simPublic()
+
     // GE
     val vex2ge 		= master(Flow(Axi2Stream()))
     val wb_valid  = in Bool()
@@ -74,6 +77,12 @@ case class Dispatcher(config: Config) extends Component {
   val data_stream         = StreamDemux(io.axiMemControlPort.r, vexEdgeSelect, 2) // to vex, to edge
   val edge_stream         = StreamDemux(data_stream(1), pe_select, config.pe_num) // edge to pe 1, 2, 3, 4
   val vex_stream          = StreamDemux(data_stream(0), pe_select, config.pe_num) // vex to pe 1, 2, 3, 4
+
+  val done                = Reg(Bool()) init False
+  io.done := done
+  when (io.srst) {
+    done := False
+  }
 
   for (i <- 0 until config.pe_num) {
     io.vex2pe(i).payload.data  := vex_stream(i).payload.data
@@ -347,6 +356,7 @@ case class Dispatcher(config: Config) extends Component {
         // in last cycle,
         when(io.axiMemControlPort.r.last || last_r){
           when (itr_cnt === io.qsb_cfg.iteration) {
+            done := True
             goto(IDLE)
           } otherwise {
             when(RB === io.qsb_cfg.RB_max) {

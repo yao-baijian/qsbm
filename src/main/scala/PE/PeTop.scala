@@ -17,6 +17,7 @@
 
 package PE
 
+import spinal.core.sim.{SimDataPimper, SimMemPimper}
 import spinal.core.{Reg, _}
 import spinal.lib._
 import spinal.lib.fsm._
@@ -32,7 +33,7 @@ case class PeTop(config:PeConfig) extends Component {
         val vertex_stream_ge    = slave Stream (Bits(config.axi_extend_width bits))
         val pe_rdy_table        = out Vec(Bool(), config.core_num)
         val pe_busy             = out Vec(Bool(), config.core_num)
-        val update_busy         = out Bool()
+        val update_busy         = out Bool() simPublic()
         val writeback_valid     = out Bool()
         val writeback_payload   = out Bits(config.axi_extend_width bits)
         val srst                = in Bool()
@@ -60,7 +61,8 @@ case class PeTop(config:PeConfig) extends Component {
     val pecore_array                = new Array[PeCore](config.core_num)
     val vertex_reg_A                = DualModeReg(Config)
     val vertex_reg_B                = DualModeReg(Config)
-    val update_mem                  = Mem(Bits(config.spmm_prec*32 bits), wordCount = 16)
+    val update_mem                  = Mem(Bits(config.spmm_prec*32 bits), wordCount = 16) simPublic()
+
     val pe_update_reg               = new Array[PeUpdateReg](config.core_num)
 
     for (i <- 0 until config.core_num) {
@@ -139,7 +141,7 @@ case class PeTop(config:PeConfig) extends Component {
     io.pe_busy                      <> pe_busy
     gather_pe_core.io.spmm_rd_data  := update_mem.readAsync(gather_pe_core.io.rd_addr)
 
-    val update_busy = Reg(Bool()) init False
+    val update_busy = Reg(Bool()) init False simPublic()
     io.update_busy := update_busy
     //-----------------------------------------------------
     // State Machine
