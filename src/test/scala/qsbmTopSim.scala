@@ -1,4 +1,3 @@
-import dispatcher.Dispatcher
 import org.scalatest.funsuite.AnyFunSuite
 import spinal.core._
 import spinal.core.sim._
@@ -54,6 +53,7 @@ class qsbmTopSim extends AnyFunSuite {
       throw new IllegalArgumentException("Unsupported simulator")
   }
 
+  val typ           = "scaleup"
   val num_iter      = 100
   val cmp_type      = "bsb"
   val filename      = "G34"
@@ -82,7 +82,8 @@ class qsbmTopSim extends AnyFunSuite {
       bestknown.toString,
       cmp_type,
       num_iter.toString,
-      dbg_iter.toString).!!
+      dbg_iter.toString,
+      typ).!!
 
       val lines = result.split("\n")
       val x_comp_init   = lines(0).split(",").map(_.trim).filter(_.matches("-?\\d+")).map(_.toByte)
@@ -120,13 +121,16 @@ class qsbmTopSim extends AnyFunSuite {
       // start
       sbm_start(axiLite)
 
+      @volatile var timeoutOccurred = false
+
       val timeout_thread = fork {
         dut.clockDomain.waitSampling(20000)
+        timeoutOccurred = true
       }
 
       val JX_dbg_thread  = fork {
         var previous_busy = dut.io.update_busy.toBoolean
-        while (true) {
+        while (!timeoutOccurred) {
           dut.clockDomain.waitSampling()
           val current_busy = dut.io.update_busy.toBoolean
           if (previous_busy && !current_busy) {
@@ -150,7 +154,7 @@ class qsbmTopSim extends AnyFunSuite {
       val x_y_comp_dbg_thread = fork {
         var previous_busy = dut.io.ge_busy.toBoolean
 
-        while (true) {
+        while (!timeoutOccurred) {
           dut.clockDomain.waitSampling()
           val current_busy = dut.io.ge_busy.toBoolean
 

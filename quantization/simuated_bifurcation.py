@@ -135,14 +135,14 @@ def qSB_improve(J,
             # TODO
             # need implement uniform quantization here
             x_comp = x_comp + scaledown(y_comp, factor[2])
-        
-
             
+        if i == dbg_iter:
+            JX_dbg = scaleup(np.array(J @ x_comp), scale).astype(int)
+        
         y_comp[np.abs(x_comp) > scale] = 0.
         x_comp = np.clip(x_comp, -scale, scale)
         
         if i == dbg_iter:
-            JX_dbg = J @ x_comp
             x_comp_dbg = x_comp.copy()
             y_comp_dbg = y_comp.copy()
         

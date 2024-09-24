@@ -9,6 +9,7 @@ if __name__ == '__main__':
     sb_type  = sys.argv[3]
     num_iter = int(sys.argv[4])
     dbg_iter = int(sys.argv[5])
+    qtz_type = sys.argv[6]
     dt = 0.25
     J = load_data(filename)
     J = (J.T + J)
@@ -25,8 +26,8 @@ if __name__ == '__main__':
                                                                                                 num_iter, 
                                                                                                 dbg_iter, 
                                                                                                 best_known, 
-                                                                                                factor = fc, 
-                                                                                                qtz_type='scaleup')
+                                                                                                fc, 
+                                                                                                qtz_type)
     bsb_energy = SB(sb_type, J, init_x, init_y, num_iter, dt)
 
     print(','.join(map(str, x_comp_init)))
