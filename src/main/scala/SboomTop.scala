@@ -1,6 +1,6 @@
 import dispatcher._
 import spinal.core._
-import spinal.core.sim.SimDataPimper
+import spinal.core.sim._
 import spinal.lib.bus.amba4.axi.{Axi4, Axi4Config}
 import spinal.lib.{master, slave}
 import spinal.lib.bus.amba4.axilite.{AxiLite4, AxiLite4Config}
@@ -11,6 +11,8 @@ case class SboomTop(config:Config) extends Component{
         val topAxiMemControlPort = master(Axi4(Axi4Config(addressWidth = 32, dataWidth = config.axi_width, idWidth = 4)))
         val topAxiLiteSlave = slave(AxiLite4(AxiLite4Config(addressWidth = 32, dataWidth = 32)))
         val done = out Bool()
+        val update_busy = out Bool() simPublic()
+        val ge_busy = out Bool() simPublic()
     }
 
     noIoPrefix()
@@ -21,6 +23,7 @@ case class SboomTop(config:Config) extends Component{
     val ctrl_reg    = AxiLiteReg()
     val dispatcher  = Dispatcher(Config())
     val pe_top      = PE.PeTop(PE.PeConfig())
+
 
     // top axi
     io.topAxiMemControlPort << dispatcher.io.axiMemControlPort
@@ -54,9 +57,8 @@ case class SboomTop(config:Config) extends Component{
 
     dispatcher.io.update_busy := pe_top.io.update_busy
 
-    val update_busy = Bool() simPublic()
-    update_busy.simPublic()
-    update_busy := pe_top.io.update_busy
+    io.update_busy := pe_top.io.update_busy
+    io.ge_busy     := pe_top.io.ge_busy
 
     // dispatcher - ddr
     dispatcher.io.wb_valid :=  pe_top.io.writeback_valid

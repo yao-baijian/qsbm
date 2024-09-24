@@ -17,7 +17,7 @@
 
 package PE
 
-import spinal.core.sim.{SimDataPimper, SimMemPimper}
+import spinal.core.sim._
 import spinal.core.{Reg, _}
 import spinal.lib._
 import spinal.lib.fsm._
@@ -33,6 +33,7 @@ case class PeTop(config:PeConfig) extends Component {
         val vertex_stream_ge    = slave Stream (Bits(config.axi_extend_width bits))
         val pe_rdy_table        = out Vec(Bool(), config.core_num)
         val pe_busy             = out Vec(Bool(), config.core_num)
+        val ge_busy             = out Bool()
         val update_busy         = out Bool() simPublic()
         val writeback_valid     = out Bool()
         val writeback_payload   = out Bits(config.axi_extend_width bits)
@@ -53,6 +54,7 @@ case class PeTop(config:PeConfig) extends Component {
     val all_zero                = Vec(Bool(), config.core_num)
     val Config                  = PeConfig()
 
+    io.ge_busy := gather_pe_busy
     //-----------------------------------------------------
     // Module Declaration & Instantiation
     //-----------------------------------------------------

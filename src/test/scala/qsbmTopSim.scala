@@ -1,7 +1,7 @@
 import dispatcher.Dispatcher
 import org.scalatest.funsuite.AnyFunSuite
 import spinal.core._
-import spinal.core.sim.{SimConfig, _}
+import spinal.core.sim._
 import spinal.lib._
 import spinal.lib.bus.amba4.axi.sim.{AxiMemorySim, AxiMemorySimConfig}
 import spinal.lib.bus.amba4.axilite.sim.AxiLite4Driver
@@ -15,7 +15,7 @@ import scala.io.Source
 import scala.math._
 import scala.sys.process._
 
-class SboomTopTest extends AnyFunSuite {
+class qsbmTopSim extends AnyFunSuite {
 
   object MySpinalConfig extends SpinalConfig(
 
@@ -29,18 +29,30 @@ class SboomTopTest extends AnyFunSuite {
   )
   
   val ipDir = "fpga/ip"
-
   val xciSourcePaths = ArrayBuffer(
     new File(ipDir).listFiles().map(ipDir + "/" + _.getName) :_*
   )
-
   val simConfig = SpinalSimConfig(_spinalConfig = MySpinalConfig)
-
-  val compiled= simConfig
-    .withWave
-    .withXilinxDevice("xcu280-fsvh2892-2L-e")
-    .withXSim
-    .compile(SboomTop(Config()))
+  val simulator = "Verilator"
+  val compiled = simulator match {
+    case "Verilator" =>
+      simConfig
+        .withWave
+        .compile(SboomTop(Config()))
+    case "Iverilog" =>
+      simConfig
+        .withWave
+        .withIVerilog
+        .compile(SboomTop(Config()))
+    case "Xsim" =>
+      simConfig
+        .withWave
+        .withXSim
+        .withXilinxDevice("xcu280-fsvh2892-2L-e")
+        .compile(SboomTop(Config()))
+    case _ =>
+      throw new IllegalArgumentException("Unsupported simulator")
+  }
 
   val num_iter      = 100
   val cmp_type      = "bsb"
@@ -60,7 +72,7 @@ class SboomTopTest extends AnyFunSuite {
 
   val dbg_option     = true
 
-  test("SboomTopTest"){
+  test("qsbmTopSim"){
     compiled.doSim { dut =>
       dut.clockDomain.forkStimulus(100)
 
@@ -106,22 +118,20 @@ class SboomTopTest extends AnyFunSuite {
       sbm_init(axiLite, cb , rb, cb_length)
 
       // start
-      start(axiLite)
+      sbm_start(axiLite)
 
       val timeout_thread = fork {
         dut.clockDomain.waitSampling(20000)
       }
 
       val JX_dbg_thread  = fork {
-        var previous_busy = dut.update_busy.toBoolean
+        var previous_busy = dut.io.update_busy.toBoolean
         while (true) {
           dut.clockDomain.waitSampling()
-          val current_busy = dut.update_busy.toBoolean
-
-          // 检测下降沿
+          val current_busy = dut.io.update_busy.toBoolean
           if (previous_busy && !current_busy) {
             // 读取 update_mem 的值
-            val update_mem_values = (0 until 16).map(i => dut.pe_top.update_mem.readSync(i))
+            val update_mem_values = (0 until 16).map(i => dut.pe_top.update_mem.getBigInt(i))
 
             // 将 update_mem 的每一行值分成 32 个字节，并与 JX_dbg 的前 512 个字节进行比较
             for (i <- 0 until 16) {
@@ -138,15 +148,11 @@ class SboomTopTest extends AnyFunSuite {
       }
 
       val x_y_comp_dbg_thread = fork {
-        var previous_busy = dut.pe_top.gather_pe_busy.toBoolean
-
-        while (dut.pe_top.gather_pe_busy.toBoolean) {
-          dut.clockDomain.waitSampling()
-        }
+        var previous_busy = dut.io.ge_busy.toBoolean
 
         while (true) {
           dut.clockDomain.waitSampling()
-          val current_busy = dut.pe_top.gather_pe_busy.toBoolean
+          val current_busy = dut.io.ge_busy.toBoolean
 
           // 检测下降沿
           if (previous_busy && !current_busy) {
@@ -197,12 +203,13 @@ class SboomTopTest extends AnyFunSuite {
     axi_driver.write(0x38, vex_b_base)       // vex_b_base
     axi_driver.write(0x3C, edge_base)        // edge_base
   }
-  def start(axi_driver : AxiLite4Driver): Unit = {
+
+  def sbm_start(axi_driver : AxiLite4Driver): Unit = {
     axi_driver.write(0x0, 1)
     axi_driver.write(0x0, 0)
   }
 
-  def srst(axi_driver : AxiLite4Driver): Unit = {
+  def sbm_srst(axi_driver : AxiLite4Driver): Unit = {
     axi_driver.write(0x4, 1)
     axi_driver.write(0x4, 0)
   }
