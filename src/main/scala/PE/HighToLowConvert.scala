@@ -5,7 +5,9 @@ import spinal.lib._
 
 import scala.language.postfixOps
 
-case class HighToLowConvert(config:PeConfig) extends Component {
+case class HighToLowConvert() extends Component {
+
+    val config = PEConfig
 
     val io = new Bundle {
         val in_edge_stream = Vec(slave Stream (Bits(config.axi_extend_width bits)), config.core_num)

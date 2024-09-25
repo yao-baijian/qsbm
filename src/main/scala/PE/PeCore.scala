@@ -18,7 +18,9 @@ import spinal.lib.fsm._
 
 import scala.language.postfixOps
 
-case class PeCore(config: PeConfig) extends Component {
+case class PeCore() extends Component {
+
+    val config = PEConfig
 
     val io_state = new Bundle {
         val last_update = in Bool()
@@ -37,10 +39,10 @@ case class PeCore(config: PeConfig) extends Component {
         val wr_tag = out UInt(3 bits)
         val wr_valid = Vec(out Bool(), config.thread_num)
         val wr_addr = Vec(out UInt (6 bits), config.thread_num)
-        val wr_data = Vec(out Bits (31 bits), config.thread_num)
+        val wr_data = Vec(out Bits (config.spmv_w bits), config.thread_num)
         val rd_tag = out UInt(3 bits)
         val rd_addr = Vec(out UInt (6 bits), config.thread_num)
-        val rd_data = Vec(in Bits (31 bits), config.thread_num)
+        val rd_data = Vec(in Bits (config.spmv_w bits), config.thread_num)
     }
 
     val io_fifo = new Bundle {
@@ -48,11 +50,10 @@ case class PeCore(config: PeConfig) extends Component {
         val pe_fifo = Vec(slave Stream (Bits(config.data_width bits)), config.thread_num)
     }
 
-    val pe_config = PeConfig()
-    val global_reg = GlobalReg(pe_config)
+    val global_reg = GlobalReg()
 
     val vertex_addr         = Vec(UInt(config.addr_width bits), config.thread_num)
-    val vertex_data         = Vec(Bits(config.data_width bits), config.thread_num)
+    val vertex_data         = Vec(Bits(config.x_comp_width bits), config.thread_num)
     val edge_value          = Vec(Bits(config.data_width bits), config.thread_num)
     val edge_valid          = Vec(Bool(), config.thread_num)
     val pe_busy             = Reg(Bool()) init False
@@ -108,8 +109,8 @@ case class PeCore(config: PeConfig) extends Component {
     val h1_valid            = Vec(Reg(Bool()) init False, config.thread_num)
     val entry_valid_h1      = Vec(Reg(Bool()) init False, config.thread_num)
     val edge_value_h1       = Vec(Reg(SInt(config.edge_width bits)) init 0, config.thread_num)
-    val vertex_reg_data_h1  = Vec(Reg(SInt(config.data_width bits)), config.thread_num)
-    val multiply_data_h1    = Vec(SInt(20 bits), config.thread_num)
+    val vertex_reg_data_h1  = Vec(Reg(SInt(config.x_comp_width bits)), config.thread_num)
+    val multiply_data_h1    = Vec(SInt(12 bits), config.thread_num)
     val interhaz_table_h1   = Vec(Reg(Bits(config.haz_table_width bits)) init 0, config.thread_num)
     val intrahaz_table_h1   = Vec(Reg(Bits(config.haz_table_width bits)) init 0, config.thread_num)
     val intrahaz_adder_table_h1 = Vec(Vec(Reg(Bool()) init False, config.thread_num), config.thread_num)
@@ -118,21 +119,21 @@ case class PeCore(config: PeConfig) extends Component {
     val tag_value_h1        = Reg(UInt(3 bits)) init 0
 
     val h2_valid            = Vec(Reg(Bool()) init False, config.thread_num)
-    val multiply_data_h2    = Vec(Reg(SInt(20 bits)) init 0 , config.thread_num)
+    val multiply_data_h2    = Vec(Reg(SInt(12 bits)) init 0 , config.thread_num)
     val entry_valid_h2      = Vec(Reg(Bool()) init False, config.thread_num)
     val intrahaz_table_h2   = Vec(Reg(Bits(config.haz_table_width bits)) init 0, config.thread_num)
     val intrahaz_adder_table_h2 = Vec(Vec(Reg(Bool()) init False, config.thread_num), config.thread_num)
     val update_ram_addr_h2  = Vec(Reg(UInt(6 bits)) init 0, config.thread_num)
-    val forward_data_h2     = Vec(Reg(SInt(config.spmm_prec bits)) init 0, config.thread_num)
-    val normal_update_data_h2 = Vec(SInt(config.spmm_prec bits), config.thread_num)
-    val updata_data_h2      = Vec(SInt(config.spmm_prec bits), config.thread_num)
+    val forward_data_h2     = Vec(Reg(SInt(config.spmv_w bits)) init 0, config.thread_num)
+    val normal_update_data_h2 = Vec(SInt(config.spmv_w bits), config.thread_num)
+    val updata_data_h2      = Vec(SInt(config.spmv_w bits), config.thread_num)
     val adder_en_h2         = Vec(Reg(Bits(config.haz_table_width bits)) init 0, config.extra_adder_num)
-    val extra_update_data_h2 = Vec(SInt(config.spmm_prec bits), config.extra_adder_num)
-    val adder_s1_h2         = Vec(Vec(SInt(config.spmm_prec bits), config.thread_num + 1), config.extra_adder_num)
+    val extra_update_data_h2 = Vec(SInt(config.spmv_w bits), config.extra_adder_num)
+    val adder_s1_h2         = Vec(Vec(SInt(config.spmv_w bits), config.thread_num + 1), config.extra_adder_num)
     val tag_value_h2        = Reg(UInt(3 bits)) init 0
 
     val h3_valid            = Vec(Reg(Bool()) init False, config.thread_num)
-    val update_data_h3      = Vec(Reg(SInt(config.spmm_prec bits)), config.thread_num)
+    val update_data_h3      = Vec(Reg(SInt(config.spmv_w bits)), config.thread_num)
     val update_ram_addr_h3  = Vec(Reg(UInt(6 bits)) init 0, config.thread_num)
     val tag_value_h3        = Reg(UInt(3 bits)) init 0
 
@@ -489,7 +490,7 @@ case class PeCore(config: PeConfig) extends Component {
     for (i <- 0 until config.extra_adder_num) {
         for (j <- 0 until config.thread_num) {
             when(adder_en_h2(i)(3)) {
-                adder_s1_h2(i)(j) := intrahaz_adder_table_h2(adder_en_h2(i)(2 downto 0).asUInt)(j) ? multiply_data_h2(j).resize(31) | 0
+                adder_s1_h2(i)(j) := intrahaz_adder_table_h2(adder_en_h2(i)(2 downto 0).asUInt)(j) ? multiply_data_h2(j).resize(24) | 0
             } otherwise {
                 adder_s1_h2(i)(j) := 0
             }

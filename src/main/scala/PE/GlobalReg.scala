@@ -18,12 +18,14 @@ import spinal.lib._
 
 import scala.language.postfixOps
    
-case class GlobalReg(config: PeConfig) extends Component{
+case class GlobalReg() extends Component{
+
+    val config = PEConfig
 
     val io = new Bundle{
         val in_stream       = slave Stream(Bits(config.axi_extend_width bits))
         val rd_addr         = Vec(in UInt(config.addr_width bits), config.thread_num)
-        val rd_data         = Vec(out Bits(config.data_width bits), config.thread_num)
+        val rd_data         = Vec(out Bits(config.x_comp_width bits), config.thread_num)
         val srst            = in Bool()
         val reg_full        = out Bool()
     }
@@ -47,7 +49,7 @@ case class GlobalReg(config: PeConfig) extends Component{
     )
 
     for (i <- 0 until config.thread_num) {
-        io.rd_data(i) := vertex_mem.readAsync(io.rd_addr(i)(5).asUInt).subdivideIn(config.data_width bits)(io.rd_addr(i)(4 downto 0))
+        io.rd_data(i) := vertex_mem.readAsync(io.rd_addr(i)(5).asUInt).subdivideIn(config.data_width bits)(io.rd_addr(i)(4 downto 0)) (15 downto 8)
     }
 
 

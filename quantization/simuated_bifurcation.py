@@ -137,7 +137,7 @@ def qSB_improve(J,
             x_comp = x_comp + scaledown(y_comp, factor[2])
             
         if i == dbg_iter:
-            JX_dbg = scaleup(np.array(J @ x_comp), scale).astype(int)
+            JX_dbg = np.array(J @ x_comp).astype(int)
         
         y_comp[np.abs(x_comp) > scale] = 0.
         x_comp = np.clip(x_comp, -scale, scale)

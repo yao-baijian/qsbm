@@ -70,7 +70,8 @@ class qsbmTopSim extends AnyFunSuite {
   val edge_base     = 0x800000
   val RB_max        = ceil(matrix_size / RB_length).toInt
 
-  val dbg_option     = true
+  val spmv_w        = 24
+  val dbg_option    = true
 
   test("qsbmTopSim"){
     compiled.doSim { dut =>
@@ -126,65 +127,63 @@ class qsbmTopSim extends AnyFunSuite {
       val timeout_thread = fork {
         dut.clockDomain.waitSampling(20000)
         timeoutOccurred = true
+        if (!dut.io.done.toBoolean) {
+          simFailure("Simulation timed out")
+        }
+        println(s"qsb_energy: ${qsb_energy.mkString(", ")}")
       }
 
-      val JX_dbg_thread  = fork {
-        var previous_busy = dut.io.update_busy.toBoolean
-        while (!timeoutOccurred) {
-          dut.clockDomain.waitSampling()
-          val current_busy = dut.io.update_busy.toBoolean
-          if (previous_busy && !current_busy) {
-            // 读取 update_mem 的值
-            val update_mem_values = (0 until 16).map(i => dut.pe_top.update_mem.getBigInt(i))
-
-            // 将 update_mem 的每一行值分成 32 个字节，并与 JX_dbg 的前 512 个字节进行比较
-            for (i <- 0 until 16) {
-              val update_mem_bits = update_mem_values(i).toBigInt
-              for (j <- 0 until 32) {
-                val update_mem_value = (update_mem_bits >> (j * 31)) & ((1 << 31) - 1)
-                val JX_dbg_value = JX_dbg(i*32 + j)
-                assert(update_mem_value == JX_dbg_value, s"Mismatch at index ${(i * 32 + j)}: update_mem_value = $update_mem_value, JX_dbg_value = $JX_dbg_value")
+      if (simulator == "Verilator") {
+        val JX_dbg_thread  = fork {
+          var previous_busy = dut.io.update_busy.toBoolean
+          while (!timeoutOccurred) {
+            dut.clockDomain.waitSampling()
+            val current_busy = dut.io.update_busy.toBoolean
+            if (previous_busy && !current_busy) {
+              val update_mem_values = (0 until 16).map(i => dut.pe_top.update_mem.getBigInt(i))
+              for (i <- 0 until 16) {
+                val update_mem_bits = update_mem_values(i).toBigInt
+                for (j <- 0 until 32) {
+                  val update_mem_value = (update_mem_bits >> (j * spmv_w)) & ((1 << spmv_w) - 1)
+                  val JX_dbg_value = JX_dbg(i * 32 + j)
+                  assert(update_mem_value == JX_dbg_value, s"Mismatch at index ${(i * 32 + j)}: update_mem_value = $update_mem_value, JX_dbg_value = $JX_dbg_value")
+                }
               }
             }
+            previous_busy = current_busy
           }
-          previous_busy = current_busy
         }
-      }
 
-      val x_y_comp_dbg_thread = fork {
-        var previous_busy = dut.io.ge_busy.toBoolean
+        val x_y_comp_dbg_thread = fork {
+          var previous_busy = dut.io.ge_busy.toBoolean
 
-        while (!timeoutOccurred) {
-          dut.clockDomain.waitSampling()
-          val current_busy = dut.io.ge_busy.toBoolean
+          while (!timeoutOccurred) {
+            dut.clockDomain.waitSampling()
+            val current_busy = dut.io.ge_busy.toBoolean
 
-          // 检测下降沿
-          if (previous_busy && !current_busy) {
-            val x_y_comp_result = axiMemSimModel1.memory.readArray(0, combined_init.length)
-            val x_comp_result = new Array[Byte](x_comp_init.length)
-            val y_comp_result = new Array[Byte](x_comp_init.length)
+            // 检测下降沿
+            if (previous_busy && !current_busy) {
+              val x_y_comp_result = axiMemSimModel1.memory.readArray(0, combined_init.length)
+              val x_comp_result = new Array[Byte](x_comp_init.length)
+              val y_comp_result = new Array[Byte](x_comp_init.length)
 
-            for (i <- x_comp_init.indices) {
-              x_comp_result(i) = combined_init(2 * i)
-              y_comp_result(i) = combined_init(2 * i + 1)
+              for (i <- x_comp_init.indices) {
+                x_comp_result(i) = combined_init(2 * i)
+                y_comp_result(i) = combined_init(2 * i + 1)
+              }
+              scoreboard("x_comp", x_comp_result, x_comp_dbg, dbg_iter)
+              scoreboard("y_comp", y_comp_result, x_comp_dbg, dbg_iter)
             }
-            scoreboard("x_comp", x_comp_result, x_comp_dbg, dbg_iter)
-            scoreboard("y_comp", y_comp_result, x_comp_dbg, dbg_iter)
+            previous_busy = current_busy
           }
-          previous_busy = current_busy
+          simSuccess()
         }
-        simSuccess()
+
+        JX_dbg_thread.join()
+        x_y_comp_dbg_thread.join()
       }
 
       timeout_thread.join()
-      JX_dbg_thread.join()
-      x_y_comp_dbg_thread.join()
-
-      if (!dut.io.done.toBoolean) {
-        simFailure("Simulation timed out")
-      }
-
-      println(s"qsb_energy: ${qsb_energy.mkString(", ")}")
     }
   }
   def qsb_python_thread (): Unit = {

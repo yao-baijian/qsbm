@@ -6,7 +6,9 @@ import spinal.lib._
 import scala.language.postfixOps
 import scala.math._
 
-case class DualModeReg(config: PeConfig) extends Component{
+case class DualModeReg() extends Component{
+
+    val config = PEConfig
 
     val io = new Bundle{
         val in_stream   = slave Stream(Bits(config.axi_extend_width bits))

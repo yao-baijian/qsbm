@@ -22,7 +22,7 @@ case class SboomTop(config:Config) extends Component{
 
     val ctrl_reg    = AxiLiteReg()
     val dispatcher  = Dispatcher(Config())
-    val pe_top      = PE.PeTop(PE.PeConfig())
+    val pe_top      = PE.PeTop()
 
 
     // top axi
@@ -41,12 +41,10 @@ case class SboomTop(config:Config) extends Component{
     // pe - dispatcher
     pe_top.io.vertex_stream_ge.payload  := dispatcher.io.vex2ge.payload.data
     pe_top.io.vertex_stream_ge.valid    := dispatcher.io.vex2ge.valid
+    pe_top.io.last_cb                   := dispatcher.io.RB_switch
 
     for(i<-0 until config.pe_num){
-
         dispatcher.io.pe_busy(i)      := pe_top.io.pe_busy(i)
-        pe_top.io.last_update(i)      := dispatcher.io.RB_switch
-
         pe_top.io.vertex_stream_pe(i).payload   := dispatcher.io.vex2pe(i).payload.data
         pe_top.io.vertex_stream_pe(i).valid     := dispatcher.io.vex2pe(i).valid
 

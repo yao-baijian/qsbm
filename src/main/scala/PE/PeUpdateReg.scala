@@ -3,23 +3,25 @@ import spinal.core._
 import spinal.lib._
 
 import scala.language.postfixOps
-case class PeUpdateReg(config:PeConfig) extends Component {
+case class PeUpdateReg() extends Component {
+
+    val config = PEConfig
+
     val io = new Bundle {
-        val update_reg_srst = in Bool()
-        val wr_tag = in UInt (3 bits)
-        val wr_valid = Vec(in Bool(), config.thread_num)
-        val wr_addr = Vec(in UInt (6 bits), config.thread_num)
-        val wr_data = Vec(in Bits (31 bits), config.thread_num)
-        val rd_tag = in UInt (3 bits)
-        val rd_addr = Vec(in UInt (6 bits), config.thread_num)
-        val rd_data = Vec(out Bits (31 bits), config.thread_num)
-
-        val write_ptr = in UInt(4 bits)
-        val pe_bundle_wire = Vec(out SInt(config.spmm_prec bits), 32)
-
+        val srst        = in Bool()
+        val wr_tag      = in UInt (3 bits)
+        val wr_valid    = Vec(in Bool(), config.thread_num)
+        val wr_addr     = Vec(in UInt (6 bits), config.thread_num)
+        val wr_data     = Vec(in Bits (config.spmv_w bits), config.thread_num)
+        val rd_tag      = in UInt (3 bits)
+        val rd_addr     = Vec(in UInt (6 bits), config.thread_num)
+        val rd_data     = Vec(out Bits (config.spmv_w bits), config.thread_num)
+        val update_valid= in Bool()
+        val update_ptr  = in UInt(4 bits)
+        val mem_wire    = Vec(out SInt(config.spmv_w bits), 32)
     }
 
-    val update_reg = Vec(Vec(Reg(Bits(config.spmm_prec bits)) init 0, config.matrix_size), config.thread_num)
+    val update_reg = Vec(Vec(Reg(Bits(config.spmv_w bits)) init 0, config.matrix_size), config.thread_num)
 
     for (k <- 0 until config.matrix_size) {
         when((io.wr_addr(0) === k) && io.wr_valid(0)) {
@@ -47,14 +49,14 @@ case class PeUpdateReg(config:PeConfig) extends Component {
 
     for (i <- 0 until 8) {
         for (j <- 0 until 64) {
-            when(io.update_reg_srst) {
+            when(io.srst) {
                 update_reg(i)(j) := 0
             }
         }
     }
 
     for (i <- 0 until 32) {
-        io.pe_bundle_wire(i) := update_reg(io.write_ptr(3 downto 1))((io.write_ptr(0).asUInt * 32 + i).resize(6)).asSInt
+        io.mem_wire(i) := io.update_valid ? update_reg(io.update_ptr(3 downto 1))((io.update_ptr(0).asUInt * 32 + i).resize(6)).asSInt | 0
     }
 
 }

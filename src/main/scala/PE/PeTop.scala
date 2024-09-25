@@ -24,17 +24,19 @@ import spinal.lib.fsm._
 
 import scala.language.postfixOps
 
-case class PeTop(config:PeConfig) extends Component {
+case class PeTop() extends Component {
+
+    val config = PEConfig
 
     val io = new Bundle {
-        val last_update         = in Vec(Bool(), config.core_num) //big line ending
+        val last_cb             = in Bool()
         val edge_stream         = Vec(slave Stream (Bits(config.axi_extend_width bits)), config.core_num)
         val vertex_stream_pe    = Vec(slave Stream (Bits(config.axi_extend_width bits)), config.core_num)
         val vertex_stream_ge    = slave Stream (Bits(config.axi_extend_width bits))
         val pe_rdy_table        = out Vec(Bool(), config.core_num)
         val pe_busy             = out Vec(Bool(), config.core_num)
         val ge_busy             = out Bool()
-        val update_busy         = out Bool() simPublic()
+        val update_busy         = out Bool() setAsReg() init False simPublic()
         val writeback_valid     = out Bool()
         val writeback_payload   = out Bits(config.axi_extend_width bits)
         val srst                = in Bool()
@@ -44,34 +46,29 @@ case class PeTop(config:PeConfig) extends Component {
     // Val declaration
     //-----------------------------------------------------
 
-    val swap_done               = Reg(Bool())                       init False
-    val swap                    = Reg(Bool())                       init True
-    val pe_busy                 = Vec(Bool(), config.core_num)
-    val last_update             = Reg(Bool())                       init False
-    val gather_pe_busy          = Bool()
-    val update_reg_srst         = Vec(Reg(Bool()),config.core_num)
-    val pe_rdy_table_all        = Vec(Vec(Bool(), config.thread_num),config.core_num)
-    val all_zero                = Vec(Bool(), config.core_num)
-    val Config                  = PeConfig()
+    val swap_done        = Reg(Bool())  init False
+    val swap             = Reg(Bool())  init True
+    val pe_busy          = Vec(Bool(), config.core_num)
+    val last_cb          = Reg(Bool())  init False
+    val pe_rdy_table_all = Vec(Vec(Bool(), config.thread_num),config.core_num)
+    val all_zero         = Vec(Bool(), config.core_num)
 
-    io.ge_busy := gather_pe_busy
-    //-----------------------------------------------------
-    // Module Declaration & Instantiation
-    //-----------------------------------------------------
-    val high_to_low_converter       = HighToLowConvert(Config)
-    val gather_pe_core              = GatherPeCore(Config)
-    val pecore_array                = new Array[PeCore](config.core_num)
-    val vertex_reg_A                = DualModeReg(Config)
-    val vertex_reg_B                = DualModeReg(Config)
-    val update_mem                  = Mem(Bits(config.spmm_prec*32 bits), wordCount = 16) simPublic()
+    val high2low_cvt     = HighToLowConvert()
+    val gather_pe_core   = GatherPeCore()
+    val pecore_array     = new Array[PeCore](config.core_num)
+    val pe_update_reg    = new Array[PeUpdateReg](config.core_num)
+    val vertex_reg_A     = DualModeReg()
+    val vertex_reg_B     = DualModeReg()
 
-    val pe_update_reg               = new Array[PeUpdateReg](config.core_num)
+    val update_mem       = Mem(Bits(config.spmv_w * 32 bits), wordCount = 16) simPublic()
+    val update_ptr       = Reg(UInt(4 bits)) init 0
+    val pe_update_value  = Vec(SInt(config.spmv_w bits), 32)
+    val pe_bundle_wire   = Vec(Vec(SInt(config.spmv_w bits), config.core_num), 32)
+    val pe_update_bits   = Vec(pe_update_value.map(_.asBits))
 
     for (i <- 0 until config.core_num) {
-        pecore_array(i) = PeCore(Config)
-        pecore_array(i).setName("pe_bundle_" + i.toString)
-        pe_update_reg(i) = PeUpdateReg(Config)
-        pe_update_reg(i).setName("pe_update_reg_" + i.toString)
+        pecore_array(i) = PeCore().setName("pe_" + i.toString)
+        pe_update_reg(i) = PeUpdateReg().setName("pe_update_reg_" + i.toString)
     }
 
     //-----------------------------------------------------
@@ -79,27 +76,28 @@ case class PeTop(config:PeConfig) extends Component {
     //-----------------------------------------------------
 
     for (i <- 0 until config.core_num) {
-        high_to_low_converter.io.in_edge_stream(i)  <> io.edge_stream(i)
+        high2low_cvt.io.in_edge_stream(i)           <> io.edge_stream(i)
         pe_busy(i)                                  <> pecore_array(i).io_state.pe_busy
         pecore_array(i).io_global_reg.vertex_stream <> io.vertex_stream_pe(i)
-        pecore_array(i).io_state.last_update        <> io.last_update(i)
+        pecore_array(i).io_state.last_update        <> io.last_cb
         pecore_array(i).io_state.all_zero           <> all_zero(i)
         pecore_array(i).io_state.swap_done          <> swap_done
         io.pe_rdy_table(i)                          := pe_rdy_table_all(i).orR
-        all_zero(i)                                 := high_to_low_converter.io.all_zero(i)
+        all_zero(i)                                 := high2low_cvt.io.all_zero(i)
 
         for (j <- 0 until config.thread_num) {
             pe_rdy_table_all(i)(j)              <> pecore_array(i).io_fifo.pe_fifo(j).ready
-            pecore_array(i).io_fifo.pe_fifo(j)  <> high_to_low_converter.io.out_edge_stream(i)(j)
+            pecore_array(i).io_fifo.pe_fifo(j)  <> high2low_cvt.io.out_edge_stream(i)(j)
             pe_update_reg(i).io.wr_addr(j)      <> pecore_array(i).io_update.wr_addr(j)
             pe_update_reg(i).io.wr_valid(j)     <> pecore_array(i).io_update.wr_valid(j)
             pe_update_reg(i).io.wr_data(j)      <> pecore_array(i).io_update.wr_data(j)
             pe_update_reg(i).io.rd_addr(j)      <> pecore_array(i).io_update.rd_addr(j)
             pe_update_reg(i).io.rd_data(j)      <> pecore_array(i).io_update.rd_data(j)
         }
-        pe_update_reg(i).io.wr_tag   <> pecore_array(i).io_update.wr_tag
-        pe_update_reg(i).io.rd_tag   <> pecore_array(i).io_update.rd_tag
-        pe_update_reg(i).io.update_reg_srst <> update_reg_srst(0)
+        pe_update_reg(i).io.wr_tag      <> pecore_array(i).io_update.wr_tag
+        pe_update_reg(i).io.rd_tag      <> pecore_array(i).io_update.rd_tag
+        pe_update_reg(i).io.srst        <> swap_done
+        pe_update_reg(i).io.update_valid := io.update_busy
     }
     gather_pe_core.io.swap_done         <> swap_done
     vertex_reg_A.io.rd_addr             <> gather_pe_core.io.rd_addr
@@ -110,32 +108,27 @@ case class PeTop(config:PeConfig) extends Component {
     vertex_reg_B.io.in_stream.payload   := Mux(!swap, io.vertex_stream_ge.payload, B(0))
     gather_pe_core.io.vertex_rd_data    := Mux(!swap, vertex_reg_A.io.rd_data, vertex_reg_B.io.rd_data)
     io.vertex_stream_ge.ready           := Mux(swap, vertex_reg_A.io.in_stream.ready,  vertex_reg_B.io.in_stream.ready)
-    gather_pe_busy                      := !gather_pe_core.io.gather_pe_done
+    io.ge_busy                          := !gather_pe_core.io.gather_pe_done
 
     //-----------------------------------------------------
     // Other Logic
     //-----------------------------------------------------
 
-    val write_ptr       = Reg(UInt(4 bits)) init 0
-    val write_valid     = Reg(Bool()) init False
-    val pe_update_value = Vec(Bits(config.spmm_prec bits), 32)
-    val pe_bundle_wire  = Vec(Vec(SInt(config.spmm_prec bits), config.core_num), 32)
-
     for (i <- 0 until 4) {
-        pe_update_reg(i).io.write_ptr := write_ptr
+        pe_update_reg(i).io.update_ptr := update_ptr
     }
 
     for (i <- 0 until 32) {
         for (j <- 0 until 4){
-            pe_bundle_wire(i)(j) := pe_update_reg(j).io.pe_bundle_wire(j)
+            pe_bundle_wire(i)(j) := pe_update_reg(j).io.mem_wire(i)
         }
-        pe_update_value(i) := pe_bundle_wire(i).reduceBalancedTree(_ + _).asBits
+        pe_update_value(i) := pe_bundle_wire(i).reduceBalancedTree(_ + _)
     }
 
     update_mem.write(
-        enable  = write_valid,
-        address = write_ptr,
-        data    = pe_update_value.reduce(_ ## _)
+        enable  = io.update_busy,
+        address = update_ptr,
+        data    = pe_update_bits.reduce(_ ## _)
     )
 
     io.writeback_payload            <> gather_pe_core.io.writeback_payload
@@ -143,8 +136,6 @@ case class PeTop(config:PeConfig) extends Component {
     io.pe_busy                      <> pe_busy
     gather_pe_core.io.spmm_rd_data  := update_mem.readAsync(gather_pe_core.io.rd_addr)
 
-    val update_busy = Reg(Bool()) init False simPublic()
-    io.update_busy := update_busy
     //-----------------------------------------------------
     // State Machine
     //-----------------------------------------------------
@@ -163,38 +154,28 @@ case class PeTop(config:PeConfig) extends Component {
           )
         OPERATE
           .whenIsActive {
-              when (!last_update) {
-                  last_update := io.last_update(0)
+              when (!last_cb) {
+                  last_cb := io.last_cb
               }
-              when(last_update) {
-                  write_valid := True
-                  write_ptr   := 0
-                  when (!pe_busy.orR & !gather_pe_busy) {
-                      update_busy := True
-                      goto(UPDATE_SUM_AND_SWITCH)
-                  }
+              when(last_cb & !pe_busy.orR & !io.ge_busy) {
+                  io.update_busy    := True
+                  update_ptr        := 0
+                  goto(UPDATE_SUM_AND_SWITCH)
               }
           }
         UPDATE_SUM_AND_SWITCH
+          .onEntry {
+              last_cb    := False
+          }
           .whenIsActive {
-              when(last_update) {
-                  last_update := False
-              }
-              when(update_busy && write_ptr =/= 15) {
-                  write_ptr     := write_ptr + 1
-              } elsewhen (update_busy && write_ptr === 15) {
-                  for (i <- 0 until config.core_num) {
-                      update_reg_srst(i) := True
-                  }
-                  update_busy := False
-                  write_valid := False
-                  swap := !swap
-                  swap_done := True
+              when(io.update_busy && update_ptr =/= 15) {
+                  update_ptr      := update_ptr + 1
+              } elsewhen (io.update_busy && update_ptr === 15) {
+                  io.update_busy  := False
+                  swap            := !swap
+                  swap_done       := True
               } otherwise {
-                  for (i <- 0 until config.core_num) {
-                      update_reg_srst(i) := False
-                  }
-                  swap_done := False
+                  swap_done       := False
                   goto(IDLE)
               }
           }

@@ -6,15 +6,17 @@ import spinal.lib._
 
 import scala.language.postfixOps
 
-case class GatherPeCore(config:PeConfig) extends Component {
-  
+case class GatherPeCore() extends Component {
+
+    val config = PEConfig
+
     val io = new Bundle {
         val swap_done           = in Bool()
         val gather_pe_done      = out Bool()
         val writeback_valid     = out Bool()
         val writeback_payload   = out Bits(config.axi_extend_width bits)
         val rd_addr             = out UInt (4 bits)
-        val spmm_rd_data        = in  Bits(31*32 bits)
+        val spmm_rd_data        = in  Bits(config.spmv_w *32 bits)
         val vertex_rd_data      = in  Bits (config.axi_extend_width bits)
     }
 
@@ -28,15 +30,15 @@ case class GatherPeCore(config:PeConfig) extends Component {
     val spmm_vertex_rd_addr_h1 = Reg(UInt (4 bits))      init 0
 
     val h2_valid            = Reg(Bool()) init False
-    val spmm_h2             = Vec(Reg(SInt(31 bits)) init 0, 32)
+    val spmm_h2             = Vec(Reg(SInt(config.spmv_w bits)) init 0, 32)
     val y_old_h2            = Vec(Reg(SInt(config.xy_width bits)) init 0, 32)
     val x_old_h2            = Vec(Reg(SInt(config.xy_width bits)) init 0, 32)
-    val y_new_h2            = Vec(SInt(44 bits), 32)
+    val y_new_h2            = Vec(SInt(37 bits), 32)
 
     val h3_valid            = Reg(Bool()) init False
-    val y_new_h3            = Vec(Reg(SInt(44 bits)) init 0, 32)
+    val y_new_h3            = Vec(Reg(SInt(37 bits)) init 0, 32)
     val x_old_h3            = Vec(Reg(SInt(config.xy_width bits)) init 0, 32)
-    val x_new_h3            = Vec(SInt(config.quant_precision_32 bits), 32)
+    val x_new_h3            = Vec(SInt(24 bits), 32)
     val x_new_cliped_h3     = Vec(SInt(config.xy_width bits), 32)
     val y_new_cliped_h3     = Vec(SInt(config.xy_width bits), 32)
 
@@ -93,7 +95,7 @@ case class GatherPeCore(config:PeConfig) extends Component {
 
     when (h1_valid) {
         for (i <- 0 until 32) {
-            spmm_h2(i)  := io.spmm_rd_data((i+1)*31-1 downto i*31).asSInt
+            spmm_h2(i)  := io.spmm_rd_data((i+1) * config.spmv_w - 1 downto i * config.spmv_w).asSInt
             x_old_h2(i) := io.vertex_rd_data((i+1)*16-1 downto (i+1)*16-8).asSInt
             y_old_h2(i) := io.vertex_rd_data((i+1)*16-9 downto i*16).asSInt
         }
@@ -130,7 +132,7 @@ case class GatherPeCore(config:PeConfig) extends Component {
         }
     }
     for (i <- 0 until 32) {
-        x_new_h3(i) := (x_old_h3(i) + y_new_h3(i) * xi_dt)(31 downto 0)
+        x_new_h3(i) := (x_old_h3(i) + y_new_h3(i) * xi_dt)(config.spmv_w - 1 downto 0)
         x_new_cliped_h3(i) := (x_new_h3(i) > positive_boundary) ? positive_boundary | ((x_new_h3(i) < negetive_boundary) ? negetive_boundary | x_new_h3(i)(7 downto 0))
         y_new_cliped_h3(i) := Mux(((x_new_h3(i) < positive_boundary) & (x_new_h3(i) > negetive_boundary)), y_new_h3(i)(7 downto 0), S(0))
     }
