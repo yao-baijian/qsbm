@@ -1,3 +1,5 @@
+package test
+
 import org.scalatest.funsuite.AnyFunSuite
 import spinal.core._
 import spinal.core.sim._
@@ -27,13 +29,13 @@ class qsbmTopSim extends AnyFunSuite {
     oneFilePerComponent = false
   )
   
-  val ipDir = "fpga/ip"
+  val ipDir         = "fpga/ip"
   val xciSourcePaths = ArrayBuffer(
     new File(ipDir).listFiles().map(ipDir + "/" + _.getName) :_*
   )
-  val simConfig = SpinalSimConfig(_spinalConfig = MySpinalConfig)
-  val simulator = "Verilator"
-  val compiled = simulator match {
+  val simConfig     = SpinalSimConfig(_spinalConfig = MySpinalConfig)
+  val simulator     = "Verilator"
+  val compiled      = simulator match {
     case "Verilator" =>
       simConfig
         .withWave
@@ -73,7 +75,7 @@ class qsbmTopSim extends AnyFunSuite {
   val spmv_w        = 24
   val dbg_option    = true
 
-  test("qsbmTopSim"){
+  test("qsbmTopSim") {
     compiled.doSim { dut =>
       dut.clockDomain.forkStimulus(100)
 
@@ -186,6 +188,7 @@ class qsbmTopSim extends AnyFunSuite {
       timeout_thread.join()
     }
   }
+
   def qsb_python_thread (): Unit = {
   }
 
@@ -257,7 +260,7 @@ class qsbmTopSim extends AnyFunSuite {
     }
   }
 
-  def vexGen(vexValues:Array[Byte]) = {
+  def vexGen(vexValues: Array[Byte]) = {
     val fos = new FileOutputStream("build/vertex.bin")
     val dos = new DataOutputStream(fos)
     for (d <- vexValues) {
