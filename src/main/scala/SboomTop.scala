@@ -1,3 +1,5 @@
+package test
+
 import dispatcher._
 import spinal.core._
 import spinal.core.sim._

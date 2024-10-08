@@ -62,7 +62,6 @@ def load_data(name='G30'):
             J = np.zeros([N,N])
         else:
             J[int(line.split(' ')[0])-1][int(line.split(' ')[1])-1] = (line.split(' ')[2])
-            # J[int(line.split(' ')[0])-1][int(line.split(' ')[1])-1] = (line.split(' ')[2])
     file.close()
     tor_arr = -J
     return tor_arr

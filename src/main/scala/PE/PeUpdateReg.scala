@@ -1,6 +1,7 @@
 package PE
+
 import spinal.core._
-import spinal.lib._
+import spinal.core.sim._
 
 import scala.language.postfixOps
 case class PeUpdateReg() extends Component {
@@ -21,7 +22,7 @@ case class PeUpdateReg() extends Component {
         val mem_wire    = Vec(out SInt(config.spmv_w bits), 32)
     }
 
-    val update_reg = Vec(Vec(Reg(Bits(config.spmv_w bits)) init 0, config.matrix_size), config.thread_num)
+    val update_reg = Vec(Vec(Reg(Bits(config.spmv_w bits)) init 0, config.matrix_size), config.thread_num) simPublic()
 
     for (k <- 0 until config.matrix_size) {
         when((io.wr_addr(0) === k) && io.wr_valid(0)) {

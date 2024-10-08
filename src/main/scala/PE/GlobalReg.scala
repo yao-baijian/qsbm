@@ -15,6 +15,7 @@ package PE
 
 import spinal.core._
 import spinal.lib._
+import spinal.core.sim._
 
 import scala.language.postfixOps
    
@@ -33,7 +34,7 @@ case class GlobalReg() extends Component{
     //-----------------------------------------------------
     // Module Declaration
     //-----------------------------------------------------
-    val vertex_mem  = Mem(Bits(config.axi_extend_width bits), wordCount = 2)
+    val vertex_mem  = Mem(Bits(config.axi_extend_width bits), wordCount = 2) simPublic()
     val wr_pointer  = Reg(UInt(1 bits)) init 0
     val ready       = Reg(Bool()) init True
     val reg_full    = Reg(Bool()) init False
@@ -49,7 +50,7 @@ case class GlobalReg() extends Component{
     )
 
     for (i <- 0 until config.thread_num) {
-        io.rd_data(i) := vertex_mem.readAsync(io.rd_addr(i)(5).asUInt).subdivideIn(config.data_width bits)(io.rd_addr(i)(4 downto 0)) (15 downto 8)
+        io.rd_data(i) := vertex_mem.readAsync(io.rd_addr(i)(5).asUInt).subdivideIn(config.data_width bits)(io.rd_addr(i)(4 downto 0)) (7 downto 0)
     }
 
 

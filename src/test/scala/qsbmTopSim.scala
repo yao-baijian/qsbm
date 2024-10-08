@@ -1,17 +1,15 @@
-package test
-
+import dispatcher._
 import org.scalatest.funsuite.AnyFunSuite
 import spinal.core._
 import spinal.core.sim._
 import spinal.lib._
 import spinal.lib.bus.amba4.axi.sim.{AxiMemorySim, AxiMemorySimConfig}
 import spinal.lib.bus.amba4.axilite.sim.AxiLite4Driver
-import dispatcher._
+import test.SboomTop
 
 import java.io._
-import java.io.{File, FileOutputStream}
 import java.lang.Long.{parseLong, parseUnsignedLong}
-import scala.collection.mutable._
+import scala.collection.mutable.{Seq, _}
 import scala.io.Source
 import scala.math._
 import scala.sys.process._
@@ -28,7 +26,7 @@ class qsbmTopSim extends AnyFunSuite {
     targetDirectory = "fpga/target",
     oneFilePerComponent = false
   )
-  
+
   val ipDir         = "fpga/ip"
   val xciSourcePaths = ArrayBuffer(
     new File(ipDir).listFiles().map(ipDir + "/" + _.getName) :_*
@@ -58,13 +56,13 @@ class qsbmTopSim extends AnyFunSuite {
   val typ           = "scaleup"
   val num_iter      = 100
   val cmp_type      = "bsb"
-  val filename      = "G34"
+  val filename      = "Gset/G34"
   val bestknown     = 2054
   val RB_length     = 512.0
   val tile_xy       = 64
-  val dbg_iter      = 1
+  val dbg_iter      = 0
 
-  val firstLine     = Source.fromFile("data/"+filename).getLines().next()
+  val firstLine     = Source.fromFile("data/" + filename).getLines().next()
   val matrix_size   = firstLine.split(" ")(0).toInt
 
   val vex_a_base    = 0x0
@@ -73,7 +71,7 @@ class qsbmTopSim extends AnyFunSuite {
   val RB_max        = ceil(matrix_size / RB_length).toInt
 
   val spmv_w        = 24
-  val dbg_option    = true
+  val dbg_option    = false
 
   test("qsbmTopSim") {
     compiled.doSim { dut =>
@@ -94,7 +92,8 @@ class qsbmTopSim extends AnyFunSuite {
       val JX_dbg        = lines(2).split(",").map(_.trim).filter(_.matches("-?\\d+")).map(_.toInt)
       val x_comp_dbg    = lines(3).split(",").map(_.trim).filter(_.matches("-?\\d+")).map(_.toByte)
       val y_comp_dbg    = lines(4).split(",").map(_.trim).filter(_.matches("-?\\d+")).map(_.toInt)
-      val qsb_energy    = lines(5).split(",").map(_.toFloat)
+      val partial_sum_dbg = lines(5).split(",").map(_.toFloat)
+      val qsb_energy    = lines(6).split(",").map(_.toFloat)
 
       val combined_init = new Array[Byte] (x_comp_init.length * 2)
 
@@ -136,6 +135,7 @@ class qsbmTopSim extends AnyFunSuite {
       }
 
       if (simulator == "Verilator") {
+
         val JX_dbg_thread  = fork {
           var previous_busy = dut.io.update_busy.toBoolean
           while (!timeoutOccurred) {
@@ -144,11 +144,12 @@ class qsbmTopSim extends AnyFunSuite {
             if (previous_busy && !current_busy) {
               val update_mem_values = (0 until 16).map(i => dut.pe_top.update_mem.getBigInt(i))
               for (i <- 0 until 16) {
-                val update_mem_bits = update_mem_values(i).toBigInt
+                var update_mem_bits = update_mem_values(i).toBigInt
                 for (j <- 0 until 32) {
-                  val update_mem_value = (update_mem_bits >> (j * spmv_w)) & ((1 << spmv_w) - 1)
+                  val update_mem_value = update_mem_bits  & ((1 << spmv_w) - 1)
                   val JX_dbg_value = JX_dbg(i * 32 + j)
                   assert(update_mem_value == JX_dbg_value, s"Mismatch at index ${(i * 32 + j)}: update_mem_value = $update_mem_value, JX_dbg_value = $JX_dbg_value")
+                  update_mem_bits = update_mem_bits >> (j * spmv_w)
                 }
               }
             }
@@ -178,11 +179,39 @@ class qsbmTopSim extends AnyFunSuite {
             }
             previous_busy = current_busy
           }
-          simSuccess()
+        }
+
+        val partial_sum_dbg_thread  = fork {
+          var previous_busy = dut.pe_top.io.pe_busy.apply(0).toBoolean
+          var done = false
+          while (!timeoutOccurred && !done) {
+            dut.clockDomain.waitSampling()
+            val current_busy = dut.pe_top.io.pe_busy.apply(0).toBoolean
+            if (previous_busy && !current_busy) {
+              val mem_handler = dut.pe_top.pe_update_reg.apply(0)
+              for (i <- 0 until 8) {
+                for (j <- 0 until 64) {
+                  val raw_partial_mem_value = mem_handler.update_reg(i)(j).toBigInt
+                  var partial_mem_value = if ((raw_partial_mem_value & 0x800000) != 0) {
+                    raw_partial_mem_value | 0xFF000000 // 符号扩展到 32 位
+                  } else {
+                    raw_partial_mem_value & 0xFFFFFF // 如果值为正，掩码为 24 位
+                  }
+                  partial_mem_value = partial_mem_value.toInt
+                  val partial_dbg       = partial_sum_dbg(i*64+j).toInt
+                  assert(partial_mem_value == partial_dbg, s"Mismatch at index ${(i*64+j)}: partial_mem_value = $partial_mem_value, partial_value = $partial_dbg")
+                }
+              }
+              done = true
+            }
+
+            previous_busy = current_busy
+          }
         }
 
         JX_dbg_thread.join()
         x_y_comp_dbg_thread.join()
+        partial_sum_dbg_thread.join()
       }
 
       timeout_thread.join()
@@ -223,9 +252,16 @@ class qsbmTopSim extends AnyFunSuite {
   def mem_dbg(dbg: Boolean, mem: AxiMemorySim): Unit = {
     if (dbg) {
       log_dbg(dbg_option, ("vex_all", mem.memory.readArray(0x0, 64)))
-      log_dbg(dbg_option, ("vex2", mem.memory.readArray(0x0, 16)))
-      log_dbg(dbg_option, ("vex1", mem.memory.readArray(0x10, 16)))
+      log_dbg(dbg_option, ("vex1", mem.memory.readArray(0x0, 16)))
+      log_dbg(dbg_option, ("vex2", mem.memory.readArray(0x10, 16)))
       log_dbg(dbg_option, ("edge_dbg", mem.memory.readArray(0x800000, 300)))
+    }
+  }
+
+  def printNonZeroCounts(array: Array[Int], lineSize: Int): Unit = {
+    for (i <- array.indices by lineSize) {
+      val nonZeroCount = array.slice(i, i + lineSize).count(_ != 0)
+      println(s"Line ${i / lineSize + 1}: $nonZeroCount non-zero values")
     }
   }
 
@@ -287,20 +323,27 @@ class qsbmTopSim extends AnyFunSuite {
     val remainLines = Source.fromFile(filename).getLines().drop(1)
 
     for (line <- remainLines) {
+
       val row   = parseUnsignedLong(line.split(' ')(0)) - 1
       val col   = parseUnsignedLong(line.split(' ')(1)) - 1
-      val value = parseLong(line.split(' ')(2))
+      // J = -J
+      val value = -parseLong(line.split(' ')(2))
 
-      //  edge = | src : dst : value | = | 6 : 6 : 4 |    <--->     | 8 : 8 |
-      val edge = (row & ((1 << 6) - 1)) << 10 | (col & ((1 << 6) - 1)) << 6 | value & ((1 << 4) - 1)
-      //  TODO need check here
+      //  edge     = | row : col : value | = | 6 : 6 : 4 |    <--->     | 8 : 8 |
+      //  val edge = ((row - 1) & 0x3F << 10) | (col - 1 & 0x3F << 6 ) | value & ((1 << 4) - 1)
+      val edge    = ((row & 0x3F) << 10) | ((col & 0x3F) << 4) | value & 0xF
+      val edge_t  = ((col & 0x3F) << 10) | ((row & 0x3F) << 4) | value & 0xF
+
+
       val edgeBytes = ArrayBuffer[Byte]( edge.toByte, (edge >>> 8).toByte)
+      val edge_t_Bytes = ArrayBuffer[Byte]( edge_t.toByte, (edge_t >>> 8).toByte)
 
       // J = (J.T + J)
+      // TODO need check here
       val block_row = (row / tile_xy).toInt
       val block_col = (col / tile_xy).toInt
       blocks(block_row)(block_col) ++= edgeBytes
-      blocks(block_col)(block_row) ++= edgeBytes
+      blocks(block_col)(block_row) ++= edge_t_Bytes
     }
 
     val edges_new           = ArrayBuffer[Byte]()

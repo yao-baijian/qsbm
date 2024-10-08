@@ -34,7 +34,7 @@ case class PeTop() extends Component {
         val vertex_stream_pe    = Vec(slave Stream (Bits(config.axi_extend_width bits)), config.core_num)
         val vertex_stream_ge    = slave Stream (Bits(config.axi_extend_width bits))
         val pe_rdy_table        = out Vec(Bool(), config.core_num)
-        val pe_busy             = out Vec(Bool(), config.core_num)
+        val pe_busy             = out Vec(Bool(), config.core_num) simPublic()
         val ge_busy             = out Bool()
         val update_busy         = out Bool() setAsReg() init False simPublic()
         val writeback_valid     = out Bool()

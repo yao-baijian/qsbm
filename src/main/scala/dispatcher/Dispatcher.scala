@@ -239,7 +239,7 @@ case class Dispatcher(config: Config) extends Component {
       }
       whenIsActive {
         when(io.pe_busy.orR === False) {
-          set_read(U(1), U(1), vex_base_addr + (128 * io.qsb_cfg.CB_init.resize(8))) // read to initial vex addr
+          set_read(U(1), U(1), vex_base_addr + (128 * (io.qsb_cfg.CB_init.resize(8) - 1))) // read to initial vex addr
           enable_read()
         }
         when(io.axiMemControlPort.ar.fire) {
