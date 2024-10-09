@@ -10,6 +10,7 @@ if __name__ == '__main__':
     num_iter = int(sys.argv[4])
     dbg_iter = int(sys.argv[5])
     qtz_type = sys.argv[6]
+    dbg_option = sys.argv[7]
     dt = 0.25
     J = load_data(filename)
     J = (J.T + J)
@@ -20,23 +21,10 @@ if __name__ == '__main__':
     # for noscale
     # factor = [7, 4 ,4],  [8, 4, 4]
     fc = [7, 16, 16]
-    qsb_energy, qsb_step, x_comp_init, y_comp_init, JX_dbg, x_comp_dbg, y_comp_dbg, result_sub = qSB_improve(J,
-                                                                                                            init_x, 
-                                                                                                            init_y, 
-                                                                                                            num_iter, 
-                                                                                                            dbg_iter, 
-                                                                                                            best_known, 
-                                                                                                            fc, 
-                                                                                                            qtz_type)
+    qsb_energy, qsb_step= qSB_improve(J, init_x, init_y, num_iter, dbg_iter, best_known, fc, qtz_type, dbg_option)
     bsb_energy = SB(sb_type, J, init_x, init_y, num_iter, dt)
 
-    print(','.join(map(str, x_comp_init)))
-    print(','.join(map(str, y_comp_init)))
-    print(','.join(map(str, JX_dbg)))
-    print(','.join(map(str, x_comp_dbg)))
-    print(','.join(map(str, y_comp_dbg)))
-    print(','.join(map(str, result_sub)))
-    print(','.join(map(str, qsb_energy)))
+
     
 
     

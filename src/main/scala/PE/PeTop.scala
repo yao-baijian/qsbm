@@ -128,7 +128,7 @@ case class PeTop() extends Component {
     update_mem.write(
         enable  = io.update_busy,
         address = update_ptr,
-        data    = pe_update_bits.reduce(_ ## _)
+        data    = pe_update_bits.reverse.reduce(_ ## _)
     )
 
     io.writeback_payload            <> gather_pe_core.io.writeback_payload

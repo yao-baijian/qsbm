@@ -53,6 +53,7 @@ class qsbmTopSim extends AnyFunSuite {
       throw new IllegalArgumentException("Unsupported simulator")
   }
 
+
   val typ           = "scaleup"
   val num_iter      = 100
   val cmp_type      = "bsb"
@@ -84,7 +85,8 @@ class qsbmTopSim extends AnyFunSuite {
       cmp_type,
       num_iter.toString,
       dbg_iter.toString,
-      typ).!!
+      typ,
+      "ON").!!
 
       val lines = result.split("\n")
       val x_comp_init   = lines(0).split(",").map(_.trim).filter(_.matches("-?\\d+")).map(_.toByte)
@@ -92,8 +94,9 @@ class qsbmTopSim extends AnyFunSuite {
       val JX_dbg        = lines(2).split(",").map(_.trim).filter(_.matches("-?\\d+")).map(_.toInt)
       val x_comp_dbg    = lines(3).split(",").map(_.trim).filter(_.matches("-?\\d+")).map(_.toByte)
       val y_comp_dbg    = lines(4).split(",").map(_.trim).filter(_.matches("-?\\d+")).map(_.toInt)
-      val partial_sum_dbg = lines(5).split(",").map(_.toFloat)
-      val qsb_energy    = lines(6).split(",").map(_.toFloat)
+      val partial_sum_dbg1 = lines(5).split(",").map(_.toFloat)
+      val partial_sum_dbg2 = lines(6).split(",").map(_.toFloat)
+//      val qsb_energy    = lines(7).split(",").map(_.toFloat)
 
       val combined_init = new Array[Byte] (x_comp_init.length * 2)
 
@@ -131,7 +134,6 @@ class qsbmTopSim extends AnyFunSuite {
         if (!dut.io.done.toBoolean) {
           simFailure("Simulation timed out")
         }
-        println(s"qsb_energy: ${qsb_energy.mkString(", ")}")
       }
 
       if (simulator == "Verilator") {
@@ -146,10 +148,15 @@ class qsbmTopSim extends AnyFunSuite {
               for (i <- 0 until 16) {
                 var update_mem_bits = update_mem_values(i).toBigInt
                 for (j <- 0 until 32) {
-                  val update_mem_value = update_mem_bits  & ((1 << spmv_w) - 1)
+                  val raw_update_mem_value = update_mem_bits  & ((1 << spmv_w) - 1)
+                  var update_mem_value = if ((raw_update_mem_value & 0x800000) != 0) {
+                    raw_update_mem_value | 0xFF000000 // 符号扩展到 32 位
+                  } else {
+                    raw_update_mem_value & 0xFFFFFF // 如果值为正，掩码为 24 位
+                  }
                   val JX_dbg_value = JX_dbg(i * 32 + j)
                   assert(update_mem_value == JX_dbg_value, s"Mismatch at index ${(i * 32 + j)}: update_mem_value = $update_mem_value, JX_dbg_value = $JX_dbg_value")
-                  update_mem_bits = update_mem_bits >> (j * spmv_w)
+                  update_mem_bits = update_mem_bits >> spmv_w
                 }
               }
             }
@@ -181,14 +188,15 @@ class qsbmTopSim extends AnyFunSuite {
           }
         }
 
-        val partial_sum_dbg_thread  = fork {
-          var previous_busy = dut.pe_top.io.pe_busy.apply(0).toBoolean
+        val partial_sum_dbg_thread1  = fork {
+          val pe_num = 0
+          var previous_busy = dut.pe_top.io.pe_busy.apply(pe_num).toBoolean
           var done = false
           while (!timeoutOccurred && !done) {
             dut.clockDomain.waitSampling()
-            val current_busy = dut.pe_top.io.pe_busy.apply(0).toBoolean
+            val current_busy = dut.pe_top.io.pe_busy.apply(pe_num).toBoolean
             if (previous_busy && !current_busy) {
-              val mem_handler = dut.pe_top.pe_update_reg.apply(0)
+              val mem_handler = dut.pe_top.pe_update_reg.apply(pe_num)
               for (i <- 0 until 8) {
                 for (j <- 0 until 64) {
                   val raw_partial_mem_value = mem_handler.update_reg(i)(j).toBigInt
@@ -198,8 +206,36 @@ class qsbmTopSim extends AnyFunSuite {
                     raw_partial_mem_value & 0xFFFFFF // 如果值为正，掩码为 24 位
                   }
                   partial_mem_value = partial_mem_value.toInt
-                  val partial_dbg       = partial_sum_dbg(i*64+j).toInt
-                  assert(partial_mem_value == partial_dbg, s"Mismatch at index ${(i*64+j)}: partial_mem_value = $partial_mem_value, partial_value = $partial_dbg")
+                  val partial_dbg       = partial_sum_dbg1(i*64+j).toInt
+                  assert(partial_mem_value == partial_dbg, s"PE ${pe_num} Mismatch at index ${(i*64+j)}: partial_mem_value = $partial_mem_value, partial_value = $partial_dbg")
+                }
+              }
+              done = true
+            }
+            previous_busy = current_busy
+          }
+        }
+
+        val partial_sum_dbg_thread2  = fork {
+          val pe_num = 1
+          var previous_busy = dut.pe_top.io.pe_busy.apply(pe_num).toBoolean
+          var done = false
+          while (!timeoutOccurred && !done) {
+            dut.clockDomain.waitSampling()
+            val current_busy = dut.pe_top.io.pe_busy.apply(pe_num).toBoolean
+            if (previous_busy && !current_busy) {
+              val mem_handler = dut.pe_top.pe_update_reg.apply(pe_num)
+              for (i <- 0 until 8) {
+                for (j <- 0 until 64) {
+                  val raw_partial_mem_value = mem_handler.update_reg(i)(j).toBigInt
+                  var partial_mem_value = if ((raw_partial_mem_value & 0x800000) != 0) {
+                    raw_partial_mem_value | 0xFF000000 // 符号扩展到 32 位
+                  } else {
+                    raw_partial_mem_value & 0xFFFFFF // 如果值为正，掩码为 24 位
+                  }
+                  partial_mem_value = partial_mem_value.toInt
+                  val partial_dbg       = partial_sum_dbg2(i*64+j).toInt
+                  assert(partial_mem_value == partial_dbg, s"PE ${pe_num} Mismatch at index ${(i*64+j)}: partial_mem_value = $partial_mem_value, partial_value = $partial_dbg")
                 }
               }
               done = true
@@ -211,7 +247,8 @@ class qsbmTopSim extends AnyFunSuite {
 
         JX_dbg_thread.join()
         x_y_comp_dbg_thread.join()
-        partial_sum_dbg_thread.join()
+        partial_sum_dbg_thread1.join()
+        partial_sum_dbg_thread2.join()
       }
 
       timeout_thread.join()
@@ -334,14 +371,15 @@ class qsbmTopSim extends AnyFunSuite {
       val edge    = ((row & 0x3F) << 10) | ((col & 0x3F) << 4) | value & 0xF
       val edge_t  = ((col & 0x3F) << 10) | ((row & 0x3F) << 4) | value & 0xF
 
+      val block_row = (row / tile_xy).toInt
+      val block_col = (col / tile_xy).toInt
 
       val edgeBytes = ArrayBuffer[Byte]( edge.toByte, (edge >>> 8).toByte)
       val edge_t_Bytes = ArrayBuffer[Byte]( edge_t.toByte, (edge_t >>> 8).toByte)
 
       // J = (J.T + J)
       // TODO need check here
-      val block_row = (row / tile_xy).toInt
-      val block_col = (col / tile_xy).toInt
+
       blocks(block_row)(block_col) ++= edgeBytes
       blocks(block_col)(block_row) ++= edge_t_Bytes
     }
@@ -429,6 +467,7 @@ class qsbmTopSim extends AnyFunSuite {
               next_CB         = CB_list.dequeue()
               next_CB_length  = CB_length.dequeue()
             }
+
             // TODO next_CB_length can not handle matrix elements more that 32 * 256
             edges_new ++= ArrayBuffer[Byte] (0.toByte, (offset + 1).toByte, next_RB.toByte, next_CB.toByte, next_CB_length.toByte, 0.toByte)
             edges_new ++= blocks(base + offset)(col)

@@ -322,7 +322,7 @@ case class Dispatcher(config: Config) extends Component {
               }
             } otherwise {
               when (io.pe_busy.andR === False) {
-                set_read(U(1), U(1), vex_base_addr + (128) * CB_nxt_r)
+                set_read(U(1), U(1), vex_base_addr + 128 * (CB_nxt_r - 1 ))
                 enable_read()
               }
               when(io.axiMemControlPort.ar.fire) {
@@ -344,7 +344,7 @@ case class Dispatcher(config: Config) extends Component {
         io.axiMemControlPort.ar.valid   := False
       }
       whenIsActive{
-        // After get all vertex, need local nxt RB, CB, issue next vertex using CB increment
+        // After get all vertex, issue next vertex
         when(io.update_busy) {
           RB_switch     := False
         }
@@ -352,7 +352,7 @@ case class Dispatcher(config: Config) extends Component {
           last_r := io.axiMemControlPort.r.last
         }
         io.vex2ge.valid := data_stream(0).valid
-        set_read(U(1), U(1), vex_base_addr + (128) * CB_nxt_r)
+        set_read(U(1), U(1), vex_base_addr + 128 * (CB_nxt_r - 1))
         // in last cycle,
         when(io.axiMemControlPort.r.last || last_r){
           when (itr_cnt === io.qsb_cfg.iteration) {

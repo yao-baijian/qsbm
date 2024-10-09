@@ -66,7 +66,6 @@ case class PeCore() extends Component {
     //-----------------------------------------------------------
     val f0_valid            = Vec(Reg(Bool()) init False, config.thread_num)
     val update_ram_addr_f0  = Vec(Reg(UInt(6 bits)) init 0, config.thread_num)
-
     val intrahaz_vec_f0     = Vec(Vec(Bool(), config.thread_num), config.thread_num)
     val intrahaz_val_f0     = Vec(Vec(Bool(), config.thread_num), config.thread_num)
     val intrahaz_f0         = Vec(Bool(), config.thread_num)
@@ -196,7 +195,10 @@ case class PeCore() extends Component {
             // TODO arbitration need change
             when(h3_valid.orR === False
               && h2_valid.orR === False
-              && h1_valid.orR === False) {
+              && h1_valid.orR === False
+              && f2_valid.orR === False
+              && f1_valid.orR === False
+              && f0_valid.orR === False) {
                 when(io_state.last_update) {
                     for (i <- 0 until config.thread_num) {
                         fifo_rdy(i) := False

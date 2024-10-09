@@ -65,7 +65,7 @@ case class HighToLowConvert() extends Component {
             all_zero_ff(i) := True
         }
 
-        all_zero_inval(i) := (edge_convert_fifo(i).io.pop.valid && edge_convert_fifo(i).io.pop.payload.subdivideIn(config.axi_width bits)(3) === 0) ? False | True
+        all_zero_inval(i) := (edge_convert_fifo(i).io.pop.valid && edge_convert_fifo(i).io.pop.payload.subdivideIn(config.axi_width bits)((counter_group(i).value + 1).resize(2)) === 0) ? False | True
     }
 }
 

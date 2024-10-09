@@ -84,7 +84,8 @@ def qSB_improve(J,
                 dbg_iter, 
                 best_known = 0, 
                 factor = [6, 4 ,4], 
-                qtz_type = 'scaleup'):
+                qtz_type = 'scaleup',
+                dbg_option = 'OFF'):
 
     energies = []
     scale = 2 ** factor[0] - 1
@@ -125,7 +126,8 @@ def qSB_improve(J,
         
         if i == dbg_iter:
             JX_dbg = (J @ x_comp).astype(int)
-            result_sub = J[0:512, 0:64] @ x_comp[0:64]
+            result_sub  = J[0:512, 0:64] @ x_comp[0:64]
+            result_sub2 = J[0:512, 64:128] @ x_comp[64:128]
         
         if (qtz_type == 'scaleup'):
             y_comp_div_dt = (-scale + alpha[i] * scale) * x_comp + scaleup(np.array(J @ x_comp) * xi, scale)
@@ -154,15 +156,17 @@ def qSB_improve(J,
             acc_reach = 1
             step = i
         energies.append(energy)
-        # if i == num_iters -1:
-            # print(-1/4 * J.sum() - 1/2 * e)
-            # return -1/4 * J.sum() - 1/2 * e
-    # zero_momentum = 0
-    # for y in y_comp:
-    #     if y == 0.:
-    #         zero_momentum += 1
-    # print("total zero y", zero_momentum)
-    return np.array(energies), step, x_comp_init, y_comp_init, JX_dbg, x_comp_dbg, y_comp_dbg, result_sub
+        
+    if dbg_option == 'ON':
+        print(','.join(map(str, x_comp_init)))
+        print(','.join(map(str, y_comp_init)))
+        print(','.join(map(str, JX_dbg)))
+        print(','.join(map(str, x_comp_dbg)))
+        print(','.join(map(str, y_comp_dbg)))
+        print(','.join(map(str, result_sub)))
+        print(','.join(map(str, result_sub2)))
+    
+    return np.array(energies), step
 
 def scaleup(targets, factor):
     rescaled_targets = []
