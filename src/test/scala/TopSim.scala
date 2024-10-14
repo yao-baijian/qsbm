@@ -35,7 +35,7 @@ class TopSim extends TestBase {
         .withWave
         .withIVerilog
         .compile(SboomTop(Config()))
-    case "Verilator" =>
+    case "Xsim" =>
       simConfig
         .workspacePath("build/XsimWorkspace")
         .withWave

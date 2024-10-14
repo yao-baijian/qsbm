@@ -56,8 +56,8 @@ case class PeTop() extends Component {
     val all_zero         = Vec(Bool(), config.core_num)
 
     val high2low_cvt     = HighToLowConvert()
-    val gather_pe_core   = GatherPeCore()
-    val pecore_array     = new Array[PeCore](config.core_num)
+    val gather_pe_core   = Ge()
+    val pecore_array     = new Array[Pe](config.core_num)
     val pe_update_reg    = new Array[PeUpdateReg](config.core_num)
     val vertex_reg_A     = DualModeReg()
     val vertex_reg_B     = DualModeReg()
@@ -69,7 +69,7 @@ case class PeTop() extends Component {
     val pe_update_bits   = Vec(pe_update_value.map(_.asBits))
 
     for (i <- 0 until config.core_num) {
-        pecore_array(i) = PeCore().setName("pe_" + i.toString)
+        pecore_array(i) = Pe().setName("pe_" + i.toString)
         pe_update_reg(i) = PeUpdateReg().setName("pe_update_reg_" + i.toString)
     }
 
