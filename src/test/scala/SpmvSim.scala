@@ -5,10 +5,13 @@ import spinal.lib._
 import spinal.lib.bus.amba4.axi.sim.{AxiMemorySim, AxiMemorySimConfig}
 import spinal.lib.bus.amba4.axilite.sim.AxiLite4Driver
 import test.SboomTop
+
 import scala.collection.mutable.{Seq, _}
+import scala.math.sqrt
 import scala.sys.process._
 
-class qsbmSpmvSim extends qsbmTestBase {
+class SpmvSim extends TestBase {
+
   object MySpinalConfig extends SpinalConfig(
 
     defaultConfigForClockDomains = ClockDomainConfig(
@@ -42,7 +45,7 @@ class qsbmSpmvSim extends qsbmTestBase {
       throw new IllegalArgumentException("Unsupported simulator")
   }
 
-  test("qsbmSpmvSim") {
+  test("SpmvSim") {
     compiled.doSim { dut =>
       dut.clockDomain.forkStimulus(100)
 
@@ -90,7 +93,11 @@ class qsbmSpmvSim extends qsbmTestBase {
       dut.clockDomain.waitSampling(200)
 
       // sbm initialization
-      sbm_init(axiLite, cb , rb, cb_length)
+      val ai_init = 0.0
+      val ai_incr = 1.0 / num_iter
+      val xi      = 0.7 / sqrt(matrix_size)
+      // sbm initialization
+      sbm_init(axiLite, cb , rb, cb_length, ai_init, ai_incr, xi )
 
       // start
       sbm_start(axiLite)

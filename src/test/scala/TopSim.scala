@@ -1,14 +1,15 @@
 import dispatcher._
 import spinal.core.sim._
 import spinal.core._
-import spinal.lib._
 import spinal.lib.bus.amba4.axi.sim.{AxiMemorySim, AxiMemorySimConfig}
 import spinal.lib.bus.amba4.axilite.sim.AxiLite4Driver
 import test.SboomTop
 import scala.collection.mutable.{Seq, _}
 import scala.sys.process._
+import scala.math._
 
-class qsbmTopSim extends qsbmTestBase {
+class TopSim extends TestBase {
+
   object MySpinalConfig extends SpinalConfig(
 
     defaultConfigForClockDomains = ClockDomainConfig(
@@ -16,35 +17,40 @@ class qsbmTopSim extends qsbmTestBase {
       resetActiveLevel = HIGH
     ),
     defaultClockDomainFrequency = FixedFrequency(300 MHz),
-    targetDirectory = "fpga/target",
+    targetDirectory     = "fpga/target",
     oneFilePerComponent = false
   )
 
   val simConfig     = SpinalSimConfig(_spinalConfig = MySpinalConfig)
-  val simulator     = "Verilator"
+  val simulator     = "Xsim"
   val compiled      = simulator match {
     case "Verilator" =>
       simConfig
+        .workspacePath("build/VsimWorkspace")
         .withWave
         .compile(SboomTop(Config()))
     case "Iverilog" =>
       simConfig
+        .workspacePath("build/IsimWorkspace")
         .withWave
         .withIVerilog
         .compile(SboomTop(Config()))
-    case "Xsim" =>
+    case "Verilator" =>
       simConfig
+        .workspacePath("build/XsimWorkspace")
         .withWave
         .withXSim
-        .withXilinxDevice("xcu280-fsvh2892-2L-e")
+//        .withXilinxDevice("xcu280-fsvh2892-2L-e")
+        .withXilinxDevice("xczu7ev-ffvc1156-2-e")
         .compile(SboomTop(Config()))
     case _ =>
       throw new IllegalArgumentException("Unsupported simulator")
   }
 
-  test("qsbmTopSim") {
-    compiled.doSim { dut =>
-      dut.clockDomain.forkStimulus(100)
+  test("TopSim") {
+    compiled
+      .doSim { dut =>
+        dut.clockDomain.forkStimulus(100)
 
       // algorithm
       val result = Seq("python", "quantization/spinal_test.py",
@@ -89,8 +95,11 @@ class qsbmTopSim extends qsbmTestBase {
 
       dut.clockDomain.waitSampling(200)
 
+      val ai_init = 1.0
+      val ai_incr = 1.0 / num_iter
+      val xi      = 0.7 / sqrt(matrix_size)
       // sbm initialization
-      sbm_init(axiLite, cb , rb, cb_length)
+      sbm_init(axiLite, cb , rb, cb_length, ai_init, ai_incr, xi )
 
       // start
       sbm_start(axiLite)
@@ -124,8 +133,8 @@ class qsbmTopSim extends qsbmTestBase {
                 x_comp_result(i) = combined_init(2 * i)
                 y_comp_result(i) = combined_init(2 * i + 1)
               }
-              scoreboard("x_comp", x_comp_result, x_comp_dbg, dbg_iter)
               scoreboard("y_comp", y_comp_result, x_comp_dbg, dbg_iter)
+              scoreboard("x_comp", x_comp_result, x_comp_dbg, dbg_iter)
             }
             previous_busy = current_busy
           }

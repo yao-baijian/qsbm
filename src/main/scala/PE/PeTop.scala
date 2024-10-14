@@ -39,7 +39,9 @@ case class PeTop() extends Component {
         val update_busy         = out Bool() setAsReg() init False simPublic()
         val writeback_valid     = out Bool()
         val writeback_payload   = out Bits(config.axi_extend_width bits)
+        val itr_cnt             = in  UInt (16 bits)
         val srst                = in Bool()
+        val qsb_cfg 		        = slave(qsbConfig())
     }
 
     //-----------------------------------------------------
@@ -110,6 +112,8 @@ case class PeTop() extends Component {
     io.vertex_stream_ge.ready           := Mux(swap, vertex_reg_A.io.in_stream.ready,  vertex_reg_B.io.in_stream.ready)
     io.ge_busy                          := !gather_pe_core.io.gather_pe_done
 
+    gather_pe_core.io.qsb_cfg <> io.qsb_cfg
+    gather_pe_core.io.itr_cnt <> io.itr_cnt
     //-----------------------------------------------------
     // Other Logic
     //-----------------------------------------------------
@@ -134,7 +138,7 @@ case class PeTop() extends Component {
     io.writeback_payload            <> gather_pe_core.io.writeback_payload
     io.writeback_valid              <> gather_pe_core.io.writeback_valid
     io.pe_busy                      <> pe_busy
-    gather_pe_core.io.spmm_rd_data  := update_mem.readAsync(gather_pe_core.io.rd_addr)
+    gather_pe_core.io.spmv_result   := update_mem.readAsync(gather_pe_core.io.rd_addr)
 
     //-----------------------------------------------------
     // State Machine

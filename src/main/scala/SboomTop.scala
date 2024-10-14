@@ -31,14 +31,17 @@ case class SboomTop(config:Config) extends Component{
     io.topAxiMemControlPort << dispatcher.io.axiMemControlPort
     io.done := dispatcher.io.done
     // ctrl reg - dispatcher
-    ctrl_reg.io.axi_lite << io.topAxiLiteSlave
+    ctrl_reg.io.axi_lite  << io.topAxiLiteSlave
     dispatcher.io.start 	:= ctrl_reg.io.start(0)
     dispatcher.io.srst   	:= ctrl_reg.io.srst(0)
     ctrl_reg.io.done      := dispatcher.io.done
-    dispatcher.io.qsb_cfg 	<> ctrl_reg.io.qsb_cfg
+    dispatcher.io.qsb_cfg <> ctrl_reg.io.qsb_cfg
     dispatcher.io.vex_a_base:= ctrl_reg.io.vex_a_base
     dispatcher.io.vex_b_base:= ctrl_reg.io.vex_b_base
     dispatcher.io.edge_base := ctrl_reg.io.edge_base
+
+    pe_top.io.qsb_cfg   <> ctrl_reg.io.qsb_cfg
+    pe_top.io.itr_cnt   := dispatcher.io.itr_cnt
 
     // pe - dispatcher
     pe_top.io.vertex_stream_ge.payload  := dispatcher.io.vex2ge.payload.data

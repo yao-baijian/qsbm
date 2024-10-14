@@ -1,7 +1,6 @@
 from misc import *
 from simuated_bifurcation import *
 import sys
-import json
 
 if __name__ == '__main__':
     filename = sys.argv[1]
@@ -16,15 +15,8 @@ if __name__ == '__main__':
     J = (J.T + J)
     init_x = np.random.uniform(-0.1,0.1,J.shape[0])
     init_y = np.random.uniform(-0.1,0.1,J.shape[0])
-    # for scaleup
-    # factor = [7, 128,4],  [8, 16, 16], [7,16,16]
-    # for noscale
-    # factor = [7, 4 ,4],  [8, 4, 4]
-    fc = [7, 16, 16]
+    fc = [7, 4, 4]
     qsb_energy, qsb_step= qSB_improve(J, init_x, init_y, num_iter, dbg_iter, best_known, fc, qtz_type, dbg_option)
     bsb_energy = SB(sb_type, J, init_x, init_y, num_iter, dt)
-
-
-    
 
     

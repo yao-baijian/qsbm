@@ -7,8 +7,9 @@ import org.scalatest.funsuite.AnyFunSuite
 import spinal.lib.bus.amba4.axi.sim.AxiMemorySim
 import spinal.lib.bus.amba4.axilite.sim.AxiLite4Driver
 import dispatcher._
+import spinal.core.sim._
 
-class qsbmTestBase extends AnyFunSuite {
+class TestBase extends AnyFunSuite {
 
   val typ           = "scaleup"
   val num_iter      = 100
@@ -29,22 +30,22 @@ class qsbmTestBase extends AnyFunSuite {
 
   // Simulation API
 
-  def sbm_init(axi_driver : AxiLite4Driver, cb : Int, rb : Int, cb_length : Int): Unit = {
-    axi_driver.write(0x0C, num_iter)    // 1000 iteration
-    axi_driver.write(0x10, matrix_size) // matrix size 2000
-    axi_driver.write(0x14, tile_xy)     // tile 64
-    axi_driver.write(0x18, BigInt(ceil(matrix_size / tile_xy).toLong))    // max CB number = 2000 / 64 = 32
-    axi_driver.write(0x40, RB_max)    // max RB number = 2000 / 512 = 4
-    axi_driver.write(0x1C, cb)      // CB init
-    axi_driver.write(0x20, rb)      // RB init
-    axi_driver.write(0x44, cb_length)      // RB init
-    axi_driver.write(0x24, 0)      // ai init
-    axi_driver.write(0x28, 1)      // ai incr
-    axi_driver.write(0x2C, 1)      // xi
-    axi_driver.write(0x30, 16)     // dt
-    axi_driver.write(0x34, vex_a_base)       // vex_a_base
-    axi_driver.write(0x38, vex_b_base)       // vex_b_base
-    axi_driver.write(0x3C, edge_base)        // edge_base
+  def sbm_init(axi_driver : AxiLite4Driver, cb : Int, rb : Int, cb_length : Int, ai_init : Double, ai_incr : Double, xi : Double): Unit = {
+    axi_driver.write(0x0C, num_iter)
+    axi_driver.write(0x10, matrix_size)
+    axi_driver.write(0x14, tile_xy)
+    axi_driver.write(0x18, BigInt(ceil(matrix_size / tile_xy).toLong))
+    axi_driver.write(0x40, RB_max)
+    axi_driver.write(0x1C, cb)
+    axi_driver.write(0x20, rb)
+    axi_driver.write(0x44, cb_length)
+    axi_driver.write(0x24, floatToFixed(ai_init, 16, 16))
+    axi_driver.write(0x28, floatToFixed(ai_incr, 16, 16))
+    axi_driver.write(0x2C, floatToFixed(xi, 16, 16))
+    axi_driver.write(0x30, 16)
+    axi_driver.write(0x34, vex_a_base)
+    axi_driver.write(0x38, vex_b_base)
+    axi_driver.write(0x3C, edge_base)
   }
 
   def sbm_start(axi_driver : AxiLite4Driver): Unit = {
@@ -103,6 +104,7 @@ class qsbmTestBase extends AnyFunSuite {
       println(s"${name} scoreboard length: ${scoreboard.length}")
       println(s"${name} target: ${target.mkString(", ")}")
       println(s"${name} scoreboard: ${scoreboard.mkString(", ")}")
+      simFailure("Data Mismatch")
     }
   }
 
@@ -274,6 +276,24 @@ class qsbmTestBase extends AnyFunSuite {
     dos.close()
 
     (RB_init, CB_init, CB_length_init, edges_new.toArray)
+  }
+
+  // Math API
+
+  def floatToFixed(value: Double, intBits: Int, fracBits: Int): Int = {
+
+    val maxValue = (1 << (intBits + fracBits - 1)) - 1
+    val minValue = -(1 << (intBits + fracBits - 1))
+
+    if (value >= 0) {
+      val scaleFactor = 1 << fracBits
+      val fixedValue = (value * scaleFactor).toInt & 0xffffffff
+      fixedValue
+    } else {
+      val scaleFactor = 1 << fracBits
+      val fixedValue = (-value * scaleFactor).toInt | 0x80000000 + 1
+      fixedValue
+    }
   }
 }
 

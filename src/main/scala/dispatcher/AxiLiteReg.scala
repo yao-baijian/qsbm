@@ -4,7 +4,6 @@ import spinal.core.Component
 import spinal.core.{B, _}
 import spinal.lib._
 import spinal.lib.bus.amba4.axilite._
-import spinal.lib.tools.DataAnalyzer
 import PE.qsbConfig
 
 case class AxiLiteReg() extends Component {

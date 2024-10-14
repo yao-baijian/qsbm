@@ -14,10 +14,10 @@ case class qsbConfig() extends Bundle with IMasterSlave{
     val CB_init   = UInt(32 bits)
     val RB_init   = UInt(32 bits)
     val CB_length = UInt(32 bits)
-    val ai_init   = UInt(32 bits)
-    val ai_incr   = UInt(32 bits)
-    val xi 		    = UInt(32 bits)
-    val dt 		    = UInt(32 bits)
+    val ai_init   = Bits(32 bits)
+    val ai_incr   = Bits(32 bits)
+    val xi 		    = Bits(32 bits)
+    val dt 		    = Bits(32 bits)
 
     override def asMaster(): Unit = {
         out(iteration) setAsReg() init(0)

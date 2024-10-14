@@ -41,23 +41,15 @@ bin/
 *.json
 *.vcd
 !tester/src/test/resources/*.vhd
-
-
-simWorkspace/
-xSimWorkspace/SboomTop/*
 tmp/
 null
-
 quantization/result/*
 
-
+build/
 
 *.jou
 *.log
 *.wcfg
 *.wdb
-/xsim.dir
-
-
+xsim.dir
 .Xil
-vivado_pid15228.str

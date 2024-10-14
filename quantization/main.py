@@ -5,12 +5,12 @@ from simuated_bifurcation import *
 import time
 
 if __name__ == '__main__':
-    data_list   = {'G9': 2054, 
-                   'G47': 6634, 
-                   'G39': 2356, 
-                   'G42': 2394}
+    data_list   = {'Gset/G34': 2054 }
+                #    'G47': 6634, 
+                #    'G39': 2356, 
+                #    'G42': 2394}
     
-    qsb_type = ['improve', 'scaleup']
+    qsb_type = ['non-converge', 'unscale']
     sb_type  = "bsb"
     quant_index = [7, 6, 5]
     # quant_index = [7]
@@ -36,7 +36,7 @@ if __name__ == '__main__':
                 qsb_energies.append(gaussian_filter(qsb_energy, sigma=3))
         elif (qsb_type[0] == 'non-converge'):
             fc = [7, 4, 4]
-            qsb_energy, qsb_step = qSB_improve(J, init_x, init_y, num_iter, best_known, factor = fc, qtz_type='scaleup')
+            qsb_energy, qsb_step = qSB_improve(J, init_x, init_y, num_iter, best_known, factor = fc, qtz_type=qsb_type[1])
             qsb_energies.append(gaussian_filter(qsb_energy, sigma=3))
         else:
             qsb_energy, qsb_step = qSB(J, init_x, init_y, num_iter, best_known)
@@ -58,7 +58,7 @@ if __name__ == '__main__':
             
         plt.plot(bsb_energy,label='bSB ' + set_name)
         plt.legend()
-        plt.savefig('./quantization/result/set_'+ set_name+'_ising_solution.pdf')
+        plt.savefig('./quantization/result/set_'+ set_name[5:]+'_ising_solution.pdf')
         plt.show()
         
         

@@ -134,8 +134,9 @@ def qSB_improve(J,
             y_comp = y_comp + scaledown(y_comp_div_dt, factor[1])
             x_comp = x_comp + scaledown(y_comp, factor[2])
         elif(qtz_type == 'unscale'):
-            y_comp_div_dt = (-1 + alpha[i]) * x_comp + np.array(J @ x_comp) * xi
+            y_comp_div_dt = (-1 + alpha[i]) * x_comp + (J @ x_comp) * xi
             y_comp = y_comp + scaledown(y_comp_div_dt,  factor[1])
+            y_dbg  = scaledown(y_comp_div_dt,  factor[1])
             x_comp = x_comp + scaledown(y_comp, factor[2])
         elif(qtz_type=='uni'):
             # TODO

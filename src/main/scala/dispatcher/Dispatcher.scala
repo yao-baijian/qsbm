@@ -45,6 +45,7 @@ case class Dispatcher(config: Config) extends Component {
     val vex2ge 		= master(Flow(Axi2Stream()))
     val wb_valid  = in Bool()
     val wb_payload= in Bits(config.axi_width bits)
+    val itr_cnt   = out UInt(16 bits)
 
   }
 
@@ -67,7 +68,7 @@ case class Dispatcher(config: Config) extends Component {
 
   val vexEdgeSelect       = Reg(UInt(1 bits)) init 0
   val pe_select           = Reg(UInt(2 bits)) init 0
-  val itr_cnt             = Reg(UInt(10 bits)) init 0
+  val itr_cnt             = Reg(UInt(16 bits)) init 0
   val ping_pong           = Reg(Bool()) init True
   val vex_base_addr       = UInt(32 bits)
   val vex_base_addr_r     = UInt(32 bits)
@@ -83,6 +84,8 @@ case class Dispatcher(config: Config) extends Component {
   when (io.srst) {
     done := False
   }
+
+  io.itr_cnt := itr_cnt
 
   for (i <- 0 until config.pe_num) {
     io.vex2pe(i).payload.data  := vex_stream(i).payload.data
