@@ -87,24 +87,22 @@ def qSB_improve(J,
                 qtz_type = 'scaleup',
                 dbg_option = 'OFF'):
 
-    energies = []
-    scale = 2 ** factor[0] - 1
-    N = J.shape[0]
-    xi = (0.7 / math.sqrt(N))
-    JX_dbg = []
-    
-    # x_comp = (init_x.copy()) * scale
-    # y_comp = (init_y.copy()) * scale
-    alpha = np.linspace(0, 1, num_iters)
-    
-    step = num_iters
-    acc_reach = 0
-    
-    x_comp = scaleup(np.array(init_x.copy()), 127)
-    y_comp = scaleup(np.array(init_y.copy()), 127)
+    energies    = []
+    scl1        = 2 ** factor[0] - 1
+    scl2        = 2 ** 7 - 1
+
+    N           = J.shape[0]
+    xi          = 0.7 / math.sqrt(N)
+    JX_dbg      = []
+    alpha       = np.linspace(0, 1, num_iters)
+    step        = num_iters
+    acc_reach   = 0
+    x_comp      = scaleup(np.array(init_x.copy()), scl1)
+    y_comp      = scaleup(np.array(init_y.copy()), scl1)
     
     x_comp_init = x_comp.copy() 
     y_comp_init = y_comp.copy() 
+    
     x_comp_dbg  = []
     y_comp_dbg  = []
     
@@ -112,7 +110,7 @@ def qSB_improve(J,
         '''
         Note:
         1. All scale up to match with x_comp, the intuitive is to avoid generate any decimal during calculation, 
-            and keep Lagrange ratio unchanged
+            and keep Lagrange unchanged
             
         2. Only scale up x_comp and y_comp, scale down when calculating. This will generate decimal during calculation
         
@@ -122,6 +120,7 @@ def qSB_improve(J,
             x_comp += y_comp * dt
             y_comp[np.abs(x_comp) > 1] = 0.
             x_comp = np.clip(x_comp,-1, 1)
+        
         '''
         
         if i == dbg_iter:
@@ -130,21 +129,16 @@ def qSB_improve(J,
             result_sub2 = J[0:512, 64:128] @ x_comp[64:128]
         
         if (qtz_type == 'scaleup'):
-            y_comp_div_dt = (-scale + alpha[i] * scale) * x_comp + scaleup(np.array(J @ x_comp) * xi, scale)
+            y_comp_div_dt = (-scl2 + alpha[i] * scl2) * x_comp + scaleup((J @ x_comp) * xi, scl2)
             y_comp = y_comp + scaledown(y_comp_div_dt, factor[1])
             x_comp = x_comp + scaledown(y_comp, factor[2])
         elif(qtz_type == 'unscale'):
             y_comp_div_dt = (-1 + alpha[i]) * x_comp + (J @ x_comp) * xi
             y_comp = y_comp + scaledown(y_comp_div_dt,  factor[1])
-            y_dbg  = scaledown(y_comp_div_dt,  factor[1])
-            x_comp = x_comp + scaledown(y_comp, factor[2])
-        elif(qtz_type=='uni'):
-            # TODO
-            # need implement uniform quantization here
             x_comp = x_comp + scaledown(y_comp, factor[2])
             
-        y_comp[np.abs(x_comp) > scale] = 0.
-        x_comp = np.clip(x_comp, -scale, scale)
+        y_comp[np.abs(x_comp) > scl1] = 0.
+        x_comp = np.clip(x_comp, -scl1, scl1)
         
         if i == dbg_iter:
             x_comp_dbg = x_comp.copy()

@@ -82,7 +82,7 @@ case class Ge() extends Component {
     // pipeline s1: y_new = y_old + ((-1 + alpha) * x_old + beta * updated value) * dt
     // -----------------------------------------------------------
 
-    val s1 = new Stage(Connection.M2S()){
+    val s1 = new Stage(Connection.M2S()) {
       for (i <- 0 until config.ge_thread) {
         spmv_result(i).raw  := io.spmv_result((i + 1) * config.spmv_w - 1 downto i * config.spmv_w).asSInt
         x_old(i).raw        := io.vertex_rd_data((i + 1) * 16 - 9 downto i * 16).asSInt
