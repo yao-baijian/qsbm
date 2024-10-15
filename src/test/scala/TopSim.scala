@@ -1,9 +1,9 @@
-import dispatcher._
+import disp._
 import spinal.core.sim._
 import spinal.core._
 import spinal.lib.bus.amba4.axi.sim.{AxiMemorySim, AxiMemorySimConfig}
 import spinal.lib.bus.amba4.axilite.sim.AxiLite4Driver
-import test.SboomTop
+import test.qSBMTop
 import scala.collection.mutable.{Seq, _}
 import scala.sys.process._
 import scala.math._
@@ -22,19 +22,19 @@ class TopSim extends TestBase {
   )
 
   val simConfig     = SpinalSimConfig(_spinalConfig = MySpinalConfig)
-  val simulator     = "Xsim"
+  val simulator     = "Verilator"
   val compiled      = simulator match {
     case "Verilator" =>
       simConfig
         .workspacePath("build/VsimWorkspace")
         .withWave
-        .compile(SboomTop(Config()))
+        .compile(qSBMTop())
     case "Iverilog" =>
       simConfig
         .workspacePath("build/IsimWorkspace")
         .withWave
         .withIVerilog
-        .compile(SboomTop(Config()))
+        .compile(qSBMTop())
     case "Xsim" =>
       simConfig
         .workspacePath("build/XsimWorkspace")
@@ -42,7 +42,7 @@ class TopSim extends TestBase {
         .withXSim
 //        .withXilinxDevice("xcu280-fsvh2892-2L-e")
         .withXilinxDevice("xczu7ev-ffvc1156-2-e")
-        .compile(SboomTop(Config()))
+        .compile(qSBMTop())
     case _ =>
       throw new IllegalArgumentException("Unsupported simulator")
   }

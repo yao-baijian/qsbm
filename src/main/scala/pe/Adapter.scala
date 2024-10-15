@@ -6,12 +6,12 @@ import cfg._
 
 import scala.language.postfixOps
 
-case class HighToLowConvert() extends Component {
+case class Adapter() extends Component {
 
     val config = Config
 
     val io = new Bundle {
-        val in_edge_stream = Vec(slave Stream (Bits(config.axi_extend_width bits)), config.core_num)
+        val in_edge_stream = Vec(slave Stream (Bits(config.axi_width bits)), config.core_num)
         val out_edge_stream = Vec(Vec(master Stream (Bits(config.data_width bits)), config.thread_num), config.core_num)
         val all_zero     = out Vec(Bool(), config.core_num)
     }
@@ -28,7 +28,7 @@ case class HighToLowConvert() extends Component {
     // Module Instantiation
     //-----------------------------------------------------
     for (i <- 0 until config.core_num) {
-        edge_convert_fifo(i)= StreamFifo(Bits(config.axi_extend_width bits), config.fifo_depth_1024)
+        edge_convert_fifo(i)= StreamFifo(Bits(config.axi_width bits), config.fifo_depth_1024)
         counter_group(i)    = Counter(0 until config.core_num )
         counter_group(i).setName("Counter_" + i.toString)
     }
@@ -43,7 +43,7 @@ case class HighToLowConvert() extends Component {
 
         for (j <- 0 until config.thread_num) {
             io.out_edge_stream(i)(j).valid  := all_zero_ff(i)  & edge_convert_fifo(i).io.pop.valid
-            io.out_edge_stream(i)(j).payload:= edge_convert_fifo(i).io.pop.payload.subdivideIn(config.axi_width bits)(counter_group(i).value)(config.data_width * (j + 1) - 1 downto config.data_width * j)
+            io.out_edge_stream(i)(j).payload:= edge_convert_fifo(i).io.pop.payload.subdivideIn(config.pe_width bits)(counter_group(i).value)(config.data_width * (j + 1) - 1 downto config.data_width * j)
             ready_table(i)(j)               := io.out_edge_stream(i)(j).ready
         }
         when (counter_group(i).value === 0)  {
@@ -66,7 +66,7 @@ case class HighToLowConvert() extends Component {
             all_zero_ff(i) := True
         }
 
-        all_zero_inval(i) := (edge_convert_fifo(i).io.pop.valid && edge_convert_fifo(i).io.pop.payload.subdivideIn(config.axi_width bits)((counter_group(i).value + 1).resize(2)) === 0) ? False | True
+        all_zero_inval(i) := (edge_convert_fifo(i).io.pop.valid && edge_convert_fifo(i).io.pop.payload.subdivideIn(config.pe_width bits)((counter_group(i).value + 1).resize(2)) === 0) ? False | True
     }
 }
 

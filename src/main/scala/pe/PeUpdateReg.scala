@@ -1,12 +1,13 @@
-package PE
+package pe
 
+import cfg.Config
 import spinal.core._
 import spinal.core.sim._
 
 import scala.language.postfixOps
 case class PeUpdateReg() extends Component {
 
-    val config = PEConfig
+    val config = Config
 
     val io = new Bundle {
         val srst        = in Bool()

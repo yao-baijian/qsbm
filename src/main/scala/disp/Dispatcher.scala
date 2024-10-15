@@ -1,24 +1,26 @@
-package dispatcher
-import spinal.core.Component.push
+package disp
 import spinal.core._
 import spinal.lib._
 import spinal.lib.{Stream, _}
 import spinal.lib.bus.amba4.axi.{Axi4, Axi4Config}
 import spinal.lib.tools.DataAnalyzer
 import spinal.lib.fsm._
-import PE.qsbConfig
+import cfg._
 import spinal.core.sim.SimDataPimper
 
 case class Axi2Stream() extends Bundle {
-  val data = Bits(Config().axi_width bits)
+  val config  = Config
+  val data    = Bits(config.axi_width bits)
   // def isBlack : Bool = red === 0 && green === 0 && blue === 0
 }
 
-case class Dispatcher(config: Config) extends Component {
+case class Dispatcher() extends Component {
 
-  val axiConfig = Axi4Config(addressWidth = config.addrWid, 
-    							dataWidth = config.axi_width, 
-								idWidth = config.idWid)
+  val config = Config
+
+  val axiConfig = Axi4Config( addressWidth = config.addrWid,
+    							            dataWidth = config.axi_width,
+								              idWidth = config.idWid)
 
   val io = new Bundle {
 
@@ -33,13 +35,11 @@ case class Dispatcher(config: Config) extends Component {
     val vex_b_base= in UInt(32 bits)
     val edge_base = in UInt(32 bits)
     // to PE
-    val pe_busy 	= in Vec(Bool(), config.pe_num)
+    val pe_busy 	= in Vec(Bool(), config.core_num)
     val RB_switch = out Bool()
-    val vex2pe  	= Vec(master(Flow(Axi2Stream())), config.pe_num)
-    val edge2pe 	= Vec(master(Stream(Axi2Stream())), config.pe_num)
+    val vex2pe  	= Vec(master(Flow(Axi2Stream())), config.core_num)
+    val edge2pe 	= Vec(master(Stream(Axi2Stream())), config.core_num)
     val update_busy = in Bool()
-
-    update_busy.simPublic()
 
     // GE
     val vex2ge 		= master(Flow(Axi2Stream()))
@@ -76,8 +76,8 @@ case class Dispatcher(config: Config) extends Component {
   val pe_nxt_rdy          = Reg(Bool()) init True
 
   val data_stream         = StreamDemux(io.axiMemControlPort.r, vexEdgeSelect, 2) // to vex, to edge
-  val edge_stream         = StreamDemux(data_stream(1), pe_select, config.pe_num) // edge to pe 1, 2, 3, 4
-  val vex_stream          = StreamDemux(data_stream(0), pe_select, config.pe_num) // vex to pe 1, 2, 3, 4
+  val edge_stream         = StreamDemux(data_stream(1), pe_select, config.core_num) // edge to pe 1, 2, 3, 4
+  val vex_stream          = StreamDemux(data_stream(0), pe_select, config.core_num) // vex to pe 1, 2, 3, 4
 
   val done                = Reg(Bool()) init False
   io.done := done
@@ -87,7 +87,7 @@ case class Dispatcher(config: Config) extends Component {
 
   io.itr_cnt := itr_cnt
 
-  for (i <- 0 until config.pe_num) {
+  for (i <- 0 until config.core_num) {
     io.vex2pe(i).payload.data  := vex_stream(i).payload.data
     io.vex2pe(i).valid         := vex_stream(i).valid
     vex_stream(i).ready        := True
@@ -114,7 +114,7 @@ case class Dispatcher(config: Config) extends Component {
   // Flow:
   //        data_stream  -> edge_stream | edge_stream | edge_stream | edge_stream -> pe_1 | pe_2 | pe_3 | pe_4
 
-  for (i <- 0 until config.pe_num) {
+  for (i <- 0 until config.core_num) {
     edge_stream(i).ready        := io.edge2pe(i).ready
     io.edge2pe(i).payload.data  := edge_stream(i).payload.data
     io.edge2pe(i).valid         := edge_stream(i).valid
@@ -130,7 +130,7 @@ case class Dispatcher(config: Config) extends Component {
   val partial_zero_in_r    = Reg(Bool()) init False
   val edge_in_ptr_in       = UInt(4 bits)
 
-  for(i <- 0 until config.pe_num) {
+  for(i <- 0 until config.core_num) {
     single_zero_in(i)  := (data_stream(1).payload.data.subdivideIn(128 bits)(i) === 0) && data_stream(1).valid
   }
   partial_zero_in := single_zero_in.orR
@@ -160,7 +160,7 @@ case class Dispatcher(config: Config) extends Component {
   val last_r              = Reg(Bool()) init False
   val RB_switch 		      = Reg(Bool()) init False
 
-  for(i <- 0 until config.pe_num) {
+  for(i <- 0 until config.core_num) {
     head(i) := (data_stream(1).payload.data.subdivideIn(128 bits)(i).subdivideIn(8 bits)(0) === 0x00 &&
                 data_stream(1).payload.data.subdivideIn(128 bits)(i).subdivideIn(8 bits)(1) =/= 0x00)
   }

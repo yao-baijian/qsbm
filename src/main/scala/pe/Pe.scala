@@ -9,18 +9,19 @@
  * Copyright (c) 2023 by ${git_name_email}, All Rights Reserved. 
  */
 
-package PE
+package pe
 
 import org.scalatest.Assertions.convertToEqualizer
 import spinal.core._
 import spinal.lib._
+import cfg.Config
 import spinal.lib.fsm._
 
 import scala.language.postfixOps
 
 case class Pe() extends Component {
 
-    val config = PEConfig
+    val config = Config
 
     val io_state = new Bundle {
         val last_update = in Bool()
@@ -31,7 +32,7 @@ case class Pe() extends Component {
     }
 
     val io_global_reg = new Bundle {
-        val vertex_stream = slave Stream (Bits(config.axi_extend_width bits))
+        val vertex_stream = slave Stream (Bits(config.axi_width bits))
         val reg_full = out Bool()
     }
 
@@ -141,11 +142,11 @@ case class Pe() extends Component {
     // Wiring
     //-----------------------------------------------------------
 
-    io_state.pe_busy := pe_busy
-    io_state.need_new_vertex := need_new_vertex
-    global_reg.io.in_stream <> io_global_reg.vertex_stream
-    global_reg.io.srst <> need_new_vertex
-    io_fifo.globalreg_done <> global_reg.io.reg_full
+    io_state.pe_busy            := pe_busy
+    io_state.need_new_vertex    := need_new_vertex
+    global_reg.io.in_stream     <> io_global_reg.vertex_stream
+    global_reg.io.srst          <> need_new_vertex
+    io_fifo.globalreg_done      <> global_reg.io.reg_full
     io_global_reg.reg_full <> global_reg.io.reg_full
 
     for (i <- 0 until config.thread_num) {

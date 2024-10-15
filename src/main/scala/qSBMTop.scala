@@ -1,13 +1,16 @@
 package test
 
-import dispatcher._
+import disp._
 import spinal.core._
 import spinal.core.sim._
 import spinal.lib.bus.amba4.axi.{Axi4, Axi4Config}
 import spinal.lib.{master, slave}
 import spinal.lib.bus.amba4.axilite.{AxiLite4, AxiLite4Config}
+import cfg._
 
-case class SboomTop(config:Config) extends Component{
+case class qSBMTop() extends Component{
+
+    val config =Config
 
     val io = new Bundle {
         val topAxiMemControlPort = master(Axi4(Axi4Config(addressWidth = 32, dataWidth = config.axi_width, idWidth = 4)))
@@ -23,8 +26,8 @@ case class SboomTop(config:Config) extends Component{
     axiLiteRename(io.topAxiLiteSlave,  "S00_AXI_")
 
     val ctrl_reg    = AxiLiteReg()
-    val dispatcher  = Dispatcher(Config())
-    val pe_top      = PE.PeTop()
+    val dispatcher  = Dispatcher()
+    val pe_top      = pe.P4Top()
 
 
     // top axi
@@ -48,7 +51,7 @@ case class SboomTop(config:Config) extends Component{
     pe_top.io.vertex_stream_ge.valid    := dispatcher.io.vex2ge.valid
     pe_top.io.last_cb                   := dispatcher.io.RB_switch
 
-    for(i<-0 until config.pe_num){
+    for(i<-0 until config.core_num){
         dispatcher.io.pe_busy(i)      := pe_top.io.pe_busy(i)
         pe_top.io.vertex_stream_pe(i).payload   := dispatcher.io.vex2pe(i).payload.data
         pe_top.io.vertex_stream_pe(i).valid     := dispatcher.io.vex2pe(i).valid

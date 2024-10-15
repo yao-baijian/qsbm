@@ -1,10 +1,10 @@
-import dispatcher._
+import disp._
 import spinal.core.sim._
 import spinal.core._
 import spinal.lib._
 import spinal.lib.bus.amba4.axi.sim.{AxiMemorySim, AxiMemorySimConfig}
 import spinal.lib.bus.amba4.axilite.sim.AxiLite4Driver
-import test.SboomTop
+import test.qSBMTop
 
 import scala.collection.mutable.{Seq, _}
 import scala.math.sqrt
@@ -29,18 +29,18 @@ class SpmvSim extends TestBase {
     case "Verilator" =>
       simConfig
         .withWave
-        .compile(SboomTop(Config()))
+        .compile(qSBMTop())
     case "Iverilog" =>
       simConfig
         .withWave
         .withIVerilog
-        .compile(SboomTop(Config()))
+        .compile(qSBMTop())
     case "Xsim" =>
       simConfig
         .withWave
         .withXSim
         .withXilinxDevice("xcu280-fsvh2892-2L-e")
-        .compile(SboomTop(Config()))
+        .compile(qSBMTop())
     case _ =>
       throw new IllegalArgumentException("Unsupported simulator")
   }
@@ -205,5 +205,6 @@ class SpmvSim extends TestBase {
       timeout_thread.join()
     }
   }
+
 }
 

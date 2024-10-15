@@ -1,7 +1,6 @@
-package PE
+package cfg
 
-import spinal.core.Component
-import spinal.core.{B, _}
+import spinal.core._
 import spinal.lib._
 
 case class qsbConfig() extends Bundle with IMasterSlave{

@@ -1,23 +1,24 @@
-package PE
+package pe
 
 import spinal.core._
 import spinal.lib.fsm._
 import spinal.lib._
+import cfg._
 import spinal.lib.pipeline._
 
 import scala.language.postfixOps
 
 case class Ge() extends Component {
 
-  val config = PEConfig
+  val config = Config
 
   val io = new Bundle {
     val swap_done           = in Bool()
     val spmv_result         = in Bits(config.spmv_w * config.ge_thread bits)
-    val vertex_rd_data      = in Bits (config.axi_extend_width bits)
+    val vertex_rd_data      = in Bits (config.axi_width bits)
     val gather_pe_done      = out Bool() setAsReg() init True
     val writeback_valid     = out Bool()
-    val writeback_payload   = out Bits(config.axi_extend_width bits) setAsReg() init 0
+    val writeback_payload   = out Bits(config.axi_width bits) setAsReg() init 0
     val rd_addr             = out UInt (4 bits) setAsReg() init 0
     val itr_cnt             = in  UInt (16 bits)
     val qsb_cfg 		        = slave(qsbConfig())

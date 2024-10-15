@@ -25,21 +25,21 @@ import spinal.lib.fsm._
 
 import scala.language.postfixOps
 
-case class PeTop() extends Component {
+case class P4Top() extends Component {
 
     val config = Config
 
     val io = new Bundle {
         val last_cb             = in Bool()
-        val edge_stream         = Vec(slave Stream (Bits(config.axi_extend_width bits)), config.core_num)
-        val vertex_stream_pe    = Vec(slave Stream (Bits(config.axi_extend_width bits)), config.core_num)
-        val vertex_stream_ge    = slave Stream (Bits(config.axi_extend_width bits))
+        val edge_stream         = Vec(slave Stream (Bits(config.axi_width bits)), config.core_num)
+        val vertex_stream_pe    = Vec(slave Stream (Bits(config.axi_width bits)), config.core_num)
+        val vertex_stream_ge    = slave Stream (Bits(config.axi_width bits))
         val pe_rdy_table        = out Vec(Bool(), config.core_num)
         val pe_busy             = out Vec(Bool(), config.core_num) simPublic()
         val ge_busy             = out Bool()
         val update_busy         = out Bool() setAsReg() init False simPublic()
         val writeback_valid     = out Bool()
-        val writeback_payload   = out Bits(config.axi_extend_width bits)
+        val writeback_payload   = out Bits(config.axi_width bits)
         val itr_cnt             = in  UInt (16 bits)
         val srst                = in Bool()
         val qsb_cfg 		        = slave(qsbConfig())
@@ -56,7 +56,7 @@ case class PeTop() extends Component {
     val pe_rdy_table_all = Vec(Vec(Bool(), config.thread_num),config.core_num)
     val all_zero         = Vec(Bool(), config.core_num)
 
-    val high2low_cvt     = HighToLowConvert()
+    val high2low_cvt     = Adapter()
     val gather_pe_core   = Ge()
     val pecore_array     = new Array[Pe](config.core_num)
     val pe_update_reg    = new Array[PeUpdateReg](config.core_num)

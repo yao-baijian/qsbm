@@ -11,20 +11,21 @@
  * 
  * Copyright (c) 2023 by ${git_name_email}, All Rights Reserved. 
  */
-package PE
+package pe
 
 import spinal.core._
 import spinal.lib._
+import cfg._
 import spinal.core.sim._
 
 import scala.language.postfixOps
    
 case class GlobalReg() extends Component{
 
-    val config = PEConfig
+    val config = Config
 
     val io = new Bundle{
-        val in_stream       = slave Stream(Bits(config.axi_extend_width bits))
+        val in_stream       = slave Stream(Bits(config.axi_width bits))
         val rd_addr         = Vec(in UInt(config.addr_width bits), config.thread_num)
         val rd_data         = Vec(out Bits(config.x_comp_width bits), config.thread_num)
         val srst            = in Bool()
@@ -34,7 +35,7 @@ case class GlobalReg() extends Component{
     //-----------------------------------------------------
     // Module Declaration
     //-----------------------------------------------------
-    val vertex_mem  = Mem(Bits(config.axi_extend_width bits), wordCount = 2) simPublic()
+    val vertex_mem  = Mem(Bits(config.axi_width bits), wordCount = 2) simPublic()
     val wr_pointer  = Reg(UInt(1 bits)) init 0
     val ready       = Reg(Bool()) init True
     val reg_full    = Reg(Bool()) init False

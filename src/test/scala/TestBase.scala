@@ -6,7 +6,7 @@ import scala.math._
 import org.scalatest.funsuite.AnyFunSuite
 import spinal.lib.bus.amba4.axi.sim.AxiMemorySim
 import spinal.lib.bus.amba4.axilite.sim.AxiLite4Driver
-import dispatcher._
+import cfg._
 import spinal.core.sim._
 
 class TestBase extends AnyFunSuite {
@@ -180,7 +180,7 @@ class TestBase extends AnyFunSuite {
     var CB_length_init      = 0
 
     // RB
-    for (base <- 0 until  arrayWidth by Config().pe_thread) {
+    for (base <- 0 until  arrayWidth by Config.pe_thread) {
       // CB
       last_non_empty_CB = 0
       non_empty_CB = false
@@ -188,7 +188,7 @@ class TestBase extends AnyFunSuite {
       for (col <- 0 until arrayWidth) {
         non_empty_tile = false
         CB_length_128  = 0
-        for (offset <- 0 until Config().pe_thread) {
+        for (offset <- 0 until Config.pe_thread) {
           if (blocks(base + offset)(col).nonEmpty) {
             last_non_empty_tile = offset + 1
             CB_length_128 += ceil((blocks(base + offset)(col).length + 6) / 16.0).toInt // 5 byte for header
@@ -225,14 +225,14 @@ class TestBase extends AnyFunSuite {
 
     log_dbg(dbg_option, ("RB_init", RB_init), ("CB_init", CB_init) , ("CB_length", CB_length))
 
-    for (base <- 0 until  arrayWidth by Config().pe_thread) {
+    for (base <- 0 until  arrayWidth by Config.pe_thread) {
       last_non_empty_CB = 0
       next_RB = 0
       for (col <- 0 until arrayWidth) {
         last_non_empty_tile = 0
         next_CB = 0
         next_CB_length = 0
-        for (offset <- 0 until Config().pe_thread) {
+        for (offset <- 0 until Config.pe_thread) {
           if (blocks(base + offset)(col).nonEmpty) {
             if (last_non_empty_CB == 0) { last_non_empty_CB  = RB_last_non_empty_CB.dequeue() }
             if (last_non_empty_tile == 0) { last_non_empty_tile  = CB_last_non_empty_tile.dequeue() }

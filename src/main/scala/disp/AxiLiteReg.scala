@@ -1,10 +1,10 @@
-package dispatcher
+package disp
 
+import cfg.qsbConfig
 import spinal.core.Component
 import spinal.core.{B, _}
 import spinal.lib._
 import spinal.lib.bus.amba4.axilite._
-import PE.qsbConfig
 
 case class AxiLiteReg() extends Component {
 
