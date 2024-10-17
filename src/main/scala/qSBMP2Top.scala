@@ -25,7 +25,7 @@ case class qSBMZ2Top() extends Component{
   axiLiteRename(io.topAxiLiteSlave,  "S00_AXI_")
 
   val ctrl_reg    = AxiLiteReg()
-  val dispatcher  = Dispatcher()
+  val dispatcher  = DispatcherZ2()
   val pe_top      = pe.P2Top()
 
   // top axi

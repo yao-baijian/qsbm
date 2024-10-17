@@ -1,9 +1,8 @@
-import disp._
 import spinal.core.sim._
 import spinal.core._
 import spinal.lib.bus.amba4.axi.sim.{AxiMemorySim, AxiMemorySimConfig}
 import spinal.lib.bus.amba4.axilite.sim.AxiLite4Driver
-import test.qSBMTop
+import test._
 import scala.collection.mutable.{Seq, _}
 import scala.sys.process._
 import scala.math._
@@ -28,13 +27,13 @@ class Z2Sim extends TestBase {
       simConfig
         .workspacePath("build/VsimWorkspace")
         .withWave
-        .compile(qSBMTop())
+        .compile(qSBMZ2Top())
     case "Iverilog" =>
       simConfig
         .workspacePath("build/IsimWorkspace")
         .withWave
         .withIVerilog
-        .compile(qSBMTop())
+        .compile(qSBMZ2Top())
     case "Xsim" =>
       simConfig
         .workspacePath("build/XsimWorkspace")
@@ -42,7 +41,7 @@ class Z2Sim extends TestBase {
         .withXSim
         //        .withXilinxDevice("xcu280-fsvh2892-2L-e")
         .withXilinxDevice("xczu7ev-ffvc1156-2-e")
-        .compile(qSBMTop())
+        .compile(qSBMZ2Top())
     case _ =>
       throw new IllegalArgumentException("Unsupported simulator")
   }
