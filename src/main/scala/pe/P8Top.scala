@@ -32,29 +32,27 @@ case class P8Top() extends Component {
   //-----------------------------------------------------
   // Val declaration
   //-----------------------------------------------------
+  val adapter           = Adapter()
+  val ge                = Ge()
+  val pe_array          = new Array[Pe](config.core_num)
+  val pe_update_reg     = new Array[PeUpdateReg](config.core_num)
+  val vertex_reg_A      = DualModeReg()
+  val vertex_reg_B      = DualModeReg()
+  val update_mem        = Mem(Bits(config.spmv_w * 32 bits), wordCount = 16) simPublic()
 
-  val swap_done        = Reg(Bool())  init False
-  val swap             = Reg(Bool())  init True
-  val pe_busy          = Vec(Bool(), config.core_num)
-  val last_cb          = Reg(Bool())  init False
-  val pe_rdy_table_all = Vec(Vec(Bool(), config.thread_num),config.core_num)
-  val all_zero         = Vec(Bool(), config.core_num)
-
-  val high2low_cvt     = Adapter()
-  val gather_pe_core   = Ge()
-  val pecore_array     = new Array[Pe](config.core_num)
-  val pe_update_reg    = new Array[PeUpdateReg](config.core_num)
-  val vertex_reg_A     = DualModeReg()
-  val vertex_reg_B     = DualModeReg()
-
-  val update_mem       = Mem(Bits(config.spmv_w * 32 bits), wordCount = 16) simPublic()
-  val update_ptr       = Reg(UInt(4 bits)) init 0
-  val pe_update_value  = Vec(SInt(config.spmv_w bits), 32)
-  val pe_bundle_wire   = Vec(Vec(SInt(config.spmv_w bits), config.core_num), 32)
-  val pe_update_bits   = Vec(pe_update_value.map(_.asBits))
+  val swap_done         = Reg(Bool())  init False
+  val swap              = Reg(Bool())  init True
+  val pe_busy           = Vec(Bool(), config.core_num)
+  val last_cb           = Reg(Bool())  init False
+  val pe_rdy_table_all  = Vec(Vec(Bool(), config.thread_num),config.core_num)
+  val all_zero          = Vec(Bool(), config.core_num)
+  val update_ptr        = Reg(UInt(4 bits)) init 0
+  val pe_update_value   = Vec(SInt(config.spmv_w bits), 32)
+  val pe_bundle_wire    = Vec(Vec(SInt(config.spmv_w bits), config.core_num), 32)
+  val pe_update_bits    = Vec(pe_update_value.map(_.asBits))
 
   for (i <- 0 until config.core_num) {
-    pecore_array(i) = Pe().setName("pe_" + i.toString)
+    pe_array(i) = Pe().setName("pe_" + i.toString)
     pe_update_reg(i) = PeUpdateReg().setName("pe_update_reg_" + i.toString)
   }
 
@@ -63,52 +61,52 @@ case class P8Top() extends Component {
   //-----------------------------------------------------
 
   for (i <- 0 until config.core_num) {
-    high2low_cvt.io.in_edge_stream(i)           <> io.edge_stream(i)
-    pe_busy(i)                                  <> pecore_array(i).io_state.pe_busy
-    pecore_array(i).io_global_reg.vertex_stream <> io.vertex_stream_pe(i)
-    pecore_array(i).io_state.last_update        <> io.last_cb
-    pecore_array(i).io_state.all_zero           <> all_zero(i)
-    pecore_array(i).io_state.swap_done          <> swap_done
+    adapter.io.in_edge_stream(i)           <> io.edge_stream(i)
+    pe_busy(i)                                  <> pe_array(i).io_state.pe_busy
+    pe_array(i).io_global_reg.vertex_stream <> io.vertex_stream_pe(i)
+    pe_array(i).io_state.last_update        <> io.last_cb
+    pe_array(i).io_state.all_zero           <> all_zero(i)
+    pe_array(i).io_state.swap_done          <> swap_done
     io.pe_rdy_table(i)                          := pe_rdy_table_all(i).orR
-    all_zero(i)                                 := high2low_cvt.io.all_zero(i)
+    all_zero(i)                                 := adapter.io.all_zero(i)
 
     for (j <- 0 until config.thread_num) {
-      pe_rdy_table_all(i)(j)              <> pecore_array(i).io_fifo.pe_fifo(j).ready
-      pecore_array(i).io_fifo.pe_fifo(j)  <> high2low_cvt.io.out_edge_stream(i)(j)
-      pe_update_reg(i).io.wr_addr(j)      <> pecore_array(i).io_update.wr_addr(j)
-      pe_update_reg(i).io.wr_valid(j)     <> pecore_array(i).io_update.wr_valid(j)
-      pe_update_reg(i).io.wr_data(j)      <> pecore_array(i).io_update.wr_data(j)
-      pe_update_reg(i).io.rd_addr(j)      <> pecore_array(i).io_update.rd_addr(j)
-      pe_update_reg(i).io.rd_data(j)      <> pecore_array(i).io_update.rd_data(j)
+      pe_rdy_table_all(i)(j)              <> pe_array(i).io_fifo.pe_fifo(j).ready
+      pe_array(i).io_fifo.pe_fifo(j)  <> adapter.io.out_edge_stream(i)(j)
+      pe_update_reg(i).io.wr_addr(j)      <> pe_array(i).io_update.wr_addr(j)
+      pe_update_reg(i).io.wr_valid(j)     <> pe_array(i).io_update.wr_valid(j)
+      pe_update_reg(i).io.wr_data(j)      <> pe_array(i).io_update.wr_data(j)
+      pe_update_reg(i).io.rd_addr(j)      <> pe_array(i).io_update.rd_addr(j)
+      pe_update_reg(i).io.rd_data(j)      <> pe_array(i).io_update.rd_data(j)
     }
-    pe_update_reg(i).io.wr_tag      <> pecore_array(i).io_update.wr_tag
-    pe_update_reg(i).io.rd_tag      <> pecore_array(i).io_update.rd_tag
+    pe_update_reg(i).io.wr_tag      <> pe_array(i).io_update.wr_tag
+    pe_update_reg(i).io.rd_tag      <> pe_array(i).io_update.rd_tag
     pe_update_reg(i).io.srst        <> swap_done
     pe_update_reg(i).io.update_valid := io.update_busy
   }
-  gather_pe_core.io.swap_done         <> swap_done
-  vertex_reg_A.io.rd_addr             <> gather_pe_core.io.rd_addr
-  vertex_reg_B.io.rd_addr             <> gather_pe_core.io.rd_addr
+  ge.io.swap_done         <> swap_done
+  vertex_reg_A.io.rd_addr             <> ge.io.rd_addr
+  vertex_reg_B.io.rd_addr             <> ge.io.rd_addr
   vertex_reg_A.io.in_stream.valid     := Mux(swap, io.vertex_stream_ge.valid , False)
   vertex_reg_A.io.in_stream.payload   := Mux(swap, io.vertex_stream_ge.payload,  B(0))
   vertex_reg_B.io.in_stream.valid     := Mux(!swap, io.vertex_stream_ge.valid, False)
   vertex_reg_B.io.in_stream.payload   := Mux(!swap, io.vertex_stream_ge.payload, B(0))
-  gather_pe_core.io.vertex_rd_data    := Mux(!swap, vertex_reg_A.io.rd_data, vertex_reg_B.io.rd_data)
+  ge.io.vertex_rd_data    := Mux(!swap, vertex_reg_A.io.rd_data, vertex_reg_B.io.rd_data)
   io.vertex_stream_ge.ready           := Mux(swap, vertex_reg_A.io.in_stream.ready,  vertex_reg_B.io.in_stream.ready)
-  io.ge_busy                          := !gather_pe_core.io.gather_pe_done
+  io.ge_busy                          := !ge.io.gather_pe_done
 
-  gather_pe_core.io.qsb_cfg <> io.qsb_cfg
-  gather_pe_core.io.itr_cnt <> io.itr_cnt
+  ge.io.qsb_cfg <> io.qsb_cfg
+  ge.io.itr_cnt <> io.itr_cnt
   //-----------------------------------------------------
   // Other Logic
   //-----------------------------------------------------
 
-  for (i <- 0 until 4) {
+  for (i <- 0 until config.core_num) {
     pe_update_reg(i).io.update_ptr := update_ptr
   }
 
   for (i <- 0 until 32) {
-    for (j <- 0 until 4){
+    for (j <- 0 until config.core_num){
       pe_bundle_wire(i)(j) := pe_update_reg(j).io.mem_wire(i)
     }
     pe_update_value(i) := pe_bundle_wire(i).reduceBalancedTree(_ + _)
@@ -120,10 +118,12 @@ case class P8Top() extends Component {
     data    = pe_update_bits.reverse.reduce(_ ## _)
   )
 
-  io.writeback_payload            <> gather_pe_core.io.writeback_payload
-  io.writeback_valid              <> gather_pe_core.io.writeback_valid
-  io.pe_busy                      <> pe_busy
-  gather_pe_core.io.spmv_result   := update_mem.readAsync(gather_pe_core.io.rd_addr)
+  io.writeback_payload    <> ge.io.writeback_payload
+  io.writeback_valid      <> ge.io.writeback_valid
+  io.pe_busy              <> pe_busy
+
+  // TODO revise here
+  ge.io.spmv_result       := update_mem.readAsync(ge.io.rd_addr) ## update_mem.readAsync(ge.io.rd_addr)
 
   //-----------------------------------------------------
   // State Machine

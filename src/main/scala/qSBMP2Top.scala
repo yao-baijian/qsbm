@@ -8,9 +8,13 @@ import spinal.lib.bus.amba4.axi.{Axi4, Axi4Config}
 import spinal.lib.{master, slave}
 import spinal.lib.bus.amba4.axilite.{AxiLite4, AxiLite4Config}
 
-case class qSBMZ2Top() extends Component{
+case class qSBMP2Top() extends Component{
 
   val config = Config
+
+  config.core_num   = 2
+  config.axi_width  = 256
+  config.ge_thread  = 16
 
   val io = new Bundle {
     val topAxiMemControlPort  = master(Axi4(Axi4Config(addressWidth = 32, dataWidth = config.axi_width, idWidth = 4)))
@@ -25,7 +29,7 @@ case class qSBMZ2Top() extends Component{
   axiLiteRename(io.topAxiLiteSlave,  "S00_AXI_")
 
   val ctrl_reg    = AxiLiteReg()
-  val dispatcher  = DispatcherZ2()
+  val dispatcher  = DispatcherP2()
   val pe_top      = pe.P2Top()
 
   // top axi
@@ -51,7 +55,7 @@ case class qSBMZ2Top() extends Component{
   pe_top.io.last_cb                   := dispatcher.io.RB_switch
 
   for(i<-0 until config.core_num){
-    dispatcher.io.pe_busy(i)      := pe_top.io.pe_busy(i)
+    dispatcher.io.pe_busy(i)                := pe_top.io.pe_busy(i)
     pe_top.io.vertex_stream_pe(i).payload   := dispatcher.io.vex2pe(i).payload.data
     pe_top.io.vertex_stream_pe(i).valid     := dispatcher.io.vex2pe(i).valid
 

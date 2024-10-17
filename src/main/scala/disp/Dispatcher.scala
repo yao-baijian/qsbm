@@ -6,7 +6,6 @@ import spinal.lib.bus.amba4.axi.{Axi4, Axi4Config}
 import spinal.lib.tools.DataAnalyzer
 import spinal.lib.fsm._
 import cfg._
-import spinal.core.sim.SimDataPimper
 
 case class Axi2Stream() extends Bundle {
   val config  = Config
@@ -403,4 +402,5 @@ case class Dispatcher() extends Component {
     io.axiMemControlPort.ar.payload.addr  := addr
   }
 
-}//end of component
+}
+

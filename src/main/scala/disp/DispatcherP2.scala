@@ -7,7 +7,7 @@ import spinal.lib.tools.DataAnalyzer
 import spinal.lib.fsm._
 import cfg._
 
-case class DispatcherZ2() extends Component {
+case class DispatcherP2() extends Component {
 
   val config    = Config
   val axiConfig = Axi4Config( addressWidth = config.addrWid, dataWidth = config.axi_width, idWidth = config.idWid)
@@ -112,7 +112,14 @@ case class DispatcherZ2() extends Component {
   io.axiMemControlPort.aw.valid         := io.wb_valid
 
   io.axiMemControlPort.w.payload.data   := io.wb_payload
-  io.axiMemControlPort.w.strb 			    := B"32'hffff_ffff"
+
+  if (config.axi_width == 256) {
+    io.axiMemControlPort.w.strb 			    := B"32'hffff_ffff"
+  } else if (config.axi_width == 512) {
+    io.axiMemControlPort.w.strb 			    := B"64'hffff_ffff_ffff_ffff"
+  } else if (config.axi_width == 1024) {
+    io.axiMemControlPort.w.strb 			    := B"128'hffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff"
+  }
 
   io.axiMemControlPort.ar.payload.prot 	:= B"3'b000"
   io.axiMemControlPort.ar.payload.size 	:= U"3'b110" // 64 bytes(512b) in a transfer

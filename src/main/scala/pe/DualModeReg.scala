@@ -13,7 +13,7 @@ case class DualModeReg() extends Component{
 
     val io = new Bundle{
         val in_stream   = slave Stream(Bits(config.axi_width bits))
-        val rd_addr     = in UInt (4 bits)
+        val rd_addr     = in UInt (config.ram_addr_width bits)
         val rd_data     = out Bits (config.axi_width bits)
     }
 
@@ -21,14 +21,13 @@ case class DualModeReg() extends Component{
     // Module Declaration
     //-----------------------------------------------------
 
-    val vertex_mem  = Mem(Bits(config.axi_width bits), 16)
-    val wr_pointer  = Reg(UInt(4 bits))  init 0
-//    val ready       = Reg(Bool())               init True
+    val vertex_mem  = Mem(Bits(config.axi_width bits), config.ram_depth)
+    val wr_pointer  = Reg(UInt(config.ram_addr_width bits))  init 0
     io.in_stream.ready := True
 
-    when(io.in_stream.valid && wr_pointer =/= 15 ) {
+    when(io.in_stream.valid && wr_pointer =/= config.ram_depth - 1 ) {
         wr_pointer := wr_pointer + 1
-    } elsewhen (wr_pointer === 15) {
+    } elsewhen (wr_pointer === config.ram_depth - 1) {
         wr_pointer := 0
     }
 

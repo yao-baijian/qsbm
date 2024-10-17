@@ -7,7 +7,7 @@ import scala.collection.mutable.{Seq, _}
 import scala.sys.process._
 import scala.math._
 
-class Z2Sim extends TestBase {
+class P2Sim extends TestBase {
 
   object MySpinalConfig extends SpinalConfig(
 
@@ -21,19 +21,19 @@ class Z2Sim extends TestBase {
   )
 
   val simConfig     = SpinalSimConfig(_spinalConfig = MySpinalConfig)
-  val simulator     = "Verilator"
+  val simulator     = "Xsim"
   val compiled      = simulator match {
     case "Verilator" =>
       simConfig
         .workspacePath("build/VsimWorkspace")
         .withWave
-        .compile(qSBMZ2Top())
+        .compile(qSBMP2Top())
     case "Iverilog" =>
       simConfig
         .workspacePath("build/IsimWorkspace")
         .withWave
         .withIVerilog
-        .compile(qSBMZ2Top())
+        .compile(qSBMP2Top())
     case "Xsim" =>
       simConfig
         .workspacePath("build/XsimWorkspace")
@@ -41,7 +41,7 @@ class Z2Sim extends TestBase {
         .withXSim
         //        .withXilinxDevice("xcu280-fsvh2892-2L-e")
         .withXilinxDevice("xczu7ev-ffvc1156-2-e")
-        .compile(qSBMZ2Top())
+        .compile(qSBMP2Top())
     case _ =>
       throw new IllegalArgumentException("Unsupported simulator")
   }

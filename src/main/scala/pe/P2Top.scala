@@ -12,7 +12,7 @@ case class P2Top() extends Component {
 
   val config = Config
 
-  config.core_num = 2
+
 
   val io = new Bundle {
     val last_cb             = in Bool()
@@ -40,18 +40,16 @@ case class P2Top() extends Component {
   val last_cb          = Reg(Bool())  init False
   val pe_rdy_table_all = Vec(Vec(Bool(), config.thread_num),config.core_num)
   val all_zero         = Vec(Bool(), config.core_num)
-
   val high2low_cvt     = Adapter()
   val gather_pe_core   = Ge()
   val pecore_array     = new Array[Pe](config.core_num)
   val pe_update_reg    = new Array[PeUpdateReg](config.core_num)
   val vertex_reg_A     = DualModeReg()
   val vertex_reg_B     = DualModeReg()
-
-  val update_mem       = Mem(Bits(config.spmv_w * 32 bits), wordCount = 16) simPublic()
-  val update_ptr       = Reg(UInt(4 bits)) init 0
-  val pe_update_value  = Vec(SInt(config.spmv_w bits), 32)
-  val pe_bundle_wire   = Vec(Vec(SInt(config.spmv_w bits), config.core_num), 32)
+  val update_mem       = Mem(Bits(config.spmv_w * config.ge_thread bits), wordCount = config.ram_depth) simPublic()
+  val update_ptr       = Reg(UInt(config.ram_addr_width bits)) init 0
+  val pe_update_value  = Vec(SInt(config.spmv_w bits), config.ge_thread)
+  val pe_bundle_wire   = Vec(Vec(SInt(config.spmv_w bits), config.core_num), config.ge_thread)
   val pe_update_bits   = Vec(pe_update_value.map(_.asBits))
 
   for (i <- 0 until config.core_num) {
@@ -82,10 +80,11 @@ case class P2Top() extends Component {
       pe_update_reg(i).io.rd_addr(j)      <> pecore_array(i).io_update.rd_addr(j)
       pe_update_reg(i).io.rd_data(j)      <> pecore_array(i).io_update.rd_data(j)
     }
-    pe_update_reg(i).io.wr_tag      <> pecore_array(i).io_update.wr_tag
-    pe_update_reg(i).io.rd_tag      <> pecore_array(i).io_update.rd_tag
-    pe_update_reg(i).io.srst        <> swap_done
-    pe_update_reg(i).io.update_valid := io.update_busy
+    pe_update_reg(i).io.wr_tag        <> pecore_array(i).io_update.wr_tag
+    pe_update_reg(i).io.rd_tag        <> pecore_array(i).io_update.rd_tag
+    pe_update_reg(i).io.srst          <> swap_done
+    pe_update_reg(i).io.update_valid  := io.update_busy
+    pe_update_reg(i).io.update_ptr    := update_ptr
   }
   gather_pe_core.io.swap_done         <> swap_done
   vertex_reg_A.io.rd_addr             <> gather_pe_core.io.rd_addr
@@ -104,12 +103,8 @@ case class P2Top() extends Component {
   // Other Logic
   //-----------------------------------------------------
 
-  for (i <- 0 until 4) {
-    pe_update_reg(i).io.update_ptr := update_ptr
-  }
-
-  for (i <- 0 until 32) {
-    for (j <- 0 until 4){
+  for (i <- 0 until config.ge_thread) {
+    for (j <- 0 until config.core_num){
       pe_bundle_wire(i)(j) := pe_update_reg(j).io.mem_wire(i)
     }
     pe_update_value(i) := pe_bundle_wire(i).reduceBalancedTree(_ + _)

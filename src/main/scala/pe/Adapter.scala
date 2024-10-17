@@ -11,9 +11,9 @@ case class Adapter() extends Component {
     val config = Config
 
     val io = new Bundle {
-        val in_edge_stream = Vec(slave Stream (Bits(config.axi_width bits)), config.core_num)
+        val in_edge_stream  = Vec(slave Stream (Bits(config.axi_width bits)), config.core_num)
         val out_edge_stream = Vec(Vec(master Stream (Bits(config.data_width bits)), config.thread_num), config.core_num)
-        val all_zero     = out Vec(Bool(), config.core_num)
+        val all_zero        = out Vec(Bool(), config.core_num)
     }
     //-----------------------------------------------------
     // Module Declaration
@@ -23,12 +23,12 @@ case class Adapter() extends Component {
     val all_zero_ff         = Vec(Reg(Bool()) init True ,config.core_num)
     val ready_table         = Vec(Vec(Bool(),config.thread_num),config.core_num)
     val ready_reg           = Vec(Reg(Bool()) init True ,config.core_num)
-    val all_zero_inval         = Vec(Bool(),config.core_num)
+    val all_zero_inval      = Vec(Bool(),config.core_num)
     //-----------------------------------------------------
     // Module Instantiation
     //-----------------------------------------------------
     for (i <- 0 until config.core_num) {
-        edge_convert_fifo(i)= StreamFifo(Bits(config.axi_width bits), config.fifo_depth_1024)
+        edge_convert_fifo(i)= StreamFifo(Bits(config.axi_width bits), 1024)
         counter_group(i)    = Counter(0 until config.core_num )
         counter_group(i).setName("Counter_" + i.toString)
     }
@@ -49,7 +49,7 @@ case class Adapter() extends Component {
         when (counter_group(i).value === 0)  {
             ready_reg(i) := ready_table(i).andR
         }
-        edge_convert_fifo(i).io.pop.ready   := ready_reg(i) && (counter_group(i).value === 3)
+        edge_convert_fifo(i).io.pop.ready   := ready_reg(i) && (counter_group(i).value === config.core_num - 1)
         when(!edge_convert_fifo(i).io.pop.valid) {
             counter_group(i).clear()
         } otherwise {
@@ -66,7 +66,7 @@ case class Adapter() extends Component {
             all_zero_ff(i) := True
         }
 
-        all_zero_inval(i) := (edge_convert_fifo(i).io.pop.valid && edge_convert_fifo(i).io.pop.payload.subdivideIn(config.pe_width bits)((counter_group(i).value + 1).resize(2)) === 0) ? False | True
+        all_zero_inval(i) := (edge_convert_fifo(i).io.pop.valid && edge_convert_fifo(i).io.pop.payload.subdivideIn(config.pe_width bits)((counter_group(i).value + 1).resize(log2Up(config.core_num))) === 0) ? False | True
     }
 }
 

@@ -19,7 +19,7 @@ case class Ge() extends Component {
     val gather_pe_done      = out Bool() setAsReg() init True
     val writeback_valid     = out Bool()
     val writeback_payload   = out Bits(config.axi_width bits) setAsReg() init 0
-    val rd_addr             = out UInt (4 bits) setAsReg() init 0
+    val rd_addr             = out UInt (config.ram_addr_width bits) setAsReg() init 0
     val itr_cnt             = in  UInt (16 bits)
     val qsb_cfg 		        = slave(qsbConfig())
   }
