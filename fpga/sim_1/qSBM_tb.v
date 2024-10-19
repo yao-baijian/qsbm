@@ -20,7 +20,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module SboomTop_tb(
+module qSBM_tb(
     );
     wire          tb_M00_AXI_AWVALID;
     reg          	tb_M00_AXI_AWREADY;
@@ -92,7 +92,7 @@ module SboomTop_tb(
     reg          	tb_clk;
     reg          	tb_reset;
   
-SboomTop dut(
+  qSBM dut(
 	.M00_AXI_AWVALID(tb_M00_AXI_AWVALID),
 	.M00_AXI_AWREADY(tb_M00_AXI_AWREADY),
 	.M00_AXI_AWADDR(tb_M00_AXI_AWADDR),

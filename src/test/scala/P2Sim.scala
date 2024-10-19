@@ -6,6 +6,7 @@ import test._
 import scala.collection.mutable.{Seq, _}
 import scala.sys.process._
 import scala.math._
+import java.nio.file.Paths
 
 class P2Sim extends TestBase {
 
@@ -19,6 +20,7 @@ class P2Sim extends TestBase {
     targetDirectory     = "fpga/target",
     oneFilePerComponent = false
   )
+
 
   val simConfig     = SpinalSimConfig(_spinalConfig = MySpinalConfig)
   val simulator     = "Xsim"
@@ -45,6 +47,8 @@ class P2Sim extends TestBase {
     case _ =>
       throw new IllegalArgumentException("Unsupported simulator")
   }
+
+  val syn_impl      = true
 
   test("Z2Sim") {
     compiled
@@ -94,6 +98,28 @@ class P2Sim extends TestBase {
 
         dut.clockDomain.waitSampling(200)
 
+        val projectPath = Paths.get(".").toAbsolutePath.normalize.toString.replace("\\", "/")
+        val ip_tcl_path = projectPath + "/fpga/package_ip.tcl"
+
+//        if (syn_impl) {
+//          println("Vivado Package IP called")
+//          val vivadoCmd       = Seq("sh", "-c", "'vivado, -mode, batch, -source, " + ip_tcl_path + "'").!!
+//          val processBuilder  = Process(vivadoCmd)
+//          val logger          = ProcessLogger(line => println(line))
+//          val process         = processBuilder.run(logger)
+//          val logger    = ProcessLogger(line => println(line))
+//          val process   = vivadoCmd.run(logger)
+//          process.exitValue()
+//        }
+
+//        if (syn_impl) {
+//          println("Vivado Block Design Flow called")
+//          val vivadoCmd = Seq("vivado", "-mode", "batch", "-source", "fpga/block_design.tcl").!!
+//          val logger    = ProcessLogger(line => println(line))
+//          val process   = vivadoCmd.run(logger)
+//          process.exitValue()
+//        }
+
         val ai_init = 1.0
         val ai_incr = 1.0 / num_iter
         val xi      = 0.7 / sqrt(matrix_size)
@@ -103,10 +129,13 @@ class P2Sim extends TestBase {
         // start
         sbm_start(axiLite)
 
+        dut.clockDomain.waitSampling(2000)
+
         @volatile var timeoutOccurred = false
 
         val timeout_thread = fork {
-          dut.clockDomain.waitSampling(20000)
+          dut.clockDomain.waitSampling(2000)
+
           timeoutOccurred = true
           if (!dut.io.done.toBoolean) {
             simFailure("Simulation timed out")
@@ -142,7 +171,7 @@ class P2Sim extends TestBase {
           x_y_comp_dbg_thread.join()
         }
 
-        timeout_thread.join()
+//        timeout_thread.join()
       }
   }
 }

@@ -22,7 +22,7 @@ class TopSim extends TestBase {
   )
 
   val simConfig     = SpinalSimConfig(_spinalConfig = MySpinalConfig)
-  val simulator     = "Verilator"
+  val simulator     = "Xsim"
   val compiled      = simulator match {
     case "Verilator" =>
       simConfig
@@ -107,7 +107,7 @@ class TopSim extends TestBase {
       @volatile var timeoutOccurred = false
 
       val timeout_thread = fork {
-        dut.clockDomain.waitSampling(20000)
+        dut.clockDomain.waitSampling(2000)
         timeoutOccurred = true
         if (!dut.io.done.toBoolean) {
           simFailure("Simulation timed out")

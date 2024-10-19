@@ -1,7 +1,7 @@
 # package new ip
-ipx::package_project -root_dir D:/study/PG/qsbm/build/XsimWorkspace/qSBMP2Top/ip -vendor xilinx.com -library user -taxonomy /UserIP -import_files -set_current false
-ipx::unload_core d:/study/PG/qsbm/build/XsimWorkspace/qSBMP2Top/ip/component.xml
-ipx::edit_ip_in_project -upgrade true -name tmp_edit_project -directory D:/study/PG/qsbm/build/XsimWorkspace/qSBMP2Top/ip d:/study/PG/qsbm/build/XsimWorkspace/qSBMP2Top/ip/component.xml
+ipx::package_project -root_dir $project_root/build/XsimWorkspace/$design_name/ip -vendor xilinx.com -library user -taxonomy /UserIP -import_files -set_current false
+ipx::unload_core $project_root/build/XsimWorkspace/$design_name/ip/component.xml
+ipx::edit_ip_in_project -upgrade true -name tmp_edit_project -directory $project_root/build/XsimWorkspace/$design_name/ip $project_root/build/XsimWorkspace/$design_name/ip/component.xml
 update_compile_order -fileset sources_1
 
 # set ignore freq_hz
@@ -76,5 +76,5 @@ ipx::check_integrity [ipx::current_core]
 ipx::save_core [ipx::current_core]
 ipx::move_temp_component_back -component [ipx::current_core]
 close_project -delete
-set_property  ip_repo_paths  d:/study/PG/qsbm/build/XsimWorkspace/qSBMP2Top/ip [current_project]
+set_property  ip_repo_paths  $project_root/build/XsimWorkspace/$design_name/ip [current_project]
 update_ip_catalog
