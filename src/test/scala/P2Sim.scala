@@ -115,7 +115,7 @@ class P2Sim extends TestBase {
 //        if (syn_impl) {
 //          println("Vivado Block Design Flow called")
 //          val vivadoCmd = Seq("vivado", "-mode", "batch", "-source", "fpga/block_design.tcl").!!
-//          val logger    = ProcessLogger(line => println(line))
+//          val logger    = ProcessLogger(line => pri ntln(line))
 //          val process   = vivadoCmd.run(logger)
 //          process.exitValue()
 //        }

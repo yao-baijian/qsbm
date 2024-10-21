@@ -1867,3 +1867,4 @@ set_property PACKAGE_PIN A33      [get_ports "FMCP_HSPC_DP11_C2M_P"] ;# Bank 131
 #Other net   PACKAGE_PIN Y33      - MGTAVCC                   Bank 999 - MGTAVCC_L
 #Other net   PACKAGE_PIN R31      - MGT1V8                    Bank 999 - MGTVCCAUX_L
 #Other net   PACKAGE_PIN U31      - MGT1V8                    Bank 999 - MGTVCCAUX_L
+

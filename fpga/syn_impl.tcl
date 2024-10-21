@@ -1,7 +1,3 @@
-# add constraints
-add_files -fileset constrs_1 -norecurse $project_root/fpga/constrs_1/ZCU111_Rev1.0.xdc 
-add_files -fileset constrs_1 -norecurse $project_root/fpga/constrs_1/sboom_timing.xdc
-
 # synthesis design
 synth_design -top design_1
 
