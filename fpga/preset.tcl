@@ -19,4 +19,4 @@ add_files -fileset sim_1 $project_root/fpga/sim_1/qSBM_tb.v
 
 # add constraints
 add_files -fileset constrs_1 -norecurse $project_root/fpga/constrs_1/ZCU111_Rev1.0.xdc 
-add_files -fileset constrs_1 -norecurse $project_root/fpga/constrs_1/sboom_timing.xdc
+add_files -fileset constrs_1 -norecurse $project_root/fpga/constrs_1/qsbm.xdc

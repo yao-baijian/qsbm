@@ -29,7 +29,6 @@ case class qSBMTop() extends Component{
     val dispatcher  = Dispatcher()
     val pe_top      = pe.P4Top()
 
-
     // top axi
     io.topAxiMemControlPort << dispatcher.io.axiMemControlPort
     io.done := dispatcher.io.done

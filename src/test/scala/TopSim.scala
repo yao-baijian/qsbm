@@ -22,7 +22,7 @@ class TopSim extends TestBase {
   )
 
   val simConfig     = SpinalSimConfig(_spinalConfig = MySpinalConfig)
-  val simulator     = "Verilator"
+  val simulator     = "Xsim"
   val compiled      = simulator match {
     case "Verilator" =>
       simConfig

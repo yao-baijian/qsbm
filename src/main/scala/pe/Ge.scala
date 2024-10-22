@@ -24,9 +24,10 @@ case class Ge() extends Component {
     val qsb_cfg 		        = slave(qsbConfig())
   }
 
-  val ai_init, ai_incr    = SFix(16 exp, 32 bits)
-  val xi, ai              = SFix(16 exp, 32 bits)
-  val itr_cnt             = SFix(0  exp, 16 bits)
+  val ai_incr             = SFix(16 exp, 32 bits)
+  val xi                  = SFix(16 exp, 32 bits)
+  val ai                  = Reg(SFix(16 exp, 32 bits)) init 0
+  val itr_cnt             = Reg(SFix(0  exp, 16 bits)) init 0
   val h1_valid            = Reg(Bool()) init False
   val spmv_result         = Stageable(Vec(SFix(0 exp, config.spmv_w bits), config.ge_thread))
   val y_old, x_old        = Stageable(Vec(SFix(0 exp, config.xy_width bits), config.ge_thread))
@@ -35,11 +36,18 @@ case class Ge() extends Component {
   val x_new_clp, y_new_clp= Stageable(Vec(SInt(config.xy_width bits), config.ge_thread))
   val gather_pe_busy      = Reg(Bool()) init False
 
-  ai_init.raw         := io.qsb_cfg.ai_init.asSInt
-  ai_incr.raw         := io.qsb_cfg.ai_incr.asSInt
-  xi.raw              := io.qsb_cfg.xi.asSInt
-  itr_cnt.raw         := io.itr_cnt.asSInt
-  ai                  := (ai_incr * itr_cnt - ai_init).truncated(16 exp, 32 bits)
+  ai_incr.raw  := io.qsb_cfg.ai_incr.asSInt
+  xi.raw       := io.qsb_cfg.xi.asSInt
+
+  when(True) {
+    itr_cnt.raw  := io.itr_cnt.asSInt
+  }
+
+  when (io.itr_cnt === 0) {
+    ai.raw  := io.qsb_cfg.ai_init.asSInt
+  } elsewhen (itr_cnt.raw =/= io.itr_cnt.asSInt) {
+    ai      := (ai_incr + ai).truncated(16 exp, 32 bits)
+  }
 
   val ge_fsm = new StateMachine {
 
