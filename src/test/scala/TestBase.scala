@@ -8,13 +8,14 @@ import spinal.lib.bus.amba4.axi.sim.AxiMemorySim
 import spinal.lib.bus.amba4.axilite.sim.AxiLite4Driver
 import cfg._
 import spinal.core.sim._
+import spinal.core.log2Up
 
 class TestBase extends AnyFunSuite {
 
   val typ           = "scaleup"
   val num_iter      = 100
   val cmp_type      = "bsb"
-  val filename      = "Gset/G34"
+  var filename      = "Gset/G34"
   val bestknown     = 2054
   val RB_length     = 512.0
   val tile_xy       = 64
@@ -223,6 +224,12 @@ class TestBase extends AnyFunSuite {
     CB_list.enqueue(CB_init)
     CB_length.enqueue(CB_length_init)
 
+    println("*" * 30)
+    println(s"Graph: ${filename}")
+    println(s"CB number: ${CB_list.length}")
+    println(s"Expect vertex transfer (512 width): ${CB_list.length * 2}")
+    val cb_transfer_cycle = CB_list.length * 2
+
     log_dbg(dbg_option, ("RB_init", RB_init), ("CB_init", CB_init) , ("CB_length", CB_length))
 
     for (base <- 0 until  arrayWidth by Config.pe_thread) {
@@ -268,6 +275,11 @@ class TestBase extends AnyFunSuite {
       }
     }
 
+    println(s"expect edge transfer: ${ceil(edges_new.length/64.0)}")
+    val edge_transfer_cycle = ceil(edges_new.length/64.0)
+    println(s"efficiency: ${edge_transfer_cycle / (edge_transfer_cycle + cb_transfer_cycle)}")
+    println("*" * 30)
+
     val fos = new FileOutputStream("build/edge.bin")
     val dos = new DataOutputStream(fos)
     for (d <- edges_new) {
@@ -276,6 +288,174 @@ class TestBase extends AnyFunSuite {
     dos.close()
 
     (RB_init, CB_init, CB_length_init, edges_new.toArray)
+  }
+
+  def performanceModeling(filename: String, tile_xy: Int) = {
+
+    val firstLine   = Source.fromFile(filename).getLines().next()
+    val firFields   = firstLine.split(' ')
+    val arrayWidth  = scala.math.ceil(parseUnsignedLong(firFields(0)).toDouble / tile_xy).toInt
+    val blocks      = Array.ofDim[ArrayBuffer[Byte]](arrayWidth, arrayWidth)
+
+    for (row <- 0 until arrayWidth) {
+      for (col <- 0 until (arrayWidth)) {
+        blocks(row)(col) = ArrayBuffer[Byte]()
+      }
+    }
+
+    val remainLines = Source.fromFile(filename).getLines().drop(1)
+
+    for (line <- remainLines) {
+
+      val row   = parseUnsignedLong(line.split(' ')(0)) - 1
+      val col   = parseUnsignedLong(line.split(' ')(1)) - 1
+      // J = -J
+      val value = -parseLong(line.split(' ')(2))
+
+      //  edge     = | row : col : value | = | 6 : 6 : 4 |    <--->     | 8 : 8 |
+      //  val edge = ((row - 1) & 0x3F << 10) | (col - 1 & 0x3F << 6 ) | value & ((1 << 4) - 1)
+      val edge    = ((row & 0x3F) << 10) | ((col & 0x3F) << 4) | value & 0xF
+      val edge_t  = ((col & 0x3F) << 10) | ((row & 0x3F) << 4) | value & 0xF
+
+      val block_row = (row / tile_xy).toInt
+      val block_col = (col / tile_xy).toInt
+
+      val edgeBytes = ArrayBuffer[Byte]( edge.toByte, (edge >>> 8).toByte)
+      val edge_t_Bytes = ArrayBuffer[Byte]( edge_t.toByte, (edge_t >>> 8).toByte)
+
+      // J = (J.T + J)
+      // TODO need check here
+
+      blocks(block_row)(block_col) ++= edgeBytes
+      blocks(block_col)(block_row) ++= edge_t_Bytes
+    }
+
+    val edges_new           = ArrayBuffer[Byte]()
+    val CB_last_non_empty_tile  = Queue[Int]()
+    val RB_last_non_empty_CB    = Queue[Int]()
+    val CB_length           = Queue[Int]()
+    val CB_list             = Queue[Int]()
+    val RB_list             = Queue[Int]()
+    var non_empty_tile      = false
+    var non_empty_CB        = false
+    var last_non_empty_tile = 0
+    var last_non_empty_CB   = 0
+    var RB_init             = 0
+    var CB_init             = 0
+    var next_CB             = 0
+    var next_RB             = 0
+    var next_CB_length      = 0
+    var CB_length_128       = 0
+    var CB_length_init      = 0
+
+    // RB
+    for (base <- 0 until  arrayWidth by Config.pe_thread) {
+      // CB
+      last_non_empty_CB = 0
+      non_empty_CB = false
+
+      for (col <- 0 until arrayWidth) {
+        non_empty_tile = false
+        CB_length_128  = 0
+        for (offset <- 0 until Config.pe_thread) {
+          if (base + offset <= arrayWidth - 1) {
+            if (blocks(base + offset)(col).nonEmpty) {
+              last_non_empty_tile = offset + 1
+              CB_length_128 += ceil((blocks(base + offset)(col).length + 6) / 16.0).toInt // 5 byte for header
+              non_empty_tile = true
+            }
+          }
+        }
+
+        if (non_empty_tile) {
+          if (CB_length_128 % 4 == 0) {
+            CB_length += CB_length_128 / 4 + 1
+          } else {
+            CB_length += floor(CB_length_128 / 4.0).toInt + 1
+          }
+          CB_list += col + 1
+          CB_last_non_empty_tile += last_non_empty_tile
+          non_empty_CB = true
+          last_non_empty_CB = col + 1
+        }
+      }
+
+      if (non_empty_CB) {
+        RB_list += floor(base / 8).toInt + 1
+        RB_last_non_empty_CB += last_non_empty_CB
+      }
+    }
+
+    RB_init   = RB_list.dequeue()
+    CB_init   = CB_list.dequeue()
+    CB_length_init = CB_length.dequeue()
+
+    RB_list.enqueue(RB_init)
+    CB_list.enqueue(CB_init)
+    CB_length.enqueue(CB_length_init)
+
+    println("*" * 30)
+    println(s"Graph: ${filename}")
+    println(s"CB number: ${CB_list.length}")
+    println(s"Expect vertex transfer (512 width): ${CB_list.length * 2}")
+    val cb_transfer_cycle = CB_list.length * 2
+
+    for (base <- 0 until  arrayWidth by Config.pe_thread) {
+      last_non_empty_CB = 0
+      next_RB = 0
+      for (col <- 0 until arrayWidth) {
+        last_non_empty_tile = 0
+        next_CB = 0
+        next_CB_length = 0
+        for (offset <- 0 until Config.pe_thread) {
+          if (base + offset <= arrayWidth - 1) {
+            if (blocks(base + offset)(col).nonEmpty) {
+              if (last_non_empty_CB == 0) {
+                last_non_empty_CB = RB_last_non_empty_CB.dequeue()
+              }
+              if (last_non_empty_tile == 0) {
+                last_non_empty_tile = CB_last_non_empty_tile.dequeue()
+              }
+              if (col + 1 == last_non_empty_CB && offset + 1 == last_non_empty_tile && next_RB == 0) {
+                next_RB = RB_list.dequeue()
+                log_dbg(dbg_option, ("next_RB", next_RB))
+              }
+              if (offset + 1 == last_non_empty_tile && next_CB == 0) {
+                next_CB = CB_list.dequeue()
+                next_CB_length = CB_length.dequeue()
+              }
+
+              // TODO next_CB_length can not handle matrix elements more that 32 * 256
+              edges_new ++= ArrayBuffer[Byte](0.toByte, (offset + 1).toByte, next_RB.toByte, next_CB.toByte, next_CB_length.toByte, 0.toByte)
+              edges_new ++= blocks(base + offset)(col)
+
+              if (edges_new.length % 16 != 0) {
+                // padding to make a 128b packet
+                for (i <- 0 until 16 - edges_new.length % 16) {
+                  edges_new ++= ArrayBuffer[Byte](0.toByte)
+                }
+              }
+
+              // pad zeros for 512b alignment
+              if (last_non_empty_tile == offset + 1) {
+                for (i <- 0 until 64 - edges_new.length % 64) {
+                  val zero512 = ArrayBuffer[Byte](0.toByte)
+                  edges_new ++= zero512
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    println(s"expect edge transfer: ${ceil(edges_new.length/64.0)}")
+    val edge_transfer_cycle = ceil(edges_new.length/64.0)
+    println(s"efficiency: ${edge_transfer_cycle / (edge_transfer_cycle + cb_transfer_cycle)}")
+    val efficiency = edge_transfer_cycle / (edge_transfer_cycle + cb_transfer_cycle)
+    println("*" * 30)
+
+    efficiency
   }
 
   // Math API
